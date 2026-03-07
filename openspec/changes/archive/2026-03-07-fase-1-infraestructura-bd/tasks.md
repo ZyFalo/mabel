@@ -41,7 +41,7 @@
 - [x] 4.4 Ejecutar script de creación de BD: crear `mabel_ia` en PostgreSQL local
 - [x] 4.5 Generar migración inicial con `alembic revision --autogenerate -m "initial_schema_13_tables"`
 - [x] 4.6 Revisar migración generada: verificar 13 tablas, 102 columnas, 13 CHECK constraints, 16 FK (8 CASCADE + 7 SET NULL + 1 RESTRICT), 20 índices explícitos (4 parciales + 1 UNIQUE parcial), 7 UNIQUE. Ajustar manualmente lo que autogenerate no capture (especialmente CHECK constraints y partial indices)
-- [ ] 4.7 Aplicar migración: `alembic upgrade head` contra BD local
+- [x] 4.7 Aplicar migración: `alembic upgrade head` contra BD local
 - [x] 4.8 Verificar que las 13 tablas existen en `mabel_ia` con constraints correctos
 
 ## 5. Frontend scaffold (React + Vite)
@@ -60,4 +60,4 @@
 - [x] 6.2 Verificar frontend arranca: `npm run dev` muestra placeholder
 - [x] 6.3 Verificar linters: `ruff check backend/` y `npm run lint` pasan sin errores
 - [x] 6.4 Verificar BD: 13 tablas, 102 columnas, 16 FK, 13 CHECK, 20 índices, 7 UNIQUE en `mabel_ia`
-- [ ] 6.5 Commit final y push a GitHub con mensaje descriptivo
+- [x] 6.5 Commit final y push a GitHub con mensaje descriptivo
