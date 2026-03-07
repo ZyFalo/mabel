@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.routers.auth_router import router as auth_router
 from app.routers.consent_router import router as consent_router
+from app.routers.preference_router import router as preference_router
 from app.routers.report_router import router as report_router
 from app.routers.safety_event_router import router as safety_event_router
 from app.routers.session_router import router as session_router
@@ -23,6 +24,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(consent_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(preference_router, prefix="/api/v1")
 app.include_router(session_router, prefix="/api/v1")
 app.include_router(report_router, prefix="/api/v1")
 app.include_router(safety_event_router, prefix="/api/v1")

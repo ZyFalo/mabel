@@ -101,6 +101,21 @@ async def patch_consent(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="El scope es requerido para re-aceptar",
             )
+        if msg == "ALREADY_SOLO_USO":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="El scope ya es solo_uso",
+            )
+        if msg == "CONSENT_REVOKED":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede reducir scope de un consentimiento revocado",
+            )
+        if msg == "ALREADY_REVOKED":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="El consentimiento ya esta revocado",
+            )
         if msg == "UNSUPPORTED_ACTION":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

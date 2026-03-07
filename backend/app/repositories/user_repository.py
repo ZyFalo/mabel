@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -30,3 +30,8 @@ class UserRepository:
         if user:
             user.hashed_password = hashed_password
             await self.db.commit()
+
+    async def delete(self, user_id: uuid.UUID) -> bool:
+        result = await self.db.execute(delete(User).where(User.id == user_id))
+        await self.db.commit()
+        return result.rowcount > 0

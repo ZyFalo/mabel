@@ -4,7 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.repositories.password_reset_repository import PasswordResetRepository
 from app.repositories.user_repository import UserRepository
+from app.middleware.auth import get_current_user
+from app.models.user import User
 from app.schemas.auth import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
@@ -14,6 +17,7 @@ from app.schemas.auth import (
     TokenValidationResponse,
     UserResponse,
 )
+from app.services.account_service import AccountService
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -74,5 +78,30 @@ async def reset_password(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Este enlace ha expirado. Solicita uno nuevo.",
+            )
+        raise
+
+
+@router.put("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AccountService(UserRepository(db), db)
+    try:
+        await service.change_password(current_user, request.current_password, request.new_password)
+        return {"message": "Contrasena actualizada exitosamente"}
+    except ValueError as e:
+        msg = str(e)
+        if msg == "WRONG_PASSWORD":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Contrasena actual incorrecta",
+            )
+        if msg == "SAME_PASSWORD":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La nueva contrasena debe ser diferente a la actual",
             )
         raise

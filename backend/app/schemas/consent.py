@@ -12,6 +12,8 @@ class ScopeEnum(str, Enum):
 
 class ConsentActionEnum(str, Enum):
     re_accept = "re-accept"
+    reduce_scope = "reduce-scope"
+    revoke = "revoke"
 
 
 class AcceptConsentRequest(BaseModel):

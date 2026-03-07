@@ -78,6 +78,24 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("La contrasena debe tener al menos 8 caracteres")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("La contrasena debe tener al menos 1 mayuscula")
+        if not re.search(r"[0-9]", v):
+            raise ValueError("La contrasena debe tener al menos 1 numero")
+        if not re.search(r"[^a-zA-Z0-9]", v):
+            raise ValueError("La contrasena debe tener al menos 1 caracter especial")
+        return v
+
+
 class TokenValidationResponse(BaseModel):
     valid: bool
     reason: str | None = None

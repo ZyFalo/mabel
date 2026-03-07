@@ -64,6 +64,22 @@ class ConsentService:
             )
             return ConsentResponse.model_validate(consent)
 
+        if action == "reduce-scope":
+            if existing.revoked_at is not None:
+                raise ValueError("CONSENT_REVOKED")
+            if existing.scope == "solo_uso":
+                raise ValueError("ALREADY_SOLO_USO")
+            consent = await self.consent_repo.update(existing, scope="solo_uso")
+            return ConsentResponse.model_validate(consent)
+
+        if action == "revoke":
+            if existing.revoked_at is not None:
+                raise ValueError("ALREADY_REVOKED")
+            consent = await self.consent_repo.update(
+                existing, revoked_at=datetime.now(timezone.utc)
+            )
+            return ConsentResponse.model_validate(consent)
+
         raise ValueError("UNSUPPORTED_ACTION")
 
     async def get_consent_status(self, user_id: uuid.UUID) -> ConsentStatusResponse:

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import ConsentGuard from './guards/ConsentGuard'
+import OnboardingGuard from './guards/OnboardingGuard'
 import ProtectedRoute from './guards/ProtectedRoute'
 import PublicRoute from './guards/PublicRoute'
 import RoleGuard from './guards/RoleGuard'
@@ -17,11 +18,13 @@ import ConsentRequired from './pages/ConsentRequired'
 import ForgotPassword from './pages/ForgotPassword'
 import Home from './pages/Home'
 import Landing from './pages/Landing'
+import Onboarding from './pages/Onboarding'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
 import SessionDetail from './pages/SessionDetail'
 import SessionEnd from './pages/SessionEnd'
+import Settings from './pages/Settings'
 import { useAuthStore } from './stores/authStore'
 
 function AdminPlaceholder() {
@@ -87,11 +90,17 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<ConsentGuard />}>
             <Route element={<StudentLayout />}>
-              <Route path="/home" element={<Home />} />
-              <Route path="/session/:id/checkin" element={<CheckIn />} />
-              <Route path="/session/:id/chat" element={<Chat />} />
-              <Route path="/session/:id/end" element={<SessionEnd />} />
-              <Route path="/session/:id/detail" element={<SessionDetail />} />
+              {/* Onboarding: inside ConsentGuard, outside OnboardingGuard */}
+              <Route path="/onboarding" element={<Onboarding />} />
+              {/* All other student routes: require preferences (OnboardingGuard) */}
+              <Route element={<OnboardingGuard />}>
+                <Route path="/home" element={<Home />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/session/:id/checkin" element={<CheckIn />} />
+                <Route path="/session/:id/chat" element={<Chat />} />
+                <Route path="/session/:id/end" element={<SessionEnd />} />
+                <Route path="/session/:id/detail" element={<SessionDetail />} />
+              </Route>
             </Route>
           </Route>
         </Route>
