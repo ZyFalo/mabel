@@ -21,11 +21,13 @@ class ChatService:
         message_repo: MessageRepository,
         preference_repo: PreferenceRepository,
         llm: LLMProvider,
+        guardrails=None,
     ) -> None:
         self.session_repo = session_repo
         self.message_repo = message_repo
         self.preference_repo = preference_repo
         self.llm = llm
+        self.guardrails = guardrails
 
     async def create_session(self, user_id: uuid.UUID, topic_hint: str | None = None) -> tuple:
         prefs = await self.preference_repo.get_by_user_id(user_id)
@@ -97,7 +99,19 @@ class ChatService:
         prefs = await self.preference_repo.get_by_user_id(user_id)
         save_history = prefs.save_history if prefs else False
 
+        # Pre-filter guardrails
+        pre_risk = None
+        if self.guardrails:
+            pre_risk = await self.guardrails.pre_filter(content, session_id, user_id)
+            if pre_risk.get("risk_detected"):
+                yield f'{{"risk_detected": true, "severity": {pre_risk["severity"]}}}'
+
         content_hash = hashlib.sha256(content.encode()).hexdigest()
+        user_safety_flags = (
+            {"risk_detected": True, "keywords": pre_risk["keywords"], "severity": pre_risk["severity"]}
+            if pre_risk and pre_risk.get("risk_detected")
+            else None
+        )
 
         if save_history:
             await self.message_repo.create(
@@ -105,6 +119,7 @@ class ChatService:
                 role="user",
                 content=content,
                 content_sha256=content_hash,
+                safety_flags=user_safety_flags,
             )
             await self.message_repo.db.commit()
 
@@ -135,6 +150,17 @@ class ChatService:
 
         latency_ms = int((time.time() - start_time) * 1000)
 
+        # Post-filter guardrails
+        post_risk = None
+        if self.guardrails and full_response:
+            post_risk = await self.guardrails.post_filter(content=full_response, session_id=session_id, user_id=user_id)
+
+        assistant_safety_flags = (
+            {"risk_detected": True, "keywords": post_risk["keywords"], "severity": post_risk["severity"]}
+            if post_risk and post_risk.get("risk_detected")
+            else None
+        )
+
         assistant_message_id = None
         if save_history and full_response:
             assistant_hash = hashlib.sha256(full_response.encode()).hexdigest()
@@ -145,11 +171,15 @@ class ChatService:
                 content_sha256=assistant_hash,
                 meta={"model": settings.GEMINI_MODEL},
                 latency_ms=latency_ms,
+                safety_flags=assistant_safety_flags,
             )
             await self.message_repo.db.commit()
             assistant_message_id = str(assistant_msg.id)
 
-        yield f'{{"done": true, "message_id": {_json_str(assistant_message_id)}, "latency_ms": {latency_ms}}}'
+        done_payload = f'"done": true, "message_id": {_json_str(assistant_message_id)}, "latency_ms": {latency_ms}'
+        if post_risk and post_risk.get("risk_detected"):
+            done_payload += ', "risk_detected": true'
+        yield f'{{{done_payload}}}'
 
     async def list_messages(self, session_id: uuid.UUID, user_id: uuid.UUID):
         await self.get_session(session_id, user_id)

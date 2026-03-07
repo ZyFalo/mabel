@@ -20,18 +20,25 @@ from app.schemas.chat import (
     UpdateSessionCheckin,
     UpdateSessionEnd,
 )
+from app.repositories.safety_event_repository import SafetyEventRepository
+from app.repositories.system_config_repository import SystemConfigRepository
 from app.services.chat_service import ChatService
+from app.services.guardrails_service import GuardrailsService
 from app.services.llm.gemini_adapter import GeminiAdapter
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 def _get_chat_service(db=Depends(get_db)) -> ChatService:
+    config_repo = SystemConfigRepository(db)
+    event_repo = SafetyEventRepository(db)
+    guardrails = GuardrailsService(config_repo=config_repo, event_repo=event_repo)
     return ChatService(
         session_repo=SessionRepository(db),
         message_repo=MessageRepository(db),
         preference_repo=PreferenceRepository(db),
         llm=GeminiAdapter(),
+        guardrails=guardrails,
     )
 
 

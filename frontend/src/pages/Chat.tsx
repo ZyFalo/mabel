@@ -6,6 +6,7 @@ import { useToastStore } from '../stores/toastStore'
 import { SkeletonChat } from '../components/ui/Skeleton'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import ReportModal from '../components/chat/ReportModal'
+import SosPanel from '../components/sos/SosPanel'
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -29,6 +30,7 @@ export default function Chat() {
 
   const [input, setInput] = useState('')
   const [showEndModal, setShowEndModal] = useState(false)
+  const [showSos, setShowSos] = useState(false)
   const [reportMessageId, setReportMessageId] = useState<string | null>(null)
   const [reportedIds, setReportedIds] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -37,11 +39,29 @@ export default function Chat() {
     if (!id) return
     loadSession(id).catch(() => navigate('/home'))
     loadMessages(id)
-  }, [id, loadSession, loadMessages, navigate])
+    // Restore draft from localStorage (saved on JWT expiration)
+    const draft = localStorage.getItem('mabel_draft')
+    if (draft) {
+      setInput(draft)
+      localStorage.removeItem('mabel_draft')
+      addToast({ type: 'info', message: 'Tu borrador fue recuperado' })
+    }
+  }, [id, loadSession, loadMessages, navigate, addToast])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
+
+  // Handle risk detection from chatStore
+  const riskDetected = useChatStore((s) => s.riskDetected)
+  useEffect(() => {
+    if (riskDetected) {
+      // Stop any playing audio (TTS) before opening SOS
+      window.speechSynthesis?.cancel()
+      document.querySelectorAll('audio').forEach((a) => a.pause())
+      setShowSos(true)
+    }
+  }, [riskDetected])
 
   async function handleSend() {
     if (!input.trim() || !id || isStreaming) return
@@ -227,6 +247,17 @@ export default function Chat() {
           onReported={handleReportDone}
         />
       )}
+
+      {/* SOS Panel — auto or manual activation */}
+      <SosPanel
+        open={showSos}
+        trigger={riskDetected ? 'auto' : 'manual'}
+        sessionId={id}
+        onClose={() => {
+          setShowSos(false)
+          useChatStore.getState().clearRisk()
+        }}
+      />
     </div>
   )
 }

@@ -13,13 +13,28 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+// Session expired callback — set by App.tsx to show modal instead of hard redirect
+let onSessionExpired: (() => void) | null = null
+export function setOnSessionExpired(cb: () => void) {
+  onSessionExpired = cb
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Preserve chat draft before clearing auth
+      const chatInput = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="mensaje"]')
+      if (chatInput?.value) {
+        localStorage.setItem('mabel_draft', chatInput.value)
+      }
       localStorage.removeItem('mabel_token')
       localStorage.removeItem('mabel_user')
-      window.location.href = '/login'
+      if (onSessionExpired) {
+        onSessionExpired()
+      } else {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

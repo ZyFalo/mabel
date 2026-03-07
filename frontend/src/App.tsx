@@ -1,11 +1,13 @@
-import { useEffect } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import ConsentGuard from './guards/ConsentGuard'
 import ProtectedRoute from './guards/ProtectedRoute'
 import PublicRoute from './guards/PublicRoute'
 import RoleGuard from './guards/RoleGuard'
 import StudentLayout from './components/layout/StudentLayout'
+import SessionExpiredModal from './components/ui/SessionExpiredModal'
 import ToastContainer from './components/ui/Toast'
+import { setOnSessionExpired } from './api/client'
 import AccessDenied from './pages/AccessDenied'
 import Chat from './pages/Chat'
 import CheckIn from './pages/CheckIn'
@@ -33,6 +35,25 @@ function AdminPlaceholder() {
   )
 }
 
+function SessionExpiredHandler() {
+  const [showExpired, setShowExpired] = useState(false)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    setOnSessionExpired(() => setShowExpired(true))
+  }, [])
+
+  return (
+    <SessionExpiredModal
+      open={showExpired}
+      onLogin={() => {
+        setShowExpired(false)
+        navigate('/login')
+      }}
+    />
+  )
+}
+
 export default function App() {
   const initialize = useAuthStore((s) => s.initialize)
 
@@ -43,6 +64,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ToastContainer />
+      <SessionExpiredHandler />
       <Routes>
         {/* Public routes */}
         <Route element={<PublicRoute />}>

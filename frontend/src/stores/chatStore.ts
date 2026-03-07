@@ -34,6 +34,7 @@ interface ChatState {
   isLoadingSessions: boolean
   isLoadingMessages: boolean
   saveHistoryEnabled: boolean
+  riskDetected: boolean
 
   loadSessions: () => Promise<void>
   createSession: (topicHint?: string) => Promise<CreateSessionResponse>
@@ -42,6 +43,7 @@ interface ChatState {
   sendMessage: (sessionId: string, content: string) => Promise<void>
   endSession: (sessionId: string) => Promise<void>
   loadPreferences: () => Promise<void>
+  clearRisk: () => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -53,6 +55,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoadingSessions: false,
   isLoadingMessages: false,
   saveHistoryEnabled: false,
+  riskDetected: false,
 
   loadSessions: async () => {
     set({ isLoadingSessions: true })
@@ -137,7 +140,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           try {
             const data = JSON.parse(jsonStr)
-            if (data.token) {
+            if (data.risk_detected && !data.done) {
+              // Pre-filter risk detected — trigger SOS
+              set({ riskDetected: true })
+            } else if (data.token) {
               accumulated += data.token
               set({ streamingText: accumulated })
             } else if (data.done) {
@@ -147,10 +153,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 content: accumulated,
                 created_at: new Date().toISOString(),
               }
-              set((state) => ({
-                messages: [...state.messages, assistantMsg],
+              const updates: Partial<ChatState> = {
                 streamingText: '',
                 isStreaming: false,
+              }
+              // Post-filter risk detected
+              if (data.risk_detected) {
+                updates.riskDetected = true
+              }
+              set((state) => ({
+                ...state,
+                messages: [...state.messages, assistantMsg],
+                ...updates,
               }))
             } else if (data.error) {
               set({ streamingText: '', isStreaming: false })
@@ -187,5 +201,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch {
       set({ saveHistoryEnabled: false })
     }
+  },
+
+  clearRisk: () => {
+    set({ riskDetected: false })
   },
 }))
