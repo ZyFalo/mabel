@@ -72,7 +72,21 @@ export default function Chat() {
   useEffect(() => {
     if (!id) return
     loadSession(id).catch(() => navigate('/home'))
-    loadMessages(id)
+    loadMessages(id).then(() => {
+      // Request auto-greeting if no messages exist yet
+      const currentMsgs = useChatStore.getState().messages
+      if (currentMsgs.length === 0) {
+        apiClient
+          .post(`/sessions/${id}/greeting`)
+          .then((res) => {
+            if (res.data.greeting) {
+              // Reload messages to show the greeting
+              loadMessages(id)
+            }
+          })
+          .catch(() => {})
+      }
+    })
     // Restore draft from localStorage (saved on JWT expiration)
     const draft = localStorage.getItem('mabel_draft')
     if (draft) {

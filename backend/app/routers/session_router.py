@@ -115,6 +115,24 @@ async def update_session(
     return SessionDetailResponse.model_validate(session)
 
 
+@router.post("/{session_id}/greeting")
+async def generate_greeting(
+    session_id: uuid.UUID,
+    current_user: User = Depends(require_consent),
+    service: ChatService = Depends(_get_chat_service),
+):
+    try:
+        result = await service.generate_greeting(session_id, current_user.id)
+    except ValueError as e:
+        msg = str(e)
+        if "NOT_FOUND" in msg:
+            raise HTTPException(status_code=404, detail="Sesion no encontrada")
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    if result is None:
+        return {"greeting": None}
+    return {"greeting": result}
+
+
 # --- Nested message endpoints ---
 
 

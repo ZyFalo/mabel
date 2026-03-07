@@ -50,28 +50,9 @@ export default function Settings() {
     apiClient
       .get('/users/me/consent-status')
       .then((res) => {
-        if (res.data.status === 'ok') {
-          apiClient.get('/consents/current').catch(() => {})
+        if (res.data.scope) {
+          setConsentScope(res.data.scope)
         }
-      })
-      .catch(() => {})
-
-    // Get consent scope
-    apiClient
-      .get('/users/me/consent-status')
-      .then(() => {
-        // Fetch actual consent to get scope
-        return apiClient.get('/users/me/consent-status')
-      })
-      .catch(() => {})
-  }, [])
-
-  // Fetch consent scope separately
-  useEffect(() => {
-    apiClient
-      .get('/consent-versions/active')
-      .then(() => {
-        // We just need to know the scope, not the version
       })
       .catch(() => {})
   }, [])
@@ -100,15 +81,10 @@ export default function Settings() {
     if (previewPlaying) return
     setPreviewPlaying(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-      const token = localStorage.getItem('mabel_token')
-      const params = new URLSearchParams({ text: 'Hola, soy Mabel' })
-      if (ttsVoice) params.set('voice', ttsVoice)
-      const res = await fetch(`${baseUrl}/tts/synthesize?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) throw new Error()
-      const blob = await res.blob()
+      const params: Record<string, string> = { text: 'Hola, soy Mabel' }
+      if (ttsVoice) params.voice = ttsVoice
+      const res = await apiClient.get('/tts/synthesize', { params, responseType: 'blob' })
+      const blob = res.data as Blob
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
       audio.onended = () => {

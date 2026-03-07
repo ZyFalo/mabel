@@ -196,7 +196,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadPreferences: async () => {
     try {
-      const res = await apiClient.get('/users/me/preferences')
+      const res = await apiClient.get('/preferences/me')
       set({ saveHistoryEnabled: res.data.save_history ?? false })
     } catch {
       set({ saveHistoryEnabled: false })

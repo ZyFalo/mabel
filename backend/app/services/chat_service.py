@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.repositories.message_repository import MessageRepository
 from app.repositories.preference_repository import PreferenceRepository
 from app.repositories.session_repository import SessionRepository
-from app.services.llm.prompts import MABEL_SYSTEM_PROMPT
+from app.services.llm.prompts import build_system_prompt
 from app.services.llm.provider import LLMProvider
 
 
@@ -132,6 +132,9 @@ class ChatService:
         else:
             messages = [{"role": "user", "content": content}]
 
+        # Build system prompt with check-in context
+        system_prompt = build_system_prompt(session.checkin_payload)
+
         # Stream from LLM
         start_time = time.time()
         full_response = ""
@@ -139,7 +142,7 @@ class ChatService:
         try:
             async for token in self.llm.generate_stream(
                 messages=messages,
-                system_prompt=MABEL_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
             ):
                 full_response += token
                 yield f'{{"token": {_json_str(token)}}}'
@@ -180,6 +183,56 @@ class ChatService:
         if post_risk and post_risk.get("risk_detected"):
             done_payload += ', "risk_detected": true'
         yield f'{{{done_payload}}}'
+
+    async def generate_greeting(self, session_id: uuid.UUID, user_id: uuid.UUID) -> dict | None:
+        session = await self.get_session(session_id, user_id)
+        if session.ended_at is not None:
+            return None
+
+        # Check if greeting already exists
+        existing = await self.message_repo.list_by_session(session_id)
+        if existing:
+            return None
+
+        prefs = await self.preference_repo.get_by_user_id(user_id)
+        save_history = prefs.save_history if prefs else False
+
+        system_prompt = build_system_prompt(session.checkin_payload)
+
+        greeting_instruction = "Genera un saludo breve y calido para el estudiante. Presentate como Mabel IA."
+        if session.checkin_payload:
+            greeting_instruction += " Usa los datos del check-in para personalizar tu saludo y mostrar empatia."
+
+        start_time = time.time()
+        full_response = ""
+        try:
+            async for token in self.llm.generate_stream(
+                messages=[{"role": "user", "content": greeting_instruction}],
+                system_prompt=system_prompt,
+            ):
+                full_response += token
+        except ValueError:
+            return None
+
+        if not full_response:
+            return None
+
+        latency_ms = int((time.time() - start_time) * 1000)
+
+        if save_history:
+            content_hash = hashlib.sha256(full_response.encode()).hexdigest()
+            msg = await self.message_repo.create(
+                session_id=session_id,
+                role="assistant",
+                content=full_response,
+                content_sha256=content_hash,
+                meta={"model": settings.GEMINI_MODEL, "greeting": True},
+                latency_ms=latency_ms,
+            )
+            await self.message_repo.db.commit()
+            return {"id": str(msg.id), "role": "assistant", "content": full_response, "created_at": str(msg.created_at)}
+
+        return {"id": None, "role": "assistant", "content": full_response, "created_at": datetime.utcnow().isoformat()}
 
     async def list_messages(self, session_id: uuid.UUID, user_id: uuid.UUID):
         await self.get_session(session_id, user_id)

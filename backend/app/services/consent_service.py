@@ -102,4 +102,4 @@ class ConsentService:
                 new_version=active_version.version,
             )
 
-        return ConsentStatusResponse(status="ok")
+        return ConsentStatusResponse(status="ok", scope=latest.scope)

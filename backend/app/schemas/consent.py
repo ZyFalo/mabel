@@ -30,6 +30,7 @@ class ConsentStatusResponse(BaseModel):
     status: str  # "ok" | "no_consent" | "revoked" | "new_version_required"
     current_version: str | None = None
     new_version: str | None = None
+    scope: str | None = None
 
 
 class ConsentVersionResponse(BaseModel):
