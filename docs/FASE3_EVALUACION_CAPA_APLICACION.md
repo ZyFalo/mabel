@@ -227,7 +227,7 @@ EVALUACION GAP-003: Almacenamiento de latencia por turno
 
 Ventajas:
 - Cero cambios en BD. El campo `meta JSONB` ya existe.
-- La convencion seria: `{"model": "gemini-2.0-flash-lite", "temperature": 0.7, "latency_ms": 1234}`.
+- La convencion seria: `{"model": "gemini-2.5-flash", "temperature": 0.7, "latency_ms": 1234}`.
 
 Problemas:
 - Consulte Context7 para SQLAlchemy `percentile_cont`: la funcion requiere un tipo sortable nativo (INT, NUMERIC). Sobre JSONB, se necesita `(meta->>'latency_ms')::INT` por cada fila, lo cual impide el uso de indices.
@@ -1013,7 +1013,7 @@ INSERT INTO system_config (key, value) VALUES
   ('guardrail_sos_threshold', '3'::jsonb),
   ('guardrail_enabled', 'true'::jsonb),
   ('gemini_timeout_ms', '15000'::jsonb),
-  ('gemini_model', '"gemini-2.0-flash-lite"'::jsonb);
+  ('gemini_model', '"gemini-2.5-flash"'::jsonb);
 ```
 
 ## Nota sobre la columna GAP-005 (last_active_at)

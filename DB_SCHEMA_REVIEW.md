@@ -23,7 +23,7 @@ El esquema **NO requiere reestructuracion**. Las 4 modificaciones propuestas son
 
 2. **UUIDs como PKs:** Correcto para un sistema que eventualmente migrara a Railway. Los UUIDs (generados via `gen_random_uuid()` de pgcrypto) evitan colisiones en entornos distribuidos y no revelan informacion secuencial sobre los datos.
 
-3. **JSONB para campos semi-estructurados:** Los campos `meta`, `safety_flags`, `accessibility`, `checkin_payload` y `payload` usan JSONB nativo de PostgreSQL, lo que permite flexibilidad sin necesidad de migraciones al cambiar de modelo LLM (`{"model":"gemini-2.0"}` a `{"model":"local-3b-lora-v1"}`) o al agregar nuevas propiedades al check-in.
+3. **JSONB para campos semi-estructurados:** Los campos `meta`, `safety_flags`, `accessibility`, `checkin_payload` y `payload` usan JSONB nativo de PostgreSQL, lo que permite flexibilidad sin necesidad de migraciones al cambiar de modelo LLM (`{"model":"gemini-2.5-flash"}` a `{"model":"local-3b-lora-v1"}`) o al agregar nuevas propiedades al check-in.
 
 4. **ON DELETE CASCADE correcto en toda la cadena:** La cadena `users -> sessions -> messages -> message_reports/attachments` y `users -> consents`, `users -> preferences` usan CASCADE correctamente, garantizando borrado real (hard delete) para cumplir con la Ley 1581/2012 (derecho de supresion). La tabla `safety_events` usa `ON DELETE SET NULL` en `session_id` y `CASCADE` en `user_id`, lo que preserva el registro del evento incluso si la sesion se elimina pero lo borra si el usuario se elimina -- correcto para el requisito de supresion total.
 
@@ -158,7 +158,7 @@ Esto garantiza borrado completo y real, cumpliendo el derecho de supresion del t
 
 **Escalabilidad para mas usuarios/sesiones/mensajes:** El esquema escala correctamente. Los indices compuestos (user_id + started_at, session_id + created_at) mantienen el rendimiento O(log n) para las queries principales. PostgreSQL maneja millones de registros en estas tablas sin problemas. Para el MVP con 30 usuarios, la escalabilidad no es una preocupacion.
 
-**Campo meta JSONB para cambio de modelo LLM:** El campo `messages.meta` (JSONB) esta preparado para almacenar `{"model":"gemini-2.0-flash", "temperature":0.7}` en el MVP y `{"model":"local-3b-lora-v1", "temperature":0.3, "quantization":"4bit"}` en post-MVP. El cambio de contenido del JSONB no requiere migracion de esquema. Confirmado por el TECHSTACK.md: "el campo meta en messages ya soporta {"model": "local-3b-lora-v1"} sin migracion".
+**Campo meta JSONB para cambio de modelo LLM:** El campo `messages.meta` (JSONB) esta preparado para almacenar `{"model":"gemini-2.5-flash", "temperature":0.7}` en el MVP y `{"model":"local-3b-lora-v1", "temperature":0.3, "quantization":"4bit"}` en post-MVP. El cambio de contenido del JSONB no requiere migracion de esquema. Confirmado por el TECHSTACK.md: "el campo meta en messages ya soporta {"model": "local-3b-lora-v1"} sin migracion".
 
 **Integracion futura de SER (speechbrain):** El esquema esta preparado. Los datos de emocion detectada por voz pueden almacenarse en:
 - `messages.safety_flags` (JSONB): agregar `{"emotion":"anxious", "confidence":0.85}` al JSONB existente.

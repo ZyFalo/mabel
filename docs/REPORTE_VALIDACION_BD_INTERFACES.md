@@ -675,7 +675,7 @@ INSERT INTO system_config (key, value) VALUES
   ('guardrail_sos_threshold', '3'::jsonb),
   ('guardrail_enabled', 'true'::jsonb),
   ('gemini_timeout_ms', '15000'::jsonb),
-  ('gemini_model', '"gemini-2.0-flash-lite"'::jsonb);
+  ('gemini_model', '"gemini-2.5-flash"'::jsonb);
 
 -- -----------------------------------------------
 -- GAP-002: Tabla de versiones del documento de consentimiento

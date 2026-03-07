@@ -573,7 +573,7 @@ SELECT
   DATE(created_at) AS day,
   SUM(tokens_prompt) AS total_prompt_tokens,
   SUM(tokens_completion) AS total_completion_tokens,
-  -- Precio hardcodeado para gemini-2.0-flash-lite (MVP unico modelo)
+  -- Precio hardcodeado para gemini-2.5-flash (MVP unico modelo)
   ROUND(SUM(tokens_prompt) * 0.000000075 + SUM(tokens_completion) * 0.0000003, 4) AS estimated_cost_usd
 FROM messages
 WHERE role = 'assistant'

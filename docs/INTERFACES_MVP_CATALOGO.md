@@ -1348,7 +1348,7 @@ Configuración global del sistema que afecta a todos los usuarios. Permite gesti
   - Toggle activar/desactivar guardrails globalmente: toggle (con advertencia si se desactiva)
 - **Sección API Gemini:**
   - Estado de conexión: indicador — verde "Conectada" / rojo "Error"
-  - Modelo en uso: texto — "gemini-2.0-flash-lite"
+  - Modelo en uso: texto — "gemini-2.5-flash"
   - Timeout configurado: input-text — milisegundos
   - Rate limits: indicador — uso actual vs límite
   - Botón "Test de conexión": botón — envía ping a la API
