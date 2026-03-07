@@ -21,7 +21,9 @@ export default function Settings() {
   const [fontSize, setFontSize] = useState('normal')
   const [subtitles, setSubtitles] = useState(true)
   const [ttsVoice, setTtsVoice] = useState('')
+  const [ttsEnabled, setTtsEnabled] = useState(true)
   const [chatMode, setChatMode] = useState<'chat' | 'avatar'>('chat')
+  const [previewPlaying, setPreviewPlaying] = useState(false)
   const [consentScope, setConsentScope] = useState<string>('')
 
   // Modal states
@@ -39,6 +41,7 @@ export default function Settings() {
       setFontSize((acc?.font_size as string) || 'normal')
       setSubtitles(acc?.subtitles !== false)
       setTtsVoice(preferences.tts_voice || '')
+      setTtsEnabled(acc?.tts_enabled !== false)
       setChatMode(preferences.preferred_chat_mode)
     }
   }, [preferences])
@@ -93,11 +96,42 @@ export default function Settings() {
     }
   }
 
+  async function previewVoice() {
+    if (previewPlaying) return
+    setPreviewPlaying(true)
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+      const token = localStorage.getItem('mabel_token')
+      const params = new URLSearchParams({ text: 'Hola, soy Mabel' })
+      if (ttsVoice) params.set('voice', ttsVoice)
+      const res = await fetch(`${baseUrl}/tts/synthesize?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.onended = () => {
+        URL.revokeObjectURL(url)
+        setPreviewPlaying(false)
+      }
+      audio.onerror = () => {
+        URL.revokeObjectURL(url)
+        setPreviewPlaying(false)
+      }
+      audio.play()
+    } catch {
+      addToast({ type: 'error', message: 'Error al reproducir preview' })
+      setPreviewPlaying(false)
+    }
+  }
+
   async function saveVoice() {
     try {
       await updatePreferences({
         tts_voice: ttsVoice || null,
         preferred_chat_mode: chatMode,
+        accessibility: { ...((preferences?.accessibility as Record<string, unknown>) || {}), tts_enabled: ttsEnabled },
       })
       addToast({ type: 'success', message: 'Cambios guardados' })
     } catch {
@@ -193,18 +227,36 @@ export default function Settings() {
       <section className="mb-8 bg-white rounded-xl border border-gray-100 p-5">
         <h2 className="text-lg font-semibold text-text-primary mb-4">Voz</h2>
         <div className="space-y-3">
+          <label className="flex items-center justify-between cursor-pointer">
+            <span className="text-sm text-text-primary">TTS activado</span>
+            <input
+              type="checkbox"
+              checked={ttsEnabled}
+              onChange={(e) => setTtsEnabled(e.target.checked)}
+              className="w-5 h-5 rounded text-primary focus:ring-primary"
+            />
+          </label>
           <div>
             <p className="text-sm text-text-primary mb-2">Voz del asistente</p>
-            <select
-              value={ttsVoice}
-              onChange={(e) => setTtsVoice(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Por defecto</option>
-              <option value="es-female-1">Femenina 1</option>
-              <option value="es-female-2">Femenina 2</option>
-              <option value="es-male-1">Masculina 1</option>
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={ttsVoice}
+                onChange={(e) => setTtsVoice(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Por defecto</option>
+                <option value="es-female-1">Femenina 1</option>
+                <option value="es-female-2">Femenina 2</option>
+                <option value="es-male-1">Masculina 1</option>
+              </select>
+              <button
+                onClick={previewVoice}
+                disabled={previewPlaying}
+                className="px-3 py-2 bg-gray-100 text-text-primary/60 text-sm rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                {previewPlaying ? 'Reproduciendo...' : 'Preview'}
+              </button>
+            </div>
           </div>
           <div>
             <p className="text-sm text-text-primary mb-2">Modo de interaccion</p>

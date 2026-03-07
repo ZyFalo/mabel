@@ -3,11 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import apiClient from '../api/client'
 import { useAuthStore } from '../stores/authStore'
 import { useChatStore } from '../stores/chatStore'
+import { usePreferencesStore } from '../stores/preferencesStore'
 import { useToastStore } from '../stores/toastStore'
 import { SkeletonChat } from '../components/ui/Skeleton'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import ReportModal from '../components/chat/ReportModal'
 import SosPanel from '../components/sos/SosPanel'
+import useAudioRecorder from '../hooks/useAudioRecorder'
+import useTts from '../hooks/useTts'
+import useSubtitles from '../hooks/useSubtitles'
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -51,7 +55,19 @@ export default function Chat() {
   const [showSos, setShowSos] = useState(false)
   const [reportMessageId, setReportMessageId] = useState<string | null>(null)
   const [reportedIds, setReportedIds] = useState<Set<string>>(new Set())
+  const [isProcessingAudio, setIsProcessingAudio] = useState(false)
+  const [subtitleMessageId, setSubtitleMessageId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const preferences = usePreferencesStore((s) => s.preferences)
+  const acc = preferences?.accessibility as Record<string, unknown> | null
+  const ttsEnabled = acc?.tts_enabled !== false
+  const subtitlesEnabled = acc?.subtitles !== false
+  const ttsVoice = preferences?.tts_voice || undefined
+
+  const { isRecording, startRecording, stopRecording } = useAudioRecorder()
+  const { playTts, stopTts, isMuted, toggleMute } = useTts()
+  const { currentWordIndex, startSubtitles, stopSubtitles } = useSubtitles()
 
   useEffect(() => {
     if (!id) return
@@ -85,6 +101,8 @@ export default function Chat() {
       // Stop any playing audio (TTS) before opening SOS
       window.speechSynthesis?.cancel()
       document.querySelectorAll('audio').forEach((a) => a.pause())
+      stopTts()
+      stopSubtitles()
       setShowSos(true)
     }
   }, [riskDetected])
@@ -95,6 +113,18 @@ export default function Chat() {
     setInput('')
     try {
       await sendMessage(id, text)
+      // Auto-play TTS after assistant response
+      if (ttsEnabled && !isMuted) {
+        const msgs = useChatStore.getState().messages
+          const lastMsg = msgs[msgs.length - 1]
+        if (lastMsg && lastMsg.role === 'assistant') {
+          const durationMs = await playTts(lastMsg.content, ttsVoice)
+          if (durationMs > 0 && subtitlesEnabled) {
+            setSubtitleMessageId(lastMsg.id)
+            startSubtitles(lastMsg.content, durationMs)
+          }
+        }
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al enviar mensaje'
       addToast({ type: 'error', message: msg })
@@ -116,6 +146,43 @@ export default function Chat() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
+    }
+  }
+
+  async function handleMicToggle() {
+    if (isRecording) {
+      setIsProcessingAudio(true)
+      try {
+        const blob = await stopRecording()
+        const formData = new FormData()
+        formData.append('audio', blob, 'recording.webm')
+        if (id) formData.append('session_id', id)
+        const res = await apiClient.post('/asr/transcribe', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        const text = res.data.text as string
+        if (text && id) {
+          await sendMessage(id, text)
+          // Auto-play TTS after ASR-triggered response
+          if (ttsEnabled && !isMuted) {
+            const msgs = useChatStore.getState().messages
+          const lastMsg = msgs[msgs.length - 1]
+            if (lastMsg && lastMsg.role === 'assistant') {
+              const durationMs = await playTts(lastMsg.content, ttsVoice)
+              if (durationMs > 0 && subtitlesEnabled) {
+                setSubtitleMessageId(lastMsg.id)
+                startSubtitles(lastMsg.content, durationMs)
+              }
+            }
+          }
+        }
+      } catch {
+        addToast({ type: 'error', message: 'Error al transcribir audio' })
+      } finally {
+        setIsProcessingAudio(false)
+      }
+    } else {
+      await startRecording()
     }
   }
 
@@ -168,7 +235,20 @@ export default function Chat() {
                         : 'bg-gray-100 text-text-primary rounded-bl-md'
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    {isAssistant && subtitleMessageId === msg.id && currentWordIndex >= 0 ? (
+                      <p className="text-sm whitespace-pre-wrap">
+                        {msg.content.split(/\s+/).map((word, i) => (
+                          <span
+                            key={i}
+                            className={i === currentWordIndex ? 'bg-primary/20 rounded px-0.5' : ''}
+                          >
+                            {i > 0 ? ' ' : ''}{word}
+                          </span>
+                        ))}
+                      </p>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    )}
                     <div className="flex items-center justify-between mt-1 gap-2">
                       <span
                         className={`text-[10px] ${
@@ -228,16 +308,57 @@ export default function Chat() {
       {/* Input area */}
       <div className="border-t border-gray-100 px-4 py-3">
         <div className="max-w-2xl mx-auto flex gap-2">
+          {/* Mute toggle */}
+          {ttsEnabled && (
+            <button
+              onClick={toggleMute}
+              className="px-2 py-2.5 text-text-primary/50 hover:text-text-primary transition-colors shrink-0"
+              title={isMuted ? 'Activar TTS' : 'Silenciar TTS'}
+            >
+              {isMuted ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+              )}
+            </button>
+          )}
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value.slice(0, 2000))}
             onKeyDown={handleKeyDown}
-            disabled={isStreaming}
+            disabled={isStreaming || isRecording}
             maxLength={2000}
             rows={1}
             placeholder="Escribe un mensaje..."
             className="flex-1 border border-gray-300 rounded-xl px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
           />
+          {/* Microphone button */}
+          <button
+            onClick={handleMicToggle}
+            disabled={isStreaming || isProcessingAudio}
+            className={`px-3 py-2.5 rounded-xl transition-all shrink-0 ${
+              isRecording
+                ? 'bg-white border-2 border-[#DC2626] text-[#DC2626] animate-pulse'
+                : isProcessingAudio
+                  ? 'bg-gray-100 text-text-primary/40'
+                  : 'bg-gray-100 text-text-primary/60 hover:bg-gray-200'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={isRecording ? 'Detener grabacion' : 'Grabar audio'}
+          >
+            {isProcessingAudio ? (
+              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4M12 15a3 3 0 003-3V5a3 3 0 00-6 0v7a3 3 0 003 3z" />
+              </svg>
+            )}
+          </button>
+          {/* Send button */}
           <button
             onClick={handleSend}
             disabled={!input.trim() || input.length > 2000 || isStreaming}

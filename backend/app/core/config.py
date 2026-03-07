@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     GEMINI_TIMEOUT_MS: int = 30000
     CORS_ORIGINS: str = "http://localhost:5173"
     CONTEXT_WINDOW_SIZE: int = 20
+    WHISPER_MODEL: str = "base"
+    PIPER_VOICE: str = "es_ES-mls_9972-low"
+    PIPER_MODEL_PATH: str = "models/piper/"
+    UPLOAD_DIR: str = "uploads/audio/"
 
     @property
     def cors_origins_list(self) -> list[str]:
