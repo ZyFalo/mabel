@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mabel_ia_db
+    ports:
+      - "5433:5432"  # Puerto 5433 externo para no colisionar con PostgreSQL local
+    environment:
+      POSTGRES_USER: mabel
+      POSTGRES_PASSWORD: mabel_dev
+      POSTGRES_DB: mabel_ia
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mabel -d mabel_ia"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
