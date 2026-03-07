@@ -7,6 +7,7 @@ from app.middleware.auth import require_consent
 from app.models.user import User
 from app.repositories.message_report_repository import MessageReportRepository
 from app.repositories.message_repository import MessageRepository
+from app.repositories.safety_event_repository import SafetyEventRepository
 from app.repositories.session_repository import SessionRepository
 from app.schemas.chat import CreateReportRequest, ReportCheckResponse, ReportResponse
 from app.services.report_service import ReportService
@@ -19,6 +20,7 @@ def _get_report_service(db=Depends(get_db)) -> ReportService:
         report_repo=MessageReportRepository(db),
         message_repo=MessageRepository(db),
         session_repo=SessionRepository(db),
+        event_repo=SafetyEventRepository(db),
     )
 
 

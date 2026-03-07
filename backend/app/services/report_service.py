@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.repositories.message_report_repository import MessageReportRepository
 from app.repositories.message_repository import MessageRepository
+from app.repositories.safety_event_repository import SafetyEventRepository
 from app.repositories.session_repository import SessionRepository
 
 
@@ -13,10 +14,12 @@ class ReportService:
         report_repo: MessageReportRepository,
         message_repo: MessageRepository,
         session_repo: SessionRepository,
+        event_repo: SafetyEventRepository,
     ) -> None:
         self.report_repo = report_repo
         self.message_repo = message_repo
         self.session_repo = session_repo
+        self.event_repo = event_repo
 
     async def create_report(
         self,
@@ -44,6 +47,12 @@ class ReportService:
                 reason=reason,
                 severity=severity,
                 details=details,
+            )
+            await self.event_repo.create(
+                user_id=reporter_id,
+                session_id=message.session_id,
+                event_type="user_report",
+                payload={"report_id": str(report.id)},
             )
             await self.report_repo.db.commit()
             return report

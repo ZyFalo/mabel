@@ -39,7 +39,7 @@ class SessionDetailResponse(SessionResponse):
 class CheckinPayload(BaseModel):
     mood: int = Field(ge=0, le=10)
     sleep: float | None = Field(default=None, ge=0, le=24)
-    focus: str | None = None
+    focus: Literal["Academico", "Social", "Familiar", "Salud", "Economico", "Otro"] | None = None
     note: str | None = Field(default=None, max_length=500)
 
 

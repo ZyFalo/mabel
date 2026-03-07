@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import apiClient from '../api/client'
 import { useAuthStore } from '../stores/authStore'
 import { useChatStore } from '../stores/chatStore'
 import { useToastStore } from '../stores/toastStore'
@@ -10,6 +11,23 @@ import SosPanel from '../components/sos/SosPanel'
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+}
+
+async function loadReportedIds(messages: { id: string; role: string }[]): Promise<Set<string>> {
+  const assistantMsgs = messages.filter((m) => m.role === 'assistant')
+  if (assistantMsgs.length === 0) return new Set()
+
+  const results = await Promise.allSettled(
+    assistantMsgs.map((m) => apiClient.get(`/messages/${m.id}/reports/check`))
+  )
+
+  const reported = new Set<string>()
+  results.forEach((result, i) => {
+    if (result.status === 'fulfilled' && result.value.data.already_reported) {
+      reported.add(assistantMsgs[i].id)
+    }
+  })
+  return reported
 }
 
 export default function Chat() {
@@ -47,6 +65,14 @@ export default function Chat() {
       addToast({ type: 'info', message: 'Tu borrador fue recuperado' })
     }
   }, [id, loadSession, loadMessages, navigate, addToast])
+
+  useEffect(() => {
+    if (!isLoadingMessages && messages.length > 0) {
+      loadReportedIds(messages).then((ids) => {
+        if (ids.size > 0) setReportedIds(ids)
+      })
+    }
+  }, [isLoadingMessages, messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
