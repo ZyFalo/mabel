@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Lock,
@@ -7,199 +7,35 @@ import {
   User,
   Database,
   X,
+  Shield,
+  ShieldOff,
+  Info,
+  AlertTriangle,
+  Trash2,
+  Mail,
 } from 'lucide-react'
 import { usePreferencesStore } from '../stores/preferencesStore'
 import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import apiClient from '../api/client'
-import Toggle from '../components/ui/Toggle'
 import Segmented from '../components/ui/Segmented'
-import Field from '../components/ui/Field'
 import NativeSelect from '../components/ui/NativeSelect'
 import DeleteAccountModal from '../components/settings/DeleteAccountModal'
 import RevokeConsentModal from '../components/settings/RevokeConsentModal'
 import ArcoExportModal from '../components/settings/ArcoExportModal'
 import ChangePasswordModal from '../components/settings/ChangePasswordModal'
 
-type TabId =
-  | 'privacy'
-  | 'accessibility'
-  | 'voice'
-  | 'account'
-  | 'arco'
+// Settings overlay primitives (Cap 6.4)
+import SettingsField from '../components/settings/primitives/SettingsField'
+import Toggle from '../components/settings/primitives/Toggle'
+import Card from '../components/settings/primitives/Card'
+import PrimaryButton from '../components/settings/primitives/PrimaryButton'
+import SaveBar from '../components/settings/primitives/SaveBar'
+import SettingsNavItem from '../components/settings/primitives/SettingsNavItem'
+import SectionHeader from '../components/settings/primitives/SectionHeader'
 
-const TABS: { id: TabId; icon: typeof Lock; label: string }[] = [
-  { id: 'privacy', icon: Lock, label: 'Privacidad' },
-  { id: 'accessibility', icon: Eye, label: 'Accesibilidad' },
-  { id: 'voice', icon: Volume2, label: 'Voz' },
-  { id: 'account', icon: User, label: 'Cuenta' },
-  { id: 'arco', icon: Database, label: 'Mis datos (ARCO)' },
-]
-
-// ---------------------------------------------------------------------------
-// Section header (font-display Nunito + supporting description + bottom border)
-// ---------------------------------------------------------------------------
-
-interface SectionHeaderProps {
-  title: string
-  description?: string
-}
-
-function SectionHeader({ title, description }: SectionHeaderProps) {
-  return (
-    <div
-      className="mb-2 pb-4 border-b"
-      style={{ borderColor: 'var(--ink-100)' }}
-    >
-      <h2
-        className="text-[20px] font-display italic"
-        style={{ color: 'var(--ink-900)' }}
-      >
-        {title}
-      </h2>
-      {description ? (
-        <p
-          className="text-[13px] mt-1"
-          style={{ color: 'var(--ink-500)' }}
-        >
-          {description}
-        </p>
-      ) : null}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Save button (primary, accent bg)
-// ---------------------------------------------------------------------------
-
-interface SaveButtonProps {
-  onClick: () => void
-  disabled?: boolean
-  children: React.ReactNode
-}
-
-function SaveButton({ onClick, disabled, children }: SaveButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="mt-6 px-4 py-2 text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
-      style={{
-        backgroundColor: 'var(--mabel-600)',
-        color: '#FFFFFF',
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Header
-// ---------------------------------------------------------------------------
-
-function SettingsHeader({ onClose }: { onClose: () => void }) {
-  return (
-    <header
-      className="h-12 flex items-center justify-between px-4 border-b shrink-0"
-      style={{ borderColor: 'var(--ink-100)' }}
-    >
-      <div
-        className="text-[14.5px] font-display italic"
-        style={{ color: 'var(--ink-900)' }}
-      >
-        Configuracion
-      </div>
-      <button
-        type="button"
-        onClick={onClose}
-        title="Volver (Esc)"
-        aria-label="Cerrar configuracion"
-        className="p-1.5 rounded-md transition-colors"
-        style={{ color: 'var(--ink-500)' }}
-        onMouseEnter={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-            'var(--ink-100)'
-        }}
-        onMouseLeave={(e) => {
-          ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-            'transparent'
-        }}
-      >
-        <X size={16} />
-      </button>
-    </header>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Vertical nav (desktop) / horizontal scroll (mobile)
-// ---------------------------------------------------------------------------
-
-interface SettingsNavProps {
-  activeTab: TabId
-  onChange: (id: TabId) => void
-}
-
-function SettingsNav({ activeTab, onChange }: SettingsNavProps) {
-  return (
-    <nav
-      aria-label="Secciones de configuracion"
-      className="shrink-0 md:w-[220px] border-b md:border-b-0 md:border-r overflow-x-auto md:overflow-y-auto"
-      style={{ borderColor: 'var(--ink-100)' }}
-    >
-      <ul className="flex md:flex-col p-2 md:p-3 gap-0.5 whitespace-nowrap">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id
-          const Icon = tab.icon
-          return (
-            <li key={tab.id} className="shrink-0">
-              <button
-                type="button"
-                onClick={() => onChange(tab.id)}
-                aria-current={isActive ? 'page' : undefined}
-                className={`relative w-full flex items-center gap-2 md:gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors ${
-                  isActive ? 'font-medium' : ''
-                }`}
-                style={{
-                  backgroundColor: isActive ? 'var(--mabel-50)' : 'transparent',
-                  color: isActive ? 'var(--ink-900)' : 'var(--ink-700)',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--ink-100)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'transparent'
-                  }
-                }}
-              >
-                <Icon
-                  size={14}
-                  style={{
-                    color: isActive ? 'var(--mabel-600)' : 'currentColor',
-                  }}
-                />
-                <span>{tab.label}</span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </nav>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Settings parent component
-// ---------------------------------------------------------------------------
+type TabId = 'privacy' | 'accessibility' | 'voice' | 'account' | 'arco'
 
 const VALID_TABS: ReadonlySet<TabId> = new Set([
   'privacy',
@@ -208,6 +44,50 @@ const VALID_TABS: ReadonlySet<TabId> = new Set([
   'account',
   'arco',
 ])
+
+interface SectionDef {
+  id: TabId
+  icon: ReactNode
+  title: string
+  subtitle: string
+}
+
+const SECTIONS: SectionDef[] = [
+  {
+    id: 'privacy',
+    icon: <Lock size={16} />,
+    title: 'Privacidad',
+    subtitle: 'Datos y consentimiento',
+  },
+  {
+    id: 'accessibility',
+    icon: <Eye size={16} />,
+    title: 'Accesibilidad',
+    subtitle: 'Personalizar experiencia',
+  },
+  {
+    id: 'voice',
+    icon: <Volume2 size={16} />,
+    title: 'Voz',
+    subtitle: 'TTS y voz del asistente',
+  },
+  {
+    id: 'account',
+    icon: <User size={16} />,
+    title: 'Cuenta',
+    subtitle: 'Seguridad y eliminacion',
+  },
+  {
+    id: 'arco',
+    icon: <Database size={16} />,
+    title: 'Mis datos (ARCO)',
+    subtitle: 'Tus datos personales',
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Settings — modal overlay (Cap 6.4)
+// ---------------------------------------------------------------------------
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -234,7 +114,9 @@ export default function Settings() {
   // Active tab — read initial from ?tab= query param (deeplink from UserMenu)
   const initialTab = (() => {
     const fromUrl = searchParams.get('tab')
-    return fromUrl && VALID_TABS.has(fromUrl as TabId) ? (fromUrl as TabId) : 'privacy'
+    return fromUrl && VALID_TABS.has(fromUrl as TabId)
+      ? (fromUrl as TabId)
+      : 'privacy'
   })()
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
 
@@ -247,7 +129,7 @@ export default function Settings() {
     }
   }, [activeTab, searchParams, setSearchParams])
 
-  // React to URL changes (e.g. user clicks another tab shortcut in UserMenu while already on /settings)
+  // React to URL changes (e.g. user clicks another tab shortcut in UserMenu)
   useEffect(() => {
     const fromUrl = searchParams.get('tab')
     if (fromUrl && VALID_TABS.has(fromUrl as TabId) && fromUrl !== activeTab) {
@@ -375,71 +257,208 @@ export default function Settings() {
   // Render
   // -------------------------------------------------------------------------
 
+  const currentSection =
+    SECTIONS.find((s) => s.id === activeTab) ?? SECTIONS[0]
+
   return (
     <div
-      className="flex flex-col h-screen fade-in"
-      style={{ backgroundColor: 'var(--ink-50)' }}
+      className="fade-in"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 20,
+        background: 'rgba(26,17,16,0.32)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+      onClick={handleClose}
+      role="presentation"
     >
-      <SettingsHeader onClose={handleClose} />
-
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-        <SettingsNav activeTab={activeTab} onChange={setActiveTab} />
-
-        <div className="flex-1 overflow-y-auto min-w-0">
-          <div className="max-w-2xl px-6 md:px-10 py-6 md:py-8 mx-auto md:mx-0">
-            {activeTab === 'privacy' && (
-              <PrivacyTab
-                saveHistory={saveHistory}
-                setSaveHistory={setSaveHistory}
-                checkinEnabled={checkinEnabled}
-                setCheckinEnabled={setCheckinEnabled}
-                onSave={savePrivacy}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="scale-in"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ajustes"
+        style={{
+          background: '#fff',
+          width: 'min(100%, 1100px)',
+          height: 'min(100%, 720px)',
+          borderRadius: 18,
+          boxShadow: 'var(--shadow-xl)',
+          display: 'flex',
+          overflow: 'hidden',
+          border: '1px solid var(--ink-200)',
+        }}
+      >
+        {/* LEFT 280px sidebar */}
+        <div
+          style={{
+            width: 280,
+            flexShrink: 0,
+            background: 'var(--ink-50)',
+            borderRight: '1px solid var(--ink-200)',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div
+            style={{
+              padding: '20px 18px 14px',
+              borderBottom: '1px solid var(--ink-200)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: 'var(--ink-400)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                marginBottom: 6,
+              }}
+            >
+              Ajustes
+            </div>
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: 'var(--ink-900)',
+                letterSpacing: '-0.015em',
+              }}
+            >
+              Preferencias
+            </div>
+          </div>
+          <nav
+            aria-label="Secciones de configuracion"
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+            }}
+          >
+            {SECTIONS.map((s) => (
+              <SettingsNavItem
+                key={s.id}
+                icon={s.icon}
+                title={s.title}
+                subtitle={s.subtitle}
+                active={activeTab === s.id}
+                onClick={() => setActiveTab(s.id)}
               />
-            )}
+            ))}
+          </nav>
+        </div>
 
-            {activeTab === 'accessibility' && (
-              <AccessibilityTab
-                contrast={contrast}
-                setContrast={setContrast}
-                fontSize={fontSize}
-                setFontSize={setFontSize}
-                subtitles={subtitles}
-                setSubtitles={setSubtitles}
-                onSave={saveAccessibility}
-              />
-            )}
+        {/* RIGHT content area */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            minWidth: 0,
+          }}
+        >
+          {/* Breadcrumb header */}
+          <div
+            style={{
+              padding: '16px 28px',
+              borderBottom: '1px solid var(--ink-200)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ fontSize: 12.5, color: 'var(--ink-500)' }}>
+              <span style={{ color: 'var(--ink-400)' }}>Ajustes</span>
+              <span style={{ margin: '0 8px', color: 'var(--ink-300)' }}>
+                /
+              </span>
+              <span style={{ color: 'var(--ink-800)', fontWeight: 600 }}>
+                {currentSection.title}
+              </span>
+            </div>
+            <CloseButton onClose={handleClose} />
+          </div>
 
-            {activeTab === 'voice' && (
-              <VoiceTab
-                ttsEnabled={ttsEnabled}
-                setTtsEnabled={setTtsEnabled}
-                ttsVoice={ttsVoice}
-                setTtsVoice={setTtsVoice}
-                chatMode={chatMode}
-                setChatMode={setChatMode}
-                previewPlaying={previewPlaying}
-                previewVoice={previewVoice}
-                onSave={saveVoice}
-              />
-            )}
+          {/* Content scrollable */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '28px 32px 32px',
+            }}
+          >
+            <div style={{ maxWidth: 580 }}>
+              {activeTab === 'privacy' && (
+                <PrivacidadSection
+                  saveHistory={saveHistory}
+                  setSaveHistory={setSaveHistory}
+                  checkinEnabled={checkinEnabled}
+                  setCheckinEnabled={setCheckinEnabled}
+                  onSave={savePrivacy}
+                  onOpenArco={() => setShowArco(true)}
+                  onRevokeConsent={() => setShowRevoke(true)}
+                />
+              )}
 
-            {activeTab === 'account' && (
-              <AccountTab
-                email={user?.email ?? ''}
-                onChangePassword={() => setShowPassword(true)}
-                onRevokeConsent={() => setShowRevoke(true)}
-                onDeleteAccount={() => setShowDelete(true)}
-              />
-            )}
+              {activeTab === 'accessibility' && (
+                <AccesibilidadSection
+                  contrast={contrast}
+                  setContrast={setContrast}
+                  fontSize={fontSize}
+                  setFontSize={setFontSize}
+                  subtitles={subtitles}
+                  setSubtitles={setSubtitles}
+                  onSave={saveAccessibility}
+                />
+              )}
 
-            {activeTab === 'arco' && (
-              <ArcoTab onOpenExport={() => setShowArco(true)} />
-            )}
+              {activeTab === 'voice' && (
+                <VozSection
+                  ttsEnabled={ttsEnabled}
+                  setTtsEnabled={setTtsEnabled}
+                  ttsVoice={ttsVoice}
+                  setTtsVoice={setTtsVoice}
+                  chatMode={chatMode}
+                  setChatMode={setChatMode}
+                  previewPlaying={previewPlaying}
+                  previewVoice={previewVoice}
+                  onSave={saveVoice}
+                />
+              )}
+
+              {activeTab === 'account' && (
+                <CuentaSection
+                  email={user?.email ?? ''}
+                  onChangePassword={() => setShowPassword(true)}
+                  onDeleteAccount={() => setShowDelete(true)}
+                />
+              )}
+
+              {activeTab === 'arco' && (
+                <ArcoSection
+                  onOpenExport={() => setShowArco(true)}
+                  onRevokeConsent={() => setShowRevoke(true)}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Modals — APIs preserved exactly */}
+      {/* Modals — APIs preserved exactly (open/onClose + currentScope) */}
       <DeleteAccountModal
         open={showDelete}
         onClose={() => setShowDelete(false)}
@@ -459,52 +478,211 @@ export default function Settings() {
 }
 
 // ---------------------------------------------------------------------------
-// Privacy Tab
+// Header X close button (with hover state)
 // ---------------------------------------------------------------------------
 
-interface PrivacyTabProps {
+function CloseButton({ onClose }: { onClose: () => void }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={onClose}
+      title="Cerrar (Esc)"
+      aria-label="Cerrar ajustes"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        background: hover ? 'var(--ink-100)' : 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        color: 'var(--ink-500)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background var(--dur-fast) var(--ease-out)',
+      }}
+    >
+      <X size={18} />
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Privacidad
+// ---------------------------------------------------------------------------
+
+interface PrivacidadSectionProps {
   saveHistory: boolean
   setSaveHistory: (v: boolean) => void
   checkinEnabled: boolean
   setCheckinEnabled: (v: boolean) => void
   onSave: () => void
+  onOpenArco: () => void
+  onRevokeConsent: () => void
 }
 
-function PrivacyTab({
+function PrivacidadSection({
   saveHistory,
   setSaveHistory,
   checkinEnabled,
   setCheckinEnabled,
   onSave,
-}: PrivacyTabProps) {
+  onOpenArco,
+  onRevokeConsent,
+}: PrivacidadSectionProps) {
   return (
     <section>
       <SectionHeader
         title="Privacidad"
-        description="Controla que guarda Mabel y como lo usa."
+        desc="Controla que guarda Mabel y como lo usa."
       />
-      <Field
+      <Toggle
+        checked={saveHistory}
+        onChange={setSaveHistory}
         label="Guardar historial de conversaciones"
-        description="Si esta activo, las conversaciones quedan en tu historial para revisitas y aporta al estudio."
-      >
-        <Toggle checked={saveHistory} onChange={setSaveHistory} />
-      </Field>
-      <Field
+        hint="Si esta activo, las conversaciones quedan en tu historial para revisitas y aporta al estudio."
+      />
+      <Toggle
+        checked={checkinEnabled}
+        onChange={setCheckinEnabled}
         label="Check-in emocional al inicio"
-        description="Pregunta opcional sobre tu estado emocional cuando inicias sesion."
+        hint="Pregunta opcional sobre tu estado emocional cuando inicias sesion."
+      />
+
+      <Card style={{ marginTop: 24 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 8,
+          }}
+        >
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 9,
+              background: 'var(--info-50)',
+              color: 'var(--info-600)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Shield size={16} />
+          </div>
+          <div style={{ fontSize: 14.5, fontWeight: 700 }}>Derechos ARCO</div>
+        </div>
+        <p
+          style={{
+            fontSize: 13,
+            color: 'var(--ink-600)',
+            lineHeight: 1.5,
+            margin: '4px 0 14px',
+          }}
+        >
+          Ejerce tus derechos de Acceso, Rectificacion, Cancelacion y Oposicion
+          sobre tus datos personales de acuerdo con la Ley 1581 de 2012.
+        </p>
+        <button
+          type="button"
+          onClick={onOpenArco}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '9px 16px',
+            background: '#fff',
+            color: 'var(--info-600)',
+            border: '1px solid var(--info-600)',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
+          <Info size={14} /> Solicitar datos ARCO
+        </button>
+      </Card>
+
+      <Card
+        style={{
+          marginTop: 16,
+          background: 'var(--warn-50)',
+          borderColor: 'var(--warn-200)',
+        }}
       >
-        <Toggle checked={checkinEnabled} onChange={setCheckinEnabled} />
-      </Field>
-      <SaveButton onClick={onSave}>Guardar</SaveButton>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 8,
+          }}
+        >
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 9,
+              background: '#fff',
+              color: 'var(--warn-600)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ShieldOff size={16} />
+          </div>
+          <div style={{ fontSize: 14.5, fontWeight: 700 }}>
+            Consentimiento informado
+          </div>
+        </div>
+        <p
+          style={{
+            fontSize: 13,
+            color: 'var(--ink-700)',
+            lineHeight: 1.5,
+            margin: '4px 0 14px',
+          }}
+        >
+          Puedes revocar tu consentimiento en cualquier momento. Esto eliminara
+          tus datos y finalizara tu acceso al servicio.
+        </p>
+        <button
+          type="button"
+          onClick={onRevokeConsent}
+          style={{
+            padding: '8px 14px',
+            border: '1px solid var(--warn-600)',
+            color: 'var(--warn-700)',
+            background: 'transparent',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
+          Revocar consentimiento
+        </button>
+      </Card>
+
+      <SaveBar onClick={onSave} />
     </section>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Accessibility Tab
+// Accesibilidad
 // ---------------------------------------------------------------------------
 
-interface AccessibilityTabProps {
+interface AccesibilidadSectionProps {
   contrast: boolean
   setContrast: (v: boolean) => void
   fontSize: 'small' | 'normal' | 'large'
@@ -514,7 +692,7 @@ interface AccessibilityTabProps {
   onSave: () => void
 }
 
-function AccessibilityTab({
+function AccesibilidadSection({
   contrast,
   setContrast,
   fontSize,
@@ -522,50 +700,52 @@ function AccessibilityTab({
   subtitles,
   setSubtitles,
   onSave,
-}: AccessibilityTabProps) {
+}: AccesibilidadSectionProps) {
   return (
     <section>
       <SectionHeader
         title="Accesibilidad"
-        description="Ajusta la presentacion visual y auditiva."
+        desc="Ajusta la presentacion visual y auditiva."
       />
-      <Field
+      <Toggle
+        checked={contrast}
+        onChange={setContrast}
         label="Alto contraste"
-        description="Aumenta el contraste entre texto y fondo para mejor lectura."
-      >
-        <Toggle checked={contrast} onChange={setContrast} />
-      </Field>
-      <Field
-        label="Tamano de fuente"
-        description="Aplica a todas las pantallas. Persiste entre sesiones."
-      >
-        <Segmented<'small' | 'normal' | 'large'>
-          value={fontSize}
-          onChange={setFontSize}
-          options={[
-            { value: 'small', label: 'Pequena' },
-            { value: 'normal', label: 'Normal' },
-            { value: 'large', label: 'Grande' },
-          ]}
-          ariaLabel="Tamano de fuente"
-        />
-      </Field>
-      <Field
+        hint="Mejora la visibilidad de textos y elementos."
+      />
+      <div style={{ paddingTop: 22 }}>
+        <SettingsField
+          label="Tamano de fuente"
+          hint="Afecta el cuerpo del texto. Persiste entre sesiones."
+        >
+          <Segmented<'small' | 'normal' | 'large'>
+            value={fontSize}
+            onChange={setFontSize}
+            options={[
+              { value: 'small', label: 'Pequena' },
+              { value: 'normal', label: 'Normal' },
+              { value: 'large', label: 'Grande' },
+            ]}
+            ariaLabel="Tamano de fuente"
+          />
+        </SettingsField>
+      </div>
+      <Toggle
+        checked={subtitles}
+        onChange={setSubtitles}
         label="Subtitulos TTS"
-        description="Resalta cada palabra mientras Mabel habla. Util si tienes el audio bajo."
-      >
-        <Toggle checked={subtitles} onChange={setSubtitles} />
-      </Field>
-      <SaveButton onClick={onSave}>Guardar</SaveButton>
+        hint="Resaltado word-by-word durante reproduccion de voz."
+      />
+      <SaveBar onClick={onSave} />
     </section>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Voice Tab
+// Voz
 // ---------------------------------------------------------------------------
 
-interface VoiceTabProps {
+interface VozSectionProps {
   ttsEnabled: boolean
   setTtsEnabled: (v: boolean) => void
   ttsVoice: string
@@ -577,7 +757,7 @@ interface VoiceTabProps {
   onSave: () => void
 }
 
-function VoiceTab({
+function VozSection({
   ttsEnabled,
   setTtsEnabled,
   ttsVoice,
@@ -587,156 +767,186 @@ function VoiceTab({
   previewPlaying,
   previewVoice,
   onSave,
-}: VoiceTabProps) {
+}: VozSectionProps) {
   return (
     <section>
       <SectionHeader
         title="Voz"
-        description="Configura la sintesis de voz y el modo de interaccion."
+        desc="Configura la sintesis de voz y el modo de interaccion."
       />
-      <Field
+      <Toggle
+        checked={ttsEnabled}
+        onChange={setTtsEnabled}
         label="TTS activado"
-        description="Reproducir respuestas con voz. Puedes silenciar puntualmente en el chat."
-      >
-        <Toggle checked={ttsEnabled} onChange={setTtsEnabled} />
-      </Field>
-      <Field
-        label="Voz del asistente"
-        description="Elige el timbre. Usa Preview para escuchar un fragmento breve."
-        vertical
-      >
-        <div className="flex gap-2 items-center">
-          <NativeSelect
-            value={ttsVoice}
-            onChange={setTtsVoice}
-            ariaLabel="Voz del asistente"
-          >
-            <option value="">Por defecto</option>
-            <option value="es-female-1">Femenina 1</option>
-            <option value="es-female-2">Femenina 2</option>
-            <option value="es-male-1">Masculina 1</option>
-          </NativeSelect>
-          <button
-            type="button"
-            onClick={previewVoice}
-            disabled={previewPlaying}
-            className="px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50"
+        hint="Reproducir respuestas con voz sintetizada. Puedes silenciar puntualmente en el chat."
+      />
+      <div style={{ paddingTop: 22 }}>
+        <SettingsField
+          label="Voz del asistente"
+          hint="Elige la voz para reproduccion. Usa Preview para escuchar un fragmento breve."
+        >
+          <div
             style={{
-              backgroundColor: 'var(--ink-100)',
-              color: 'var(--ink-900)',
-              border: '1px solid var(--ink-100)',
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              flexWrap: 'wrap',
             }}
           >
-            {previewPlaying ? 'Reproduciendo...' : 'Preview'}
-          </button>
-        </div>
-      </Field>
-      <Field
-        label="Modo de interaccion"
-        description="Elige entre chat clasico o avatar 3D animado."
-      >
-        <Segmented<'chat' | 'avatar'>
-          value={chatMode}
-          onChange={setChatMode}
-          options={[
-            { value: 'chat', label: 'Chat clasico' },
-            { value: 'avatar', label: 'Avatar 3D' },
-          ]}
-          ariaLabel="Modo de interaccion"
-        />
-      </Field>
-      <SaveButton onClick={onSave}>Guardar</SaveButton>
+            <NativeSelect
+              value={ttsVoice}
+              onChange={setTtsVoice}
+              ariaLabel="Voz del asistente"
+            >
+              <option value="">Por defecto</option>
+              <option value="es-female-1">Femenina 1</option>
+              <option value="es-female-2">Femenina 2</option>
+              <option value="es-male-1">Masculina 1</option>
+            </NativeSelect>
+            <PrimaryButton onClick={previewVoice} disabled={previewPlaying}>
+              {previewPlaying ? 'Reproduciendo...' : 'Preview'}
+            </PrimaryButton>
+          </div>
+        </SettingsField>
+
+        <SettingsField
+          label="Modo de interaccion"
+          hint="Chat clasico o avatar 3D animado."
+        >
+          <Segmented<'chat' | 'avatar'>
+            value={chatMode}
+            onChange={setChatMode}
+            options={[
+              { value: 'chat', label: 'Chat clasico' },
+              { value: 'avatar', label: 'Avatar 3D' },
+            ]}
+            ariaLabel="Modo de interaccion"
+          />
+        </SettingsField>
+      </div>
+      <SaveBar onClick={onSave} />
     </section>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Account Tab
+// Cuenta
 // ---------------------------------------------------------------------------
 
-interface AccountTabProps {
+interface CuentaSectionProps {
   email: string
   onChangePassword: () => void
-  onRevokeConsent: () => void
   onDeleteAccount: () => void
 }
 
-function AccountTab({
+function CuentaSection({
   email,
   onChangePassword,
-  onRevokeConsent,
   onDeleteAccount,
-}: AccountTabProps) {
+}: CuentaSectionProps) {
   return (
     <section>
-      <SectionHeader
-        title="Cuenta"
-        description="Tu identidad y opciones criticas."
-      />
-      <Field label="Email" description="No se puede cambiar el email.">
-        <span className="text-sm" style={{ color: 'var(--ink-500)' }}>
-          {email || '-'}
-        </span>
-      </Field>
+      <SectionHeader title="Cuenta" desc="Seguridad y eliminacion." />
 
-      <div className="mt-4 space-y-2">
-        <button
-          type="button"
-          onClick={onChangePassword}
-          className="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors"
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: 'var(--ink-900)',
+          marginBottom: 12,
+        }}
+      >
+        Cambiar contrasena
+      </div>
+      <PrimaryButton
+        onClick={onChangePassword}
+        icon={<Lock size={15} />}
+      >
+        Cambiar contrasena
+      </PrimaryButton>
+
+      <div style={{ marginTop: 28 }}>
+        <SettingsField
+          label="Email"
+          hint="No se puede cambiar el email asociado a tu cuenta."
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 14px',
+              background: 'var(--ink-50)',
+              border: '1px solid var(--ink-200)',
+              borderRadius: 10,
+              color: 'var(--ink-700)',
+              fontSize: 14,
+            }}
+          >
+            <Mail size={16} style={{ color: 'var(--ink-400)' }} />
+            <span>{email || '-'}</span>
+          </div>
+        </SettingsField>
+      </div>
+
+      {/* Danger zone */}
+      <div
+        style={{
+          marginTop: 36,
+          padding: 20,
+          border: '1px solid var(--danger-200)',
+          borderRadius: 14,
+          background: 'var(--danger-50)',
+        }}
+      >
+        <div
           style={{
-            backgroundColor: 'var(--ink-100)',
-            color: 'var(--ink-900)',
-          }}
-          onMouseEnter={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--mabel-50)'
-          }}
-          onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--ink-100)'
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 6,
           }}
         >
-          Cambiar contrasena
-        </button>
-        <button
-          type="button"
-          onClick={onRevokeConsent}
-          className="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors"
+          <AlertTriangle size={16} style={{ color: 'var(--danger-600)' }} />
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--danger-700)',
+            }}
+          >
+            Zona de peligro
+          </div>
+        </div>
+        <p
           style={{
-            backgroundColor: 'var(--ink-100)',
-            color: 'var(--ink-900)',
-          }}
-          onMouseEnter={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--mabel-50)'
-          }}
-          onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--ink-100)'
+            fontSize: 13,
+            color: 'var(--ink-700)',
+            lineHeight: 1.5,
+            margin: '0 0 14px',
           }}
         >
-          Revocar consentimiento
-        </button>
+          Estas acciones son irreversibles. Procede con precaucion.
+        </p>
         <button
           type="button"
           onClick={onDeleteAccount}
-          className="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors"
           style={{
-            backgroundColor: 'color-mix(in srgb, var(--danger-600) 5%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--danger-600) 20%, transparent)',
+            padding: '9px 16px',
+            border: '1px solid var(--danger-600)',
             color: 'var(--danger-600)',
-          }}
-          onMouseEnter={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'color-mix(in srgb, var(--danger-600) 10%, transparent)'
-          }}
-          onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'color-mix(in srgb, var(--danger-600) 5%, transparent)'
+            background: '#fff',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
           }}
         >
-          Eliminar cuenta
+          <Trash2 size={14} /> Eliminar cuenta
         </button>
       </div>
     </section>
@@ -744,36 +954,85 @@ function AccountTab({
 }
 
 // ---------------------------------------------------------------------------
-// ARCO Tab
+// ARCO (Mis datos)
 // ---------------------------------------------------------------------------
 
-interface ArcoTabProps {
+interface ArcoSectionProps {
   onOpenExport: () => void
+  onRevokeConsent: () => void
 }
 
-function ArcoTab({ onOpenExport }: ArcoTabProps) {
+function ArcoSection({ onOpenExport, onRevokeConsent }: ArcoSectionProps) {
   return (
     <section>
       <SectionHeader
-        title="Mis Datos (ARCO)"
-        description="Ley 1581 de 2012 — derecho a Acceso, Rectificacion, Cancelacion y Oposicion."
+        title="Mis datos (ARCO)"
+        desc="Ley 1581 de 2012 - derecho a Acceso, Rectificacion, Cancelacion y Oposicion."
       />
-      <p className="text-sm mb-6" style={{ color: 'var(--ink-500)' }}>
-        Segun la Ley 1581 de 2012, tienes derecho a acceder, rectificar, cancelar
-        y oponerte al tratamiento de tus datos personales. Descarga tu informacion
-        en formato JSON o CSV para revisarla.
-      </p>
-      <button
-        type="button"
-        onClick={onOpenExport}
-        className="px-4 py-2 text-sm font-medium rounded-lg transition-opacity hover:opacity-90"
+      <p
         style={{
-          backgroundColor: 'var(--mabel-600)',
-          color: '#FFFFFF',
+          fontSize: 14,
+          color: 'var(--ink-600)',
+          lineHeight: 1.5,
+          marginBottom: 16,
         }}
       >
-        Ver mis datos
-      </button>
+        Segun la Ley 1581 de 2012, tienes derecho a acceder, rectificar,
+        cancelar y oponerte al tratamiento de tus datos personales. Descarga tu
+        informacion en formato JSON o CSV para revisarla.
+      </p>
+      <PrimaryButton onClick={onOpenExport}>Ver mis datos</PrimaryButton>
+
+      <div style={{ marginTop: 36 }}>
+        <Card
+          style={{
+            background: 'var(--warn-50)',
+            borderColor: 'var(--warn-200)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              marginBottom: 8,
+            }}
+          >
+            <Shield size={16} style={{ color: 'var(--warn-600)' }} />
+            <div style={{ fontSize: 14.5, fontWeight: 700 }}>
+              Consentimiento informado
+            </div>
+          </div>
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--ink-700)',
+              lineHeight: 1.5,
+              margin: '4px 0 14px',
+            }}
+          >
+            Puedes revocar tu consentimiento en cualquier momento. Esto
+            eliminara tus datos y finalizara tu acceso al servicio.
+          </p>
+          <button
+            type="button"
+            onClick={onRevokeConsent}
+            style={{
+              padding: '8px 14px',
+              border: '1px solid var(--warn-600)',
+              color: 'var(--warn-700)',
+              background: 'transparent',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Revocar consentimiento
+          </button>
+        </Card>
+      </div>
     </section>
   )
 }

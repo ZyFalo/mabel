@@ -69,21 +69,21 @@
 
 ### Capability 6.4 — settings-overlay
 
-- [ ] 19. Create `frontend/src/components/settings/primitives/` directory with: `SettingsField.tsx`, `Toggle.tsx` (overload variant with label+hint+border-bottom-ink-100 — separate from base ui Toggle), `Card.tsx`, `PrimaryButton.tsx`, `SecondaryButton.tsx`, `Input.tsx` (with prefix icon + password reveal toggle + ring-mabel focus), `SaveBar.tsx`, `SettingsNavItem.tsx`, `SectionHeader.tsx`
-- [ ] 20. Refactor `frontend/src/pages/Settings.tsx` from full-page to modal overlay:
+- [x] 19. Create `frontend/src/components/settings/primitives/` directory with: `SettingsField.tsx`, `Toggle.tsx` (overload variant with label+hint+border-bottom-ink-100 — separate from base ui Toggle), `Card.tsx`, `PrimaryButton.tsx`, `SecondaryButton.tsx`, `Input.tsx` (with prefix icon + password reveal toggle + ring-mabel focus), `SaveBar.tsx`, `SettingsNavItem.tsx`, `SectionHeader.tsx`
+- [x] 20. Refactor `frontend/src/pages/Settings.tsx` from full-page to modal overlay:
   - Container: position absolute inset-0 z-20 bg rgba(26,17,16,0.32) backdrop-blur 4 fade-in
   - Modal: min(100%, 1100px) × min(100%, 720px), bg white, radius 18, border ink-200, shadow-xl, scale-in
   - LEFT 280px sidebar (bg ink-50, border-right) with header "AJUSTES" eyebrow + "Preferencias" title + 5 SettingsNavItem
   - RIGHT flex-1 with header (breadcrumb "Ajustes / {section}" + X close) + scroll content max-w 580 padding 28 32
   - Click backdrop closes; X closes; Esc closes (preserve existing useKeyboardShortcuts esc handler)
-- [ ] 21. 5 sections content:
+- [x] 21. 5 sections content:
   - PrivacidadSection: 2 toggles (save_history, checkin_enabled) + ARCO info card + Consentimiento warn card
   - AccesibilidadSection: 1 toggle contrast + Segmented font_size + 1 toggle subtitles
   - VozSection: 1 toggle TTS + voice select + preview button + Segmented chat/avatar mode
   - CuentaSection: email read-only + change password form inline + danger zone with delete button
   - ArcoSection: Ley 1581 text + "Ver mis datos" button (opens ArcoExportModal)
-- [ ] 22. PRESERVE all existing save handlers (savePrivacy, saveAccessibility, saveVoice, change password, revoke consent, delete account, ARCO export). All 4 modal triggers route to existing modals unchanged.
-- [ ] 23. PRESERVE `?tab=` deeplink support — when modal opens with `?tab=voice`, activeTab is set to voice. Map prototype IDs: `appearance` → ignored (removed). Existing tabs: privacy, accessibility, voice, account, arco.
+- [x] 22. PRESERVE all existing save handlers (savePrivacy, saveAccessibility, saveVoice, change password, revoke consent, delete account, ARCO export). All 4 modal triggers route to existing modals unchanged.
+- [x] 23. PRESERVE `?tab=` deeplink support — when modal opens with `?tab=voice`, activeTab is set to voice. Map prototype IDs: `appearance` → ignored (removed). Existing tabs: privacy, accessibility, voice, account, arco.
 
 ### Capability 6.5 — crisis-overlay
 
