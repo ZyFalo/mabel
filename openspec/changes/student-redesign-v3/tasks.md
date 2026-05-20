@@ -3,29 +3,29 @@
 ### Capability 1 — design-system-v3 (foundation)
 
 #### Tokens + theme
-- [ ] 1. Update `frontend/src/index.css`: define CSS variables for light and dark themes scoped to `:root[data-theme="light"]` and `:root[data-theme="dark"]`. Include all tokens per design.md D-02. Add `prefers-color-scheme` fallback to auto-detect when `data-theme="auto"`.
-- [ ] 2. Create `frontend/src/hooks/useTheme.ts`: exposes `{theme, setTheme, resolvedTheme}`. Persists to `localStorage` (`mabel_theme`). Listens to `prefers-color-scheme` media query when `theme === 'auto'`. Writes to `<html data-theme>` immediately. When user is authenticated, also persists via `updatePreferences({accessibility: {...prev, theme}})`.
-- [ ] 3. In `frontend/src/App.tsx` (or a new ThemeProvider at the top of the tree), call `useTheme()` on app mount to apply the persisted theme BEFORE first paint (no FOUC). Set `<html data-theme>` from a sync localStorage read.
+- [x] 1. Update `frontend/src/index.css`: define CSS variables for light and dark themes scoped to `:root[data-theme="light"]` and `:root[data-theme="dark"]`. Include all tokens per design.md D-02. Add `prefers-color-scheme` fallback to auto-detect when `data-theme="auto"`.
+- [x] 2. Create `frontend/src/hooks/useTheme.ts`: exposes `{theme, setTheme, resolvedTheme}`. Persists to `localStorage` (`mabel_theme`). Listens to `prefers-color-scheme` media query when `theme === 'auto'`. Writes to `<html data-theme>` immediately. When user is authenticated, also persists via `updatePreferences({accessibility: {...prev, theme}})`.
+- [x] 3. In `frontend/src/App.tsx` (or a new ThemeProvider at the top of the tree), call `useTheme()` on app mount to apply the persisted theme BEFORE first paint (no FOUC). Set `<html data-theme>` from a sync localStorage read.
 
 #### Fonts + animations
-- [ ] 4. Add to `frontend/src/index.css`: `@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..500&display=swap');`. Define `.font-display` utility for `font-family: 'Fraunces', serif`.
-- [ ] 5. Add keyframes `fadeUp`, `fadeIn`, `scaleIn`, `streamingPulse` and classes `.fade-up`, `.fade-in`, `.scale-in` in `frontend/src/index.css`. Wrap all in `@media (prefers-reduced-motion: no-preference) { ... }`.
+- [x] 4. Add to `frontend/src/index.css`: `@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..500&display=swap');`. Define `.font-display` utility for `font-family: 'Fraunces', serif`.
+- [x] 5. Add keyframes `fadeUp`, `fadeIn`, `scaleIn`, `streamingPulse` and classes `.fade-up`, `.fade-in`, `.scale-in` in `frontend/src/index.css`. Wrap all in `@media (prefers-reduced-motion: no-preference) { ... }`.
 
 #### Primitives UI
-- [ ] 6. Create `frontend/src/components/ui/Toggle.tsx`: button role="switch" with aria-checked. Animated thumb. Uses `--accent` for on, `--border-strong` for off.
-- [ ] 7. Create `frontend/src/components/ui/Segmented.tsx`: button group with optional icon per option. Active uses `bg-elevated text-strong shadow-sm`, inactive `text-muted hover:text`.
-- [ ] 8. Create `frontend/src/components/ui/Slider.tsx`: range custom with track + fill + thumb. Format prop for value display.
-- [ ] 9. Create `frontend/src/components/ui/Field.tsx`: wrapper row/vertical with label + description + control slot.
-- [ ] 10. Create `frontend/src/components/ui/NativeSelect.tsx`: select with custom ChevronDown.
-- [ ] 11. Create `frontend/src/components/ui/Markdown.tsx`: ~60 lines, renderer for **bold**, `code`, numbered lists, bulleted lists, paragraphs, links (http/https only).
+- [x] 6. Create `frontend/src/components/ui/Toggle.tsx`: button role="switch" with aria-checked. Animated thumb. Uses `--accent` for on, `--border-strong` for off.
+- [x] 7. Create `frontend/src/components/ui/Segmented.tsx`: button group with optional icon per option. Active uses `bg-elevated text-strong shadow-sm`, inactive `text-muted hover:text`.
+- [x] 8. Create `frontend/src/components/ui/Slider.tsx`: range custom with track + fill + thumb. Format prop for value display.
+- [x] 9. Create `frontend/src/components/ui/Field.tsx`: wrapper row/vertical with label + description + control slot.
+- [x] 10. Create `frontend/src/components/ui/NativeSelect.tsx`: select with custom ChevronDown.
+- [x] 11. Create `frontend/src/components/ui/Markdown.tsx`: ~60 lines, renderer for **bold**, `code`, numbered lists, bulleted lists, paragraphs, links (http/https only).
 
 #### Keyboard shortcuts
-- [ ] 12. Create `frontend/src/hooks/useKeyboardShortcuts.ts`: takes a `Record<'cmd+b'|'cmd+,'|'esc', () => void>` and registers a window-level keydown listener. Detect `metaKey || ctrlKey + key` (cross-platform). Skip when target is `INPUT|TEXTAREA|CONTENTEDITABLE` UNLESS `allowInInputs: true`.
+- [x] 12. Create `frontend/src/hooks/useKeyboardShortcuts.ts`: takes a `Record<'cmd+b'|'cmd+,'|'esc', () => void>` and registers a window-level keydown listener. Detect `metaKey || ctrlKey + key` (cross-platform). Skip when target is `INPUT|TEXTAREA|CONTENTEDITABLE` UNLESS `allowInInputs: true`.
 
 #### Verification
-- [ ] 13. Run `cd frontend && npx tsc --noEmit` clean.
-- [ ] 14. Manual: in a temporary test page or a quick `App.tsx` console.log, verify that `useTheme().resolvedTheme` reacts to OS `prefers-color-scheme` changes.
-- [ ] 15. Manual: verify Fraunces loads (open Network tab, see woff2 request, render an `<h1 class="font-display italic">` and confirm serif appears).
+- [x] 13. Run `cd frontend && npx tsc --noEmit` clean.
+- [x] 14. Manual: in a temporary test page or a quick `App.tsx` console.log, verify that `useTheme().resolvedTheme` reacts to OS `prefers-color-scheme` changes.
+- [x] 15. Manual: verify Fraunces loads (open Network tab, see woff2 request, render an `<h1 class="font-display italic">` and confirm serif appears).
 
 ### Capability 2 — sidebar-redesign
 

@@ -36,6 +36,7 @@ import SessionDetail from './pages/SessionDetail'
 import SessionEnd from './pages/SessionEnd'
 import Settings from './pages/Settings'
 import { useAuthStore } from './stores/authStore'
+import { useTheme } from './hooks/useTheme'
 
 function SessionExpiredHandler() {
   const [showExpired, setShowExpired] = useState(false)
@@ -58,6 +59,10 @@ function SessionExpiredHandler() {
 
 export default function App() {
   const initialize = useAuthStore((s) => s.initialize)
+  // Keep React state in sync with the <html data-theme> attribute set by the
+  // pre-mount inline script in index.html (prevents FOUC). The hook also wires
+  // up the prefers-color-scheme listener when theme === 'auto'.
+  useTheme()
 
   useEffect(() => {
     initialize()

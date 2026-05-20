@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..500;1,9..144,300..500&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -8,4 +9,120 @@
   --color-warning: #F59E0B;
   --color-bg-main: #FFFFFF;
   --color-text-primary: #1F2937;
+}
+
+/* ============================================================
+   Design System v3 — CSS variables tokens (runtime-switchable)
+   Switched via <html data-theme="light"|"dark"|"auto">
+   ============================================================ */
+
+/* Light theme — default */
+:root,
+:root[data-theme="light"] {
+  --bg: #FAFAF7;
+  --bg-elevated: #FFFFFF;
+  --bg-sidebar: #F2F0EA;
+  --bg-hover: #ECE9DF;
+  --bg-active: #E0DCCC;
+  --bg-user-msg: #ECE9DF;
+  --bg-code: #E0DCCC;
+  --border: #E0DCCC;
+  --border-subtle: #ECE9DF;
+  --border-strong: #C5BFA8;
+  --text: #2F2C24;
+  --text-strong: #1A1812;
+  --text-muted: #5C5648;
+  --text-faint: #85806F;
+  --text-placeholder: #A8A293;
+  --accent: #A51916;
+  --accent-glow: rgba(165, 25, 22, 0.14);
+  --danger: #DC2626;
+  --success: #16A34A;
+  --warning: #F59E0B;
+}
+
+/* Dark theme — explicit */
+:root[data-theme="dark"] {
+  --bg: #1F1D1A;
+  --bg-elevated: #2A2823;
+  --bg-sidebar: #161512;
+  --bg-hover: #34322C;
+  --bg-active: #423E35;
+  --bg-user-msg: #34322C;
+  --bg-code: #2D2B26;
+  --border: #34322C;
+  --border-subtle: #2A2823;
+  --border-strong: #52493D;
+  --text: #D4CFC1;
+  --text-strong: #F0EBD8;
+  --text-muted: #A09B8C;
+  --text-faint: #7A7567;
+  --text-placeholder: #6B6759;
+  --accent: #DC4844;
+  --accent-glow: rgba(220, 72, 68, 0.20);
+  --danger: #EF4444;
+  --success: #22C55E;
+  --warning: #FBBF24;
+}
+
+/* Auto theme — follows OS preference */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --bg: #1F1D1A;
+    --bg-elevated: #2A2823;
+    --bg-sidebar: #161512;
+    --bg-hover: #34322C;
+    --bg-active: #423E35;
+    --bg-user-msg: #34322C;
+    --bg-code: #2D2B26;
+    --border: #34322C;
+    --border-subtle: #2A2823;
+    --border-strong: #52493D;
+    --text: #D4CFC1;
+    --text-strong: #F0EBD8;
+    --text-muted: #A09B8C;
+    --text-faint: #7A7567;
+    --text-placeholder: #6B6759;
+    --accent: #DC4844;
+    --accent-glow: rgba(220, 72, 68, 0.20);
+    --danger: #EF4444;
+    --success: #22C55E;
+    --warning: #FBBF24;
+  }
+}
+
+/* ============================================================
+   Typography utilities
+   ============================================================ */
+
+.font-display {
+  font-family: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  font-optical-sizing: auto;
+}
+
+/* ============================================================
+   Global animations — respect prefers-reduced-motion
+   ============================================================ */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes streamingPulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.3; }
+  }
+
+  .fade-up   { animation: fadeUp 0.4s ease-out backwards; }
+  .fade-in   { animation: fadeIn 0.2s ease-out; }
+  .scale-in  { animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
 }
