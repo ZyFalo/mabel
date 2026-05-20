@@ -45,27 +45,27 @@
 
 ### Capability 6.3 — chat-skin
 
-- [ ] 11. Refactor `frontend/src/pages/Home.tsx`:
+- [x] 11. Refactor `frontend/src/pages/Home.tsx`:
   - Centered Avatar M (size 56) with shadow-brand
   - Greeting "Hola, {firstName}." 32px bold ink-900 letter-spacing -0.02em
   - Subtitle "Soy Mabel, tu asistente de bienestar en la UMB. Este es un espacio seguro y confidencial. ¿Por dónde quieres empezar?" 16px ink-500 max-width 540
   - Composer integrated
   - 4 SuggestionChip pills (Heart/Cómo me siento hoy, MessageCircle/Quiero hablar de algo, Brain/Tengo estrés académico, Sparkles/Necesito motivación) with hover bg mabel-50 + border mabel-300 + color mabel-700
   - Footer: lock 12 + "Conversaciones cifradas · Mabel no reemplaza la atención profesional" 12px ink-400
-- [ ] 12. Refactor `frontend/src/components/chat/Composer.tsx`:
+- [x] 12. Refactor `frontend/src/components/chat/Composer.tsx`:
   - Card: bg white, border ink-200 (focused mabel-300), border-radius 20, padding 14px 16px 10px, shadow-sm (focused: ring-mabel + shadow-sm)
   - Textarea auto-grow max 200px, 15px Nunito
   - Bottom row: LEFT Paperclip + Mic 34×34 hover bg ink-100, RIGHT hint "↵ para enviar" 11px ink-400 + Send circular 34×34 mabel-600 with ArrowRight (disabled ink-200)
   - PRESERVE the existing mic recording state (animate-pulse border #DC2626) — only update size/colors to match
-- [ ] 13. Create new `SuggestionChip` inline component within Home (or as `components/chat/SuggestionChip.tsx`): rounded-full pill with white bg + ink-200 border + 13px ink-700, hover mabel-50 bg + mabel-300 border + mabel-700 text + shadow-xs
-- [ ] 14. Refactor `frontend/src/pages/Chat.tsx` message rendering:
+- [x] 13. Create new `SuggestionChip` inline component within Home (or as `components/chat/SuggestionChip.tsx`): rounded-full pill with white bg + ink-200 border + 13px ink-700, hover mabel-50 bg + mabel-300 border + mabel-700 text + shadow-xs
+- [x] 14. Refactor `frontend/src/pages/Chat.tsx` message rendering:
   - User bubble: max-width min(560px, 75%), padding 11px 15px, border-radius `18px 18px 4px 18px`, bg mabel-600, white, 14.5px line-height 1.55, shadow-xs. Container flex justify-end gap-12 row-reverse align-flex-start mb-22. NO avatar.
   - Assistant: container flex gap-12 align-flex-start mb-22. Avatar M 32px on LEFT (margin-top 2). Bubble border-radius `4px 18px 18px 18px`, bg white, border ink-200, ink-900 text. Content via `<Markdown />`. Streaming cursor 7×15 bg-mabel-600 pulse. Hover actions (Copy, Flag/Reportar) below. "Ya reportado" badge always visible if reported.
   - Timestamp 11px ink-400 below each bubble
-- [ ] 15. ChatActive session header bar: padding 14px 24px, border-bottom ink-200, bg rgba(255,255,255,0.7) backdrop-blur 8px. Left: session title 14.5px bold + green "Activa" pill (10.5px success-700, bg success-50, padding 2px 8px, radius full, with green dot). Right: 2 icon buttons (voice, more) — voice could be future, more = open menu with "Finalizar sesion" item that triggers existing handler.
-- [ ] 16. PRESERVE all existing handlers: handleSend, handleEndSession, handleMicToggle, handleCopy, handleReportDone, riskDetected effect, draft restore, auto-greeting, sendMessage flow.
-- [ ] 17. Move disclaimer to below Composer in ChatActive (same as Home pattern).
-- [ ] 18. Verify: tsc + smoke test new chat flow
+- [x] 15. ChatActive session header bar: padding 14px 24px, border-bottom ink-200, bg rgba(255,255,255,0.7) backdrop-blur 8px. Left: session title 14.5px bold + green "Activa" pill (10.5px success-700, bg success-50, padding 2px 8px, radius full, with green dot). Right: 2 icon buttons (voice, more) — voice could be future, more = open menu with "Finalizar sesion" item that triggers existing handler.
+- [x] 16. PRESERVE all existing handlers: handleSend, handleEndSession, handleMicToggle, handleCopy, handleReportDone, riskDetected effect, draft restore, auto-greeting, sendMessage flow.
+- [x] 17. Move disclaimer to below Composer in ChatActive (same as Home pattern).
+- [x] 18. Verify: tsc + smoke test new chat flow
 
 ### Capability 6.4 — settings-overlay
 

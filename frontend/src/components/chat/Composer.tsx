@@ -1,5 +1,12 @@
-import { useEffect, useRef } from 'react'
-import { Send, Mic, Square, Loader2, Volume2, VolumeX } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Paperclip,
+  Mic,
+  Loader2,
+  Volume2,
+  VolumeX,
+  ArrowRight,
+} from 'lucide-react'
 
 interface ComposerProps {
   value: string
@@ -21,13 +28,20 @@ interface ComposerProps {
 const MAX_TEXTAREA_HEIGHT = 200
 
 /**
- * Composer — Cap 3, floating card composer with mic/mute/send controls.
+ * Composer — Cap 6.3, prototype-styled composer card.
+ *
+ * Card: white bg, 20px radius, ink-200 border (focused mabel-300 + ring-mabel),
+ * shadow-sm, padding 14px 16px 10px.
+ *
+ * Bottom row:
+ *  - LEFT: Paperclip (placeholder) + Mic (ASR) + Mute (TTS) — 34×34 buttons
+ *  - RIGHT: hint "↵ para enviar" + circular Send button (ArrowRight, mabel-600)
  *
  * Preserves verbatim:
- * - Mic ASR pulsing red border `animate-pulse border-2 border-[#DC2626]` while recording
- * - Mute TTS toggle (only when ttsEnabled === true)
- * - Enter to send, Shift+Enter newline
- * - 2000-char default cap
+ *  - Mic ASR pulsing red border `animate-pulse + 2px #DC2626` while recording
+ *  - Mute TTS toggle (only when ttsEnabled === true)
+ *  - Enter to send, Shift+Enter newline
+ *  - 2000-char default cap
  */
 export default function Composer({
   value,
@@ -40,12 +54,13 @@ export default function Composer({
   ttsEnabled = false,
   isMuted = false,
   onMuteToggle,
-  placeholder = 'Escribe un mensaje...',
+  placeholder = 'Cuéntame qué necesitas hoy…',
   maxLength = 2000,
   showHint = true,
   autoFocus = false,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [focused, setFocused] = useState(false)
 
   // Auto-grow textarea up to MAX_TEXTAREA_HEIGHT.
   useEffect(() => {
@@ -68,48 +83,100 @@ export default function Composer({
 
   const showMic = typeof onMicToggle === 'function'
   const showMute = ttsEnabled && typeof onMuteToggle === 'function'
+  const canSend = !!value.trim() && !disabled
   const charsNearMax = value.length > maxLength - 100
 
+  // Reusable subtle icon button styles for LEFT-row buttons (34×34 ghost).
+  const ghostBtnBase: React.CSSProperties = {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--ink-500)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all var(--dur-fast) var(--ease-out)',
+  }
+
+  function ghostHoverEnter(e: React.MouseEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = 'var(--ink-100)'
+    e.currentTarget.style.color = 'var(--ink-800)'
+  }
+  function ghostHoverLeave(e: React.MouseEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = 'transparent'
+    e.currentTarget.style.color = 'var(--ink-500)'
+  }
+
   return (
-    <div className="w-full">
+    <div style={{ width: '100%' }}>
       <div
-        className="
-          group/composer
-          bg-[#fff]
-          border border-[var(--ink-200)]
-          rounded-[22px]
-          shadow-sm
-          transition-all duration-200
-          focus-within:border-[var(--mabel-600)]/60
-          focus-within:shadow-[0_2px_24px_-6px_var(--ring-mabel)]
-        "
+        style={{
+          background: '#fff',
+          border: `1px solid ${focused ? 'var(--mabel-300)' : 'var(--ink-200)'}`,
+          borderRadius: 20,
+          boxShadow: focused
+            ? 'var(--ring-mabel), var(--shadow-sm)'
+            : 'var(--shadow-sm)',
+          padding: '14px 16px 10px',
+          transition: 'all var(--dur-base) var(--ease-out)',
+        }}
       >
         <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value.slice(0, maxLength))}
           onKeyDown={handleKeyDown}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           disabled={disabled}
           maxLength={maxLength}
           rows={1}
           placeholder={placeholder}
           aria-label="Mensaje para Mabel"
-          className="
-            w-full resize-none
-            bg-transparent
-            text-[var(--ink-900)]
-            placeholder:text-[var(--ink-400)]
-            px-5 pt-4 pb-2
-            text-[15px] leading-relaxed
-            outline-none
-            disabled:opacity-60 disabled:cursor-not-allowed
-          "
-          style={{ maxHeight: `${MAX_TEXTAREA_HEIGHT}px` }}
+          style={{
+            width: '100%',
+            border: 'none',
+            outline: 'none',
+            resize: 'none',
+            fontFamily: 'var(--font-sans)',
+            fontSize: 15,
+            lineHeight: 1.5,
+            color: 'var(--ink-900)',
+            background: 'transparent',
+            minHeight: 28,
+            maxHeight: MAX_TEXTAREA_HEIGHT,
+          }}
         />
 
-        <div className="flex items-center justify-between px-3 pb-2.5">
-          {/* LEFT — Mic + Mute */}
-          <div className="flex items-center gap-1">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: 6,
+          }}
+        >
+          {/* LEFT — Paperclip (placeholder), Mic (ASR), Mute (TTS) */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {/* Paperclip placeholder — visual only, deferred attachment feature */}
+            <button
+              type="button"
+              title="Adjuntar"
+              aria-label="Adjuntar"
+              disabled
+              style={{
+                ...ghostBtnBase,
+                cursor: 'not-allowed',
+                opacity: 0.6,
+              }}
+            >
+              <Paperclip size={17} />
+            </button>
+
+            {/* Mic (ASR) — pulsing red border when recording (PRESERVED) */}
             {showMic && (
               <button
                 type="button"
@@ -118,24 +185,51 @@ export default function Composer({
                 title={isRecording ? 'Detener grabacion' : 'Grabar audio'}
                 aria-label={isRecording ? 'Detener grabacion' : 'Grabar audio'}
                 aria-pressed={isRecording}
-                className={
+                className={isRecording ? 'animate-pulse' : ''}
+                style={
                   isRecording
-                    ? 'flex items-center justify-center w-9 h-9 rounded-lg bg-white border-2 border-[#DC2626] text-[#DC2626] animate-pulse'
+                    ? {
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        background: '#fff',
+                        color: '#DC2626',
+                        border: '2px solid #DC2626',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }
                     : isProcessingAudio
-                      ? 'flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-400)]'
-                      : 'flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-400)] hover:text-[var(--ink-700)] hover:bg-[var(--ink-100)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                      ? {
+                          ...ghostBtnBase,
+                          cursor: 'wait',
+                          color: 'var(--ink-400)',
+                        }
+                      : {
+                          ...ghostBtnBase,
+                          opacity: disabled ? 0.5 : 1,
+                          cursor: disabled ? 'not-allowed' : 'pointer',
+                        }
                 }
+                onMouseEnter={(e) => {
+                  if (isRecording || isProcessingAudio || disabled) return
+                  ghostHoverEnter(e)
+                }}
+                onMouseLeave={(e) => {
+                  if (isRecording || isProcessingAudio || disabled) return
+                  ghostHoverLeave(e)
+                }}
               >
                 {isProcessingAudio ? (
                   <Loader2 size={17} className="animate-spin" />
-                ) : isRecording ? (
-                  <Square size={15} fill="currentColor" />
                 ) : (
                   <Mic size={17} />
                 )}
               </button>
             )}
 
+            {/* Mute (TTS) — only when TTS enabled */}
             {showMute && (
               <button
                 type="button"
@@ -143,44 +237,75 @@ export default function Composer({
                 title={isMuted ? 'Activar TTS' : 'Silenciar TTS'}
                 aria-label={isMuted ? 'Activar TTS' : 'Silenciar TTS'}
                 aria-pressed={isMuted}
-                className="flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-400)] hover:text-[var(--ink-700)] hover:bg-[var(--ink-100)] transition-colors"
+                style={ghostBtnBase}
+                onMouseEnter={ghostHoverEnter}
+                onMouseLeave={ghostHoverLeave}
               >
                 {isMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
               </button>
             )}
           </div>
 
-          {/* RIGHT — Send */}
-          <button
-            type="button"
-            onClick={onSend}
-            disabled={!value.trim() || disabled}
-            aria-label="Enviar mensaje"
-            title="Enviar"
-            className="
-              flex items-center justify-center
-              p-2 rounded-lg
-              bg-[var(--mabel-600)] text-white
-              hover:opacity-90 active:opacity-100
-              transition-opacity
-              disabled:bg-[var(--ink-300)] disabled:text-[var(--ink-400)]
-              disabled:cursor-not-allowed
-            "
-          >
-            <Send size={17} />
-          </button>
+          {/* RIGHT — hint + circular Send */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {showHint && (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: 'var(--ink-400)',
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                }}
+                className="hidden sm:inline"
+              >
+                <span style={{ fontFamily: 'var(--font-ui)' }}>⏎</span> para enviar
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={onSend}
+              disabled={!canSend}
+              aria-label="Enviar mensaje"
+              title="Enviar"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: canSend ? 'var(--mabel-600)' : 'var(--ink-200)',
+                color: '#fff',
+                border: 'none',
+                cursor: canSend ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background var(--dur-fast) var(--ease-out)',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                if (canSend) e.currentTarget.style.background = 'var(--mabel-700)'
+              }}
+              onMouseLeave={(e) => {
+                if (canSend) e.currentTarget.style.background = 'var(--mabel-600)'
+              }}
+            >
+              <ArrowRight size={16} strokeWidth={2.25} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {showHint && (
-        <p className="text-[11px] text-[var(--ink-400)] text-center mt-2 select-none">
-          <span className="font-medium">Enter</span> para enviar,{' '}
-          <span className="font-medium">Shift+Enter</span> para nueva linea
-          {charsNearMax && (
-            <span className="ml-2 text-[var(--ink-500)]">
-              · {value.length}/{maxLength}
-            </span>
-          )}
+      {/* Optional inline char counter only when near limit. */}
+      {charsNearMax && (
+        <p
+          style={{
+            fontSize: 11,
+            color: 'var(--ink-500)',
+            textAlign: 'right',
+            marginTop: 6,
+          }}
+        >
+          {value.length}/{maxLength}
         </p>
       )}
     </div>

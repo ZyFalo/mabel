@@ -1,39 +1,47 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Heart, Moon, MessageCircle, Sparkles } from 'lucide-react'
+import {
+  Heart,
+  MessageCircle,
+  Brain,
+  Sparkles,
+  Lock,
+  type LucideIcon,
+} from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useChatStore } from '../stores/chatStore'
 import { useToastStore } from '../stores/toastStore'
 import Composer from '../components/chat/Composer'
-
-type SuggestionAccent = 'rose' | 'amber' | 'indigo' | 'emerald'
+import SuggestionChip from '../components/chat/SuggestionChip'
 
 interface Suggestion {
-  text: string
-  icon: React.ReactNode
-  accent: SuggestionAccent
+  icon: LucideIcon
+  label: string
+  prompt: string
 }
 
 const SUGGESTIONS: Suggestion[] = [
-  { text: 'Estoy estresado por los parciales', icon: <BookOpen size={15} />, accent: 'amber' },
-  { text: 'Tecnicas de relajacion', icon: <Heart size={15} />, accent: 'rose' },
-  { text: 'No puedo dormir bien', icon: <Moon size={15} />, accent: 'indigo' },
-  { text: 'Quiero hablar de como me siento', icon: <MessageCircle size={15} />, accent: 'emerald' },
+  {
+    icon: Heart,
+    label: 'Cómo me siento hoy',
+    prompt: 'Quiero hablarte sobre cómo me he sentido hoy.',
+  },
+  {
+    icon: MessageCircle,
+    label: 'Quiero hablar de algo',
+    prompt: 'Tengo algo en mente y necesito conversarlo.',
+  },
+  {
+    icon: Brain,
+    label: 'Tengo estrés académico',
+    prompt: 'Estoy con mucho estrés por temas académicos.',
+  },
+  {
+    icon: Sparkles,
+    label: 'Necesito motivación',
+    prompt: 'Hoy necesito un poco de motivación.',
+  },
 ]
-
-const ACCENT_CHIP: Record<SuggestionAccent, string> = {
-  rose: 'bg-rose-100 text-rose-700 border-rose-200/60',
-  amber: 'bg-amber-100 text-amber-800 border-amber-200/60',
-  indigo: 'bg-indigo-100 text-indigo-700 border-indigo-200/60',
-  emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200/60',
-}
-
-function getTimeGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Buenos dias'
-  if (hour < 19) return 'Buenas tardes'
-  return 'Buenas noches'
-}
 
 export default function Home() {
   const navigate = useNavigate()
@@ -50,15 +58,16 @@ export default function Home() {
     return full.split(/\s+/)[0]
   }, [user?.display_name])
 
-  const timeGreeting = useMemo(() => getTimeGreeting(), [])
-
   async function launchSession(topicHint?: string) {
     if (creating) return
     setCreating(true)
     try {
       const result = await createSession(topicHint)
       if (result.previous_session_closed) {
-        addToast({ type: 'info', message: 'Sesion anterior finalizada automaticamente' })
+        addToast({
+          type: 'info',
+          message: 'Sesion anterior finalizada automaticamente',
+        })
       }
       if (result.checkin_opt_in) {
         navigate(`/session/${result.id}/checkin`)
@@ -72,8 +81,8 @@ export default function Home() {
     }
   }
 
-  function handleSuggestionClick(text: string) {
-    void launchSession(text)
+  function handleSuggestionClick(s: Suggestion) {
+    void launchSession(s.prompt)
   }
 
   function handleComposerSend() {
@@ -84,91 +93,120 @@ export default function Home() {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 pb-12 pt-8">
-      <div className="max-w-2xl w-full fade-in">
-        {/* Logo / brand mark */}
-        <div className="flex justify-center mb-7">
-          <div
-            className="
-              w-12 h-12 rounded-full
-              flex items-center justify-center
-              bg-[#fff] border border-[var(--ink-200)]
-              text-[var(--mabel-600)]
-              shadow-sm
-            "
-            aria-hidden="true"
-          >
-            <Sparkles size={20} />
-          </div>
+    <div
+      className="fade-in"
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 24px',
+        overflowY: 'auto',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: 720, textAlign: 'center' }}>
+        {/* Mabel M avatar with brand shadow */}
+        <div
+          aria-hidden="true"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: 'var(--mabel-600)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            fontSize: 23,
+            margin: '0 auto 20px',
+            boxShadow: 'var(--shadow-brand)',
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          M
         </div>
 
-        {/* Greeting */}
         <h1
-          className="
-            font-display italic font-light
-            text-[34px] sm:text-[40px]
-            text-center text-[var(--ink-900)]
-            mb-10 leading-tight tracking-tight
-          "
+          style={{
+            fontSize: 32,
+            fontWeight: 700,
+            lineHeight: 1.15,
+            color: 'var(--ink-900)',
+            margin: '0 0 10px',
+            letterSpacing: '-0.02em',
+            fontFamily: 'var(--font-sans)',
+          }}
         >
-          {timeGreeting},{' '}
-          <span className="text-[var(--mabel-600)]">{firstName}</span>
+          Hola, {firstName}.
         </h1>
 
-        {/* Composer (no mic/mute on welcome — no session yet) */}
-        <Composer
-          value={draft}
-          onChange={setDraft}
-          onSend={handleComposerSend}
-          disabled={creating}
-          placeholder="Cuentame, como te sientes hoy..."
-          showHint={false}
-        />
+        <p
+          style={{
+            fontSize: 16,
+            color: 'var(--ink-500)',
+            margin: '0 auto 32px',
+            maxWidth: 540,
+            lineHeight: 1.55,
+          }}
+        >
+          Soy Mabel, tu asistente de bienestar en la UMB. Este es un espacio
+          seguro y confidencial. ¿Por dónde quieres empezar?
+        </p>
 
-        {/* Suggestions grid */}
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {SUGGESTIONS.map((s, i) => (
-            <button
-              key={s.text}
-              onClick={() => handleSuggestionClick(s.text)}
+        {/* Composer — no mic/mute on Home (no session yet) */}
+        <div style={{ textAlign: 'left' }}>
+          <Composer
+            value={draft}
+            onChange={setDraft}
+            onSend={handleComposerSend}
+            disabled={creating}
+            autoFocus
+            placeholder="Cuéntame qué necesitas hoy…"
+            showHint={false}
+          />
+        </div>
+
+        {/* 4 suggestion chips */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            justifyContent: 'center',
+            marginTop: 20,
+          }}
+        >
+          {SUGGESTIONS.map((s) => (
+            <SuggestionChip
+              key={s.label}
+              icon={s.icon}
+              label={s.label}
+              onClick={() => handleSuggestionClick(s)}
               disabled={creating}
-              className="
-                group/sg
-                flex items-start gap-3
-                p-3.5 rounded-xl
-                border border-[var(--ink-200)]
-                bg-[#fff]/60
-                hover:bg-[#fff] hover:border-[var(--ink-300)]
-                transition-all duration-200
-                text-left
-                disabled:opacity-50 disabled:cursor-not-allowed
-                fade-up
-              "
-              style={{ animationDelay: `${120 + i * 50}ms` }}
-            >
-              <span
-                className={`
-                  shrink-0 w-7 h-7 rounded-lg
-                  flex items-center justify-center
-                  border ${ACCENT_CHIP[s.accent]}
-                  transition-transform duration-200
-                  group-hover/sg:scale-110
-                `}
-                aria-hidden="true"
-              >
-                {s.icon}
-              </span>
-              <span className="text-[13.5px] text-[var(--ink-700)] leading-snug pt-0.5">
-                {s.text}
-              </span>
-            </button>
+            />
           ))}
         </div>
 
-        {/* Subtle footnote */}
-        <p className="text-center text-[11px] text-[var(--ink-400)] mt-8">
-          Mabel es una asistente de psicoeducacion. No reemplaza atencion profesional.
-        </p>
+        {/* Lock disclaimer */}
+        <div
+          style={{
+            marginTop: 28,
+            fontSize: 12,
+            color: 'var(--ink-400)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          <Lock size={12} />
+          <span>
+            Conversaciones cifradas · Mabel no reemplaza la atención profesional
+          </span>
+        </div>
       </div>
     </div>
   )
