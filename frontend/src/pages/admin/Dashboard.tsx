@@ -30,8 +30,12 @@ interface MoodDistributionPoint {
   count: number
 }
 
+// Backend may return either an array or {bajo, medio, alto} object
+type MoodDistribution = MoodDistributionPoint[] | { bajo: number; medio: number; alto: number }
+
 interface SafetyTypePoint {
-  type: string
+  event_type?: string
+  type?: string
   count: number
 }
 
@@ -62,7 +66,7 @@ interface DashboardResponse {
   // Series
   sessions_per_day_30d?: SeriesPoint[]
   sessions_per_day?: SeriesPoint[]
-  mood_distribution_30d?: MoodDistributionPoint[]
+  mood_distribution_30d?: MoodDistribution
   latency_per_day_30d?: SeriesPoint[]
   latency_per_day?: SeriesPoint[]
   safety_events_by_type_30d?: SafetyTypePoint[]
@@ -192,16 +196,28 @@ export default function Dashboard() {
   )
 
   const moodData = useMemo(() => {
-    const buckets = data?.mood_distribution_30d ?? []
+    const raw = data?.mood_distribution_30d
     const labels: Record<string, string> = {
       '0-3': 'Bajo (0-3)',
       '4-6': 'Medio (4-6)',
       '7-10': 'Alto (7-10)',
+      bajo: 'Bajo (0-3)',
+      medio: 'Medio (4-6)',
+      alto: 'Alto (7-10)',
     }
-    return buckets.map((b) => ({
-      bucket: labels[b.bucket] ?? b.bucket,
-      count: b.count,
-    }))
+    if (!raw) return []
+    // Backend may return either an array [{bucket, count}] or an object {bajo, medio, alto}
+    if (Array.isArray(raw)) {
+      return raw.map((b) => ({
+        bucket: labels[b.bucket] ?? b.bucket,
+        count: b.count,
+      }))
+    }
+    return [
+      { bucket: labels.bajo, count: raw.bajo ?? 0 },
+      { bucket: labels.medio, count: raw.medio ?? 0 },
+      { bucket: labels.alto, count: raw.alto ?? 0 },
+    ]
   }, [data])
 
   const guardrailsData = useMemo(
@@ -215,10 +231,13 @@ export default function Dashboard() {
 
   const safetyByType = useMemo(() => {
     const items = data?.safety_events_by_type_30d ?? []
-    return items.map((t) => ({
-      name: EVENT_TYPE_LABEL[t.type] ?? t.type,
-      value: t.count,
-    }))
+    return items.map((t) => {
+      const key = t.event_type ?? t.type ?? ''
+      return {
+        name: EVENT_TYPE_LABEL[key] ?? key,
+        value: t.count,
+      }
+    })
   }, [data])
 
   const safetyTotal = safetyByType.reduce((acc, d) => acc + d.value, 0)
