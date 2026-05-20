@@ -186,3 +186,43 @@ class GeminiTestResponse(BaseModel):
     latency_ms: int
     model: str
     error: str | None = None
+
+
+# --- Capability 3 (Fase 8.1): research-analytics-backend ---
+
+
+class EmpathyRatingCreate(BaseModel):
+    """Payload for POST /admin/empathy-ratings.
+
+    `criteria` is a free-form checklist (e.g. `{empathic_tone: true, ...}`).
+    Score is constrained 1..5 by Pydantic (matches DB CHECK).
+    """
+
+    message_id: uuid.UUID
+    score: int = Field(ge=1, le=5)
+    criteria: dict | None = None
+
+
+class EmpathyQueueItem(BaseModel):
+    """Item rendered by the Empathy Ratings rating queue UI."""
+
+    message_id: uuid.UUID
+    session_id: uuid.UUID
+    content: str
+    created_at: datetime
+    session_started_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmpathyRatingItem(BaseModel):
+    """Persisted rating returned by POST /admin/empathy-ratings."""
+
+    id: uuid.UUID
+    message_id: uuid.UUID
+    rater_id: uuid.UUID | None = None
+    score: int
+    criteria: dict | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

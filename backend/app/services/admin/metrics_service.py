@@ -1,11 +1,16 @@
-"""Admin Metrics service — Capability 4 (admin-metrics).
+"""Admin Metrics service — Capability 4 (admin-metrics) + Fase 8.1 (research).
 
 Aggregations for dashboard KPIs and 5 metrics tabs (Uso, Bienestar, Tecnicas,
 Seguridad, Estudio). Implements D-11 (raw SQL aggregations, no caching),
 D-03 (never serialize messages.content), D-08 (CSV anonymization).
 
-Statistics computed with numpy (scipy is not installed). Cohen's d and a
-two-tailed paired t-test approximation are implemented manually.
+Statistics computed with numpy + scipy (Fase 8.1). Per D-05, paired pre/post
+comparisons use Shapiro-Wilk to decide between paired t-test
+(``scipy.stats.ttest_rel``) and Wilcoxon signed-rank (``scipy.stats.wilcoxon``).
+If ``n_paired < 10`` the inferential block is skipped and nulls are returned.
+
+Per D-06, empathy_distribution and pct_empathy_4_or_above are sourced from
+``empathy_ratings`` (NOT from survey_responses).
 """
 
 from __future__ import annotations
@@ -18,6 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import numpy as np
+import scipy.stats as scipy_stats
 from sqlalchemy import Float, Integer, String, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +33,7 @@ from app.models.safety_event import SafetyEvent
 from app.models.session import Session as SessionModel
 from app.models.survey_response import SurveyResponse
 from app.models.user import User
+from app.repositories.empathy_rating_repository import EmpathyRatingRepository
 from app.repositories.survey_response_repository import SurveyResponseRepository
 
 # Gemini 2.5 Flash pricing snapshot (USD per 1M tokens).
@@ -115,6 +122,92 @@ def _paired_stats(
     t_value = float(np.mean(diffs) / (sd_diffs / math.sqrt(len(diffs))))
     p_value = _normal_two_tail_p(t_value)
     return mean_pre, mean_post, cohens_d, p_value
+
+
+def _compute_paired_block(
+    pairs: list[tuple[float, float]],
+    n_excluded: int,
+    group_label: str = "all",
+) -> dict[str, Any] | None:
+    """Compute the wellbeing pre/post comparison entry per D-05.
+
+    Returns ``None`` if there is no data at all (no users with pre or post).
+    Otherwise returns a dict with keys: group, n_paired, n_excluded, mean_pre,
+    mean_post, diff, cohens_d, p_value, test_used, shapiro_p, test_skipped_reason.
+    """
+    n_paired = len(pairs)
+    if n_paired == 0 and n_excluded == 0:
+        return None
+
+    base: dict[str, Any] = {
+        "group": group_label,
+        "n_paired": n_paired,
+        "n_excluded": n_excluded,
+        "mean_pre": None,
+        "mean_post": None,
+        "diff": None,
+        "cohens_d": None,
+        "p_value": None,
+        "test_used": None,
+        "shapiro_p": None,
+        "test_skipped_reason": None,
+    }
+
+    if n_paired == 0:
+        base["test_skipped_reason"] = "n_paired < 10"
+        return base
+
+    pre = np.array([p for p, _ in pairs], dtype=float)
+    post = np.array([q for _, q in pairs], dtype=float)
+    diffs = post - pre
+
+    mean_pre = float(np.mean(pre))
+    mean_post = float(np.mean(post))
+    base["mean_pre"] = mean_pre
+    base["mean_post"] = mean_post
+    base["diff"] = float(mean_post - mean_pre)
+
+    if n_paired < 10:
+        base["test_skipped_reason"] = "n_paired < 10"
+        return base
+
+    # Shapiro-Wilk on diffs
+    try:
+        shapiro_res = scipy_stats.shapiro(diffs)
+        shapiro_p = float(shapiro_res.pvalue)
+    except Exception:
+        shapiro_p = None
+    base["shapiro_p"] = shapiro_p
+
+    sd_diffs = float(np.std(diffs, ddof=1))
+    if sd_diffs == 0.0:
+        # All differences identical — neither test is meaningful.
+        base["test_used"] = None
+        base["test_skipped_reason"] = "zero_variance"
+        return base
+
+    cohens_d = float(np.mean(diffs) / sd_diffs)
+
+    if shapiro_p is not None and shapiro_p < 0.05:
+        test_used = "wilcoxon"
+        try:
+            wilcoxon_res = scipy_stats.wilcoxon(diffs)
+            p_value = float(wilcoxon_res.pvalue)
+        except ValueError:
+            # scipy raises if all diffs are zero — guarded above, but keep safe.
+            p_value = None
+    else:
+        test_used = "paired_t"
+        try:
+            ttest_res = scipy_stats.ttest_rel(post, pre)
+            p_value = float(ttest_res.pvalue)
+        except Exception:
+            p_value = None
+
+    base["cohens_d"] = cohens_d
+    base["p_value"] = p_value
+    base["test_used"] = test_used
+    return base
 
 
 def _bucket_score(values: list[float], edges: list[tuple[float, float]], labels: list[str]) -> list[dict]:
@@ -733,9 +826,11 @@ class AdminMetricsService:
     # -----------------------------------------------------------------------
 
     async def metrics_study(self, cohort: str | None = None) -> dict[str, Any]:
+        """Tab E "Estudio" — SUS, empathy (D-06: empathy_ratings) and pre/post
+        wellbeing comparison with rigorous inferential stats (D-05).
+        """
         sus_scores = await self._sus_scores(cohort=cohort)
-        empathy_scores = await self._empathy_scores(cohort=cohort)
-        pairs = await self._wellbeing_pairs(cohort=cohort)
+        pairs, n_excluded = await self._wellbeing_pair_data(cohort=cohort)
 
         sus_buckets = _bucket_score(
             sus_scores,
@@ -743,39 +838,32 @@ class AdminMetricsService:
             labels=["0-25", "25-50", "50-75", "75-100"],
         )
 
-        empathy_buckets = _bucket_score(
-            empathy_scores,
-            edges=[(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)],
-            labels=["0-1", "1-2", "2-3", "3-4", "4-5"],
-        )
+        # D-06: empathy data source is now `empathy_ratings`.
+        empathy_repo = EmpathyRatingRepository(self.db)
+        empathy_stats = await empathy_repo.stats(cohort=cohort)
+        # Distribution shape from repo is [{bucket: "1".."5", count: int}].
+        empathy_distribution = empathy_stats["distribution"]
+        pct_empathy_4_or_above = empathy_stats["pct_4_or_above"]
 
         sus_mean = _safe_mean(sus_scores)
         sus_mean_vs_target = {"mean": sus_mean, "target": 70}
 
-        # Cohen's d estimate over wellbeing pairs
-        mean_pre, mean_post, cohens_d, p_value = _paired_stats(pairs)
-        cohens_d_estimate = cohens_d
+        # D-05: paired statistical block with Shapiro-Wilk + test selection.
+        comparison = _compute_paired_block(pairs=pairs, n_excluded=n_excluded)
 
-        if mean_pre is None:
-            wellbeing_pre_post_comparison = []
-        else:
-            diff = (mean_post - mean_pre) if (mean_pre is not None and mean_post is not None) else None
-            wellbeing_pre_post_comparison = [
-                {
-                    "group": "all",
-                    "n": len(pairs),
-                    "mean_pre": mean_pre,
-                    "mean_post": mean_post,
-                    "diff": diff,
-                    "cohens_d": cohens_d,
-                    "p_value": p_value,
-                }
-            ]
+        # `cohens_d_estimate` is kept for back-compat (frontend Tab E reads it
+        # in earlier renders); mirrors comparison.cohens_d.
+        cohens_d_estimate = comparison.get("cohens_d") if comparison else None
+
+        wellbeing_pre_post_comparison: list[dict[str, Any]] = (
+            [comparison] if comparison is not None else []
+        )
 
         return {
             "sus_distribution": sus_buckets,
             "sus_mean_vs_target": sus_mean_vs_target,
-            "empathy_distribution": empathy_buckets,
+            "empathy_distribution": empathy_distribution,
+            "pct_empathy_4_or_above": pct_empathy_4_or_above,
             "cohens_d_estimate": cohens_d_estimate,
             "wellbeing_pre_post_comparison": wellbeing_pre_post_comparison,
         }
@@ -1123,6 +1211,15 @@ class AdminMetricsService:
     async def _wellbeing_pairs(
         self, cohort: str | None = None
     ) -> list[tuple[float, float]]:
+        pairs, _ = await self._wellbeing_pair_data(cohort=cohort)
+        return pairs
+
+    async def _wellbeing_pair_data(
+        self, cohort: str | None = None
+    ) -> tuple[list[tuple[float, float]], int]:
+        """Return (paired_list, n_excluded) where n_excluded counts users with
+        pre OR post but not both (Fase 8.1 D-05).
+        """
         stmt = select(
             SurveyResponse.user_id,
             SurveyResponse.instrument,
@@ -1154,7 +1251,14 @@ class AdminMetricsService:
         for uid, pre_val in pre.items():
             if uid in post:
                 pairs.append((pre_val, post[uid]))
-        return pairs
+
+        # n_excluded = users that have pre OR post but not both
+        pre_users = set(pre.keys())
+        post_users = set(post.keys())
+        both = pre_users & post_users
+        only_one_side = (pre_users | post_users) - both
+        n_excluded = len(only_one_side)
+        return pairs, n_excluded
 
 
 def _date_str(d: Any) -> str:

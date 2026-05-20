@@ -26,14 +26,14 @@
 
 ### Capability 3 — research-analytics-backend
 
-- [ ] 19. Add `scipy>=1.13,<2` to `backend/requirements.txt` and install with `pip install -r requirements.txt`.
-- [ ] 20. Create `backend/app/repositories/empathy_rating_repository.py` with `create()`, `list_unrated_messages()`, `list_by_filters()`, `stats()` methods.
-- [ ] 21. Create `backend/app/services/admin/empathy_service.py` with `AdminEmpathyService(db)`: `get_queue(rater_id, cohort, limit)`, `create_rating(rater_id, message_id, score, criteria)`, `get_stats(cohort)`.
-- [ ] 22. Create `backend/app/routers/admin/empathy_ratings_router.py` with GET `/admin/empathy-ratings/queue`, POST `/admin/empathy-ratings/`, GET `/admin/empathy-ratings/stats`. All `Depends(require_admin)`. POST commits + writes audit_logs `action="empathy_rate"`.
-- [ ] 23. Register `empathy_ratings_router` in `backend/app/main.py`.
-- [ ] 24. Update `AdminMetricsService.metrics_study()` to source `empathy_distribution` and `pct_empathy_4_or_above` from `EmpathyRatingRepository.stats(cohort)`, NOT from `survey_responses`. Add `pct_empathy_4_or_above: float | null` field to the response.
-- [ ] 25. Update `metrics_study()` statistical block per spec D-05: compute `n_paired`, `n_excluded`, choose test via `scipy.stats.shapiro` + `scipy.stats.wilcoxon | ttest_rel`, return `test_used`, `shapiro_p`, `test_skipped_reason`. Cohen's d only if `n_paired >= 10`.
-- [ ] 26. Verify backend imports cleanly: `python -c "from app.main import app; print('OK')"`.
+- [x] 19. Add `scipy>=1.13,<2` to `backend/requirements.txt` and install with `pip install -r requirements.txt`.
+- [x] 20. Create `backend/app/repositories/empathy_rating_repository.py` with `create()`, `list_unrated_messages()`, `list_by_filters()`, `stats()` methods.
+- [x] 21. Create `backend/app/services/admin/empathy_service.py` with `AdminEmpathyService(db)`: `get_queue(rater_id, cohort, limit)`, `create_rating(rater_id, message_id, score, criteria)`, `get_stats(cohort)`.
+- [x] 22. Create `backend/app/routers/admin/empathy_ratings_router.py` with GET `/admin/empathy-ratings/queue`, POST `/admin/empathy-ratings/`, GET `/admin/empathy-ratings/stats`. All `Depends(require_admin)`. POST commits + writes audit_logs `action="empathy_rate"`.
+- [x] 23. Register `empathy_ratings_router` in `backend/app/main.py`.
+- [x] 24. Update `AdminMetricsService.metrics_study()` to source `empathy_distribution` and `pct_empathy_4_or_above` from `EmpathyRatingRepository.stats(cohort)`, NOT from `survey_responses`. Add `pct_empathy_4_or_above: float | null` field to the response.
+- [x] 25. Update `metrics_study()` statistical block per spec D-05: compute `n_paired`, `n_excluded`, choose test via `scipy.stats.shapiro` + `scipy.stats.wilcoxon | ttest_rel`, return `test_used`, `shapiro_p`, `test_skipped_reason`. Cohen's d only if `n_paired >= 10`.
+- [x] 26. Verify backend imports cleanly: `python -c "from app.main import app; print('OK')"`.
 
 ### Capability 4 — research-frontend
 

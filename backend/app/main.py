@@ -6,6 +6,9 @@ from app.core.config import settings
 # Admin routers (Fase 8)
 from app.routers.admin.audit_logs_router import router as admin_audit_logs_router
 from app.routers.admin.config_router import router as admin_config_router
+from app.routers.admin.empathy_ratings_router import (
+    router as admin_empathy_ratings_router,
+)
 from app.routers.admin.metrics_router import router as admin_metrics_router
 from app.routers.admin.reports_router import router as admin_reports_router
 from app.routers.admin.safety_events_router import router as admin_safety_events_router
@@ -49,6 +52,7 @@ app.include_router(admin_safety_events_router, prefix="/api/v1")
 app.include_router(admin_metrics_router, prefix="/api/v1")
 app.include_router(admin_config_router, prefix="/api/v1")
 app.include_router(admin_audit_logs_router, prefix="/api/v1")
+app.include_router(admin_empathy_ratings_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")
