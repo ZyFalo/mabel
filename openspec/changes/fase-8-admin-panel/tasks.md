@@ -27,15 +27,15 @@
 
 #### Backend
 
-- [ ] 16. Create `app/routers/admin/__init__.py` (empty marker)
-- [ ] 17. Create `app/services/admin/users_service.py` with `list_users(filters, page, page_size)`, `get_user_detail(id)`, `disable_user(id, reason)`. Compute `consent_status` and stats via joins.
-- [ ] 18. Create `app/routers/admin/users_router.py` with GET `/admin/users`, GET `/admin/users/:id`, PATCH `/admin/users/:id/disable`. Use `require_admin`. Mask emails (`{first_char}***@{domain}`). Call `audit_log_action` for view_user / disable_user.
+- [x] 16. Create `app/routers/admin/__init__.py` (empty marker)
+- [x] 17. Create `app/services/admin/users_service.py` with `list_users(filters, page, page_size)`, `get_user_detail(id)`, `disable_user(id, reason)`. Compute `consent_status` and stats via joins.
+- [x] 18. Create `app/routers/admin/users_router.py` with GET `/admin/users`, GET `/admin/users/:id`, PATCH `/admin/users/:id/disable`. Use `require_admin`. Mask emails (`{first_char}***@{domain}`). Call `audit_log_action` for view_user / disable_user.
 
 #### Frontend
 
-- [ ] 19. Create `frontend/src/pages/admin/Users.tsx` (#28) — FilterBar + DataTable + Pagination
-- [ ] 20. Create `frontend/src/pages/admin/UserDetail.tsx` (#29) — 4 sections + Deshabilitar button
-- [ ] 21. Create `frontend/src/components/admin/DisableUserModal.tsx` — textarea con validacion min 10 chars
+- [x] 19. Create `frontend/src/pages/admin/Users.tsx` (#28) — FilterBar + DataTable + Pagination
+- [x] 20. Create `frontend/src/pages/admin/UserDetail.tsx` (#29) — 4 sections + Deshabilitar button
+- [x] 21. Create `frontend/src/components/admin/DisableUserModal.tsx` — textarea con validacion min 10 chars
 
 ### Capability 3 — admin-reports-safety
 

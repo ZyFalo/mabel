@@ -6,6 +6,8 @@ import ProtectedRoute from './guards/ProtectedRoute'
 import PublicRoute from './guards/PublicRoute'
 import RoleGuard from './guards/RoleGuard'
 import AdminLayout from './components/admin/AdminLayout'
+import AdminUsers from './pages/admin/Users'
+import AdminUserDetail from './pages/admin/UserDetail'
 import StudentLayout from './components/layout/StudentLayout'
 import SessionExpiredModal from './components/ui/SessionExpiredModal'
 import ToastContainer from './components/ui/Toast'
@@ -116,8 +118,8 @@ export default function App() {
           <Route element={<RoleGuard role="admin" />}>
             <Route element={<AdminLayout />}>
               <Route path="/admin" element={<AdminPageStub title="Dashboard" />} />
-              <Route path="/admin/users" element={<AdminPageStub title="Usuarios" />} />
-              <Route path="/admin/users/:id" element={<AdminPageStub title="Detalle de usuario" />} />
+              <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/users/:id" element={<AdminUserDetail />} />
               <Route path="/admin/reports" element={<AdminPageStub title="Reportes" />} />
               <Route path="/admin/safety-events" element={<AdminPageStub title="Safety Events" />} />
               <Route path="/admin/metrics" element={<AdminPageStub title="Metricas" />} />

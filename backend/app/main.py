@@ -13,6 +13,9 @@ from app.routers.system_config_router import router as system_config_router
 from app.routers.tts_router import router as tts_router
 from app.routers.users_router import router as users_router
 
+# Admin routers (Fase 8)
+from app.routers.admin.users_router import router as admin_users_router
+
 app = FastAPI(title="Mabel IA", version="0.1.0")
 
 app.add_middleware(
@@ -33,6 +36,9 @@ app.include_router(report_router, prefix="/api/v1")
 app.include_router(safety_event_router, prefix="/api/v1")
 app.include_router(system_config_router, prefix="/api/v1")
 app.include_router(tts_router, prefix="/api/v1")
+
+# Admin routers (grouped at the end)
+app.include_router(admin_users_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")
