@@ -65,16 +65,16 @@
 
 ### Capability 4 — settings-redesign
 
-- [ ] 37. Refactor `frontend/src/pages/Settings.tsx`: split into a `SettingsLayout` (header + nav + content) and one component per tab (PrivacyTab, AccessibilityTab, VoiceTab, AccountTab, ArcoTab, ApariencaTab).
-- [ ] 38. Implement vertical tabs nav (md:flex-col) with the 6 sections. Horizontal scroll on mobile.
-- [ ] 39. PrivacyTab uses `<Toggle>` and `<Field>` primitives. Preserves existing save logic (updatePreferences) and the existing "Guardar" button.
-- [ ] 40. AccessibilityTab: Toggle subtitles, Toggle contrast, Segmented for font_size. Preserves existing save logic.
-- [ ] 41. VoiceTab: Toggle TTS, NativeSelect voice, Preview button (existing logic), Segmented chat/avatar mode.
-- [ ] 42. AccountTab: email read-only, buttons that open existing modals (Change Password, Revoke Consent, Delete Account).
-- [ ] 43. ArcoTab: "Ver mis datos" button opens existing ArcoExportModal. Ley 1581 info text preserved.
-- [ ] 44. ApariencaTab (NEW): Segmented for theme light/dark/auto with Sun/Moon/Monitor icons. Calls `useTheme().setTheme(value)`.
-- [ ] 45. Add header X with `navigate(-1)` (fallback `/home`) + Esc shortcut via useKeyboardShortcuts.
-- [ ] 46. `npx tsc --noEmit` clean. Smoke: open /settings, switch between tabs, change a toggle and save (verify endpoint fires), change theme and verify immediate switch, X closes back to previous page.
+- [x] 37. Refactor `frontend/src/pages/Settings.tsx`: split into a `SettingsLayout` (header + nav + content) and one component per tab (PrivacyTab, AccessibilityTab, VoiceTab, AccountTab, ArcoTab, ApariencaTab).
+- [x] 38. Implement vertical tabs nav (md:flex-col) with the 6 sections. Horizontal scroll on mobile.
+- [x] 39. PrivacyTab uses `<Toggle>` and `<Field>` primitives. Preserves existing save logic (updatePreferences) and the existing "Guardar" button.
+- [x] 40. AccessibilityTab: Toggle subtitles, Toggle contrast, Segmented for font_size. Preserves existing save logic.
+- [x] 41. VoiceTab: Toggle TTS, NativeSelect voice, Preview button (existing logic), Segmented chat/avatar mode.
+- [x] 42. AccountTab: email read-only, buttons that open existing modals (Change Password, Revoke Consent, Delete Account).
+- [x] 43. ArcoTab: "Ver mis datos" button opens existing ArcoExportModal. Ley 1581 info text preserved.
+- [x] 44. ApariencaTab (NEW): Segmented for theme light/dark/auto with Sun/Moon/Monitor icons. Calls `useTheme().setTheme(value)`.
+- [x] 45. Add header X with `navigate(-1)` (fallback `/home`) + Esc shortcut via useKeyboardShortcuts.
+- [x] 46. `npx tsc --noEmit` clean. Smoke: open /settings, switch between tabs, change a toggle and save (verify endpoint fires), change theme and verify immediate switch, X closes back to previous page.
 
 ### Capability 5 — auth-onboarding-redesign
 
