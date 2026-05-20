@@ -66,7 +66,7 @@
 
 ### Verification
 
-- [x] 3- [ ] 35. Backend: `python -c "from app.main import app; routes = [r.path for r in app.routes if 'admin' in r.path]; print(len(routes), 'admin routes')"` — should be 26+ (was 23 in Fase 8).
-- [x] 3- [ ] 36. Frontend: `npx tsc --noEmit` clean.
-- [x] 3- [ ] 37. Migration verification: `alembic current` returns head; query `SELECT key FROM system_config WHERE key='study_lock_enabled'` returns 1 row.
-- [ ] 38. Smoke test: login admin → /admin/users (cohort filter works) → assign a user to piloto-fase1 → /admin/metrics?tab=study (sees ?cohort=piloto-fase1 default) → /admin/empathy-ratings (queue loads, can submit a rating) → /admin/config (toggle study_lock_enabled = true, attempt to change safety_keywords → 423 + override modal).
+- [x] 35. Backend: `python -c "from app.main import app; routes = [r.path for r in app.routes if 'admin' in r.path]; print(len(routes), 'admin routes')"` — should be 26+ (was 23 in Fase 8).
+- [x] 36. Frontend: `npx tsc --noEmit` clean.
+- [x] 37. Migration verification: `alembic current` returns head; query `SELECT key FROM system_config WHERE key='study_lock_enabled'` returns 1 row.
+- [x] 38. Smoke test: login admin → /admin/users (cohort filter works) → assign a user to piloto-fase1 → /admin/metrics?tab=study (sees ?cohort=piloto-fase1 default) → /admin/empathy-ratings (queue loads, can submit a rating) → /admin/config (toggle study_lock_enabled = true, attempt to change safety_keywords → 423 + override modal).

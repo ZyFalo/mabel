@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.empathy_rating import EmpathyRating
+from app.models.message import Message
 from app.models.session import Session as SessionModel
 from app.repositories.empathy_rating_repository import EmpathyRatingRepository
 from app.services.audit_service import audit_log_action
@@ -57,6 +58,26 @@ class AdminEmpathyService:
             s.id: s.started_at for s in sessions_result.scalars().all()
         }
 
+        # S-02: Load the immediately preceding user message per assistant msg
+        # for rater context (improves scoring accuracy). One query per session
+        # ID range — for the pilot's small batch (limit<=100) the overhead is
+        # negligible vs N+1 with explicit JOIN/lateral.
+        preceding_by_msg: dict[uuid.UUID, str] = {}
+        for m in messages:
+            prev_result = await self.db.execute(
+                select(Message.content)
+                .where(
+                    Message.session_id == m.session_id,
+                    Message.role == "user",
+                    Message.created_at < m.created_at,
+                )
+                .order_by(Message.created_at.desc())
+                .limit(1)
+            )
+            prev = prev_result.scalar_one_or_none()
+            if prev is not None:
+                preceding_by_msg[m.id] = prev
+
         out: list[dict] = []
         for m in messages:
             out.append(
@@ -66,6 +87,7 @@ class AdminEmpathyService:
                     "content": m.content,
                     "created_at": m.created_at,
                     "session_started_at": started_by_session.get(m.session_id),
+                    "preceding_user_message": preceding_by_msg.get(m.id),
                 }
             )
         return out

@@ -4,6 +4,35 @@ import apiClient from '../../api/client'
 import DisableUserModal from '../../components/admin/DisableUserModal'
 import { useToastStore } from '../../stores/toastStore'
 
+// Backend (UserAdminDetail) returns a FLAT shape. We adapt these into the
+// nested groupings the UI renders.
+interface UserAdminDetailRaw {
+  id: string
+  email_masked: string
+  display_name: string | null
+  role: string
+  cohort: string | null
+  created_at: string
+  disabled_at: string | null
+  disabled_reason: string | null
+  consent_status: string | null
+  consent_version: string | null
+  consent_scope?: string | null
+  consent_accepted_at: string | null
+  consent_revoked_at: string | null
+  save_history: boolean | null
+  checkin_enabled?: boolean | null
+  tts_enabled: boolean | null
+  asr_enabled: boolean | null
+  voice: string | null
+  notifications_email: string | null
+  total_sessions: number
+  total_messages: number
+  last_session_at: string | null
+  total_reports_filed: number
+  total_safety_events: number
+}
+
 interface UserAdminDetail {
   id: string
   email_masked: string
@@ -31,6 +60,46 @@ interface UserAdminDetail {
     avg_messages_per_session: number | null
     total_reports: number
     total_safety_events: number
+  }
+}
+
+function adaptUserDetail(raw: UserAdminDetailRaw): UserAdminDetail {
+  const avg =
+    raw.total_sessions > 0 ? raw.total_messages / raw.total_sessions : null
+  const accessibility_keys: string[] = []
+  if (raw.tts_enabled) accessibility_keys.push('tts')
+  if (raw.asr_enabled) accessibility_keys.push('asr')
+  if (raw.voice) accessibility_keys.push(`voz:${raw.voice}`)
+  return {
+    id: raw.id,
+    email_masked: raw.email_masked,
+    display_name: raw.display_name,
+    role: raw.role,
+    cohort: raw.cohort,
+    created_at: raw.created_at,
+    disabled_at: raw.disabled_at,
+    disabled_reason: raw.disabled_reason,
+    consent: raw.consent_status
+      ? {
+          version: raw.consent_version,
+          scope: raw.consent_scope ?? null,
+          accepted_at: raw.consent_accepted_at,
+          revoked_at: raw.consent_revoked_at,
+        }
+      : null,
+    preferences: {
+      save_history: raw.save_history ?? false,
+      checkin_enabled: raw.checkin_enabled ?? true,
+      has_tts_voice: !!raw.tts_enabled,
+      accessibility_keys,
+    },
+    statistics: {
+      total_sessions: raw.total_sessions,
+      last_session_at: raw.last_session_at,
+      avg_messages_per_session: avg,
+      total_reports: raw.total_reports_filed,
+      total_safety_events: raw.total_safety_events,
+    },
   }
 }
 
@@ -321,8 +390,8 @@ export default function UserDetail() {
     setLoading(true)
     setErrorMsg(null)
     try {
-      const res = await apiClient.get<UserAdminDetail>(`/admin/users/${id}`)
-      setUser(res.data)
+      const res = await apiClient.get<UserAdminDetailRaw>(`/admin/users/${id}`)
+      setUser(adaptUserDetail(res.data))
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } } }
       if (e?.response?.status === 404) {

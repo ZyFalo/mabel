@@ -16,6 +16,7 @@ interface QueueItem {
   content: string
   created_at: string
   session_started_at: string | null
+  preceding_user_message?: string | null
 }
 
 interface EmpathyStats {
@@ -141,14 +142,28 @@ function RatingCard({
       </header>
 
       {/* Message content */}
-      <div className="px-5 py-4 bg-white">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45 mb-2">
-          Respuesta del asistente
-        </p>
-        <div className="bg-accent/3 border border-accent/15 rounded-md px-4 py-3 max-h-[260px] overflow-y-auto">
-          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
-            {item.content}
+      <div className="px-5 py-4 bg-white space-y-3">
+        {item.preceding_user_message && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45 mb-2">
+              Mensaje previo del estudiante (contexto)
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-md px-4 py-3 max-h-[160px] overflow-y-auto">
+              <p className="text-sm text-text-primary/70 leading-relaxed whitespace-pre-wrap italic">
+                {item.preceding_user_message}
+              </p>
+            </div>
+          </div>
+        )}
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45 mb-2">
+            Respuesta del asistente
           </p>
+          <div className="bg-accent/3 border border-accent/15 rounded-md px-4 py-3 max-h-[260px] overflow-y-auto">
+            <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
+              {item.content}
+            </p>
+          </div>
         </div>
       </div>
 

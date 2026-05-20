@@ -211,6 +211,9 @@ class EmpathyQueueItem(BaseModel):
     content: str
     created_at: datetime
     session_started_at: datetime | None = None
+    # S-02: preceding user message for rater context (may be None for the
+    # very first turn or system messages).
+    preceding_user_message: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

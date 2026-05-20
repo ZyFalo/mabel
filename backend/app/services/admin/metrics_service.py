@@ -1196,17 +1196,9 @@ class AdminMetricsService:
         result = await self.db.execute(stmt)
         return [float(row) for row in result.scalars().all() if row is not None]
 
-    async def _empathy_scores(self, cohort: str | None = None) -> list[float]:
-        stmt = select(SurveyResponse.score).where(
-            SurveyResponse.instrument == "empathy_rubric",
-            SurveyResponse.score.is_not(None),
-        )
-        if cohort is not None:
-            stmt = stmt.join(User, SurveyResponse.user_id == User.id).where(
-                User.cohort == cohort
-            )
-        result = await self.db.execute(stmt)
-        return [float(row) for row in result.scalars().all() if row is not None]
+    # NOTE (Fase 8.1 D-06): the legacy `_empathy_scores` helper that read from
+    # `survey_responses` was removed. Empathy data now comes exclusively from
+    # `empathy_ratings` via `EmpathyRatingRepository.stats()`.
 
     async def _wellbeing_pairs(
         self, cohort: str | None = None

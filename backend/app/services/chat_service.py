@@ -174,6 +174,10 @@ class ChatService:
                 content_sha256=assistant_hash,
                 meta={"model": settings.GEMINI_MODEL},
                 latency_ms=latency_ms,
+                # Fase 8.1 D-03: latency split. For text-only chat the LLM is the
+                # dominant component, so llm_latency_ms = latency_ms. ASR/TTS
+                # latency are attributed to their own pipeline steps when applicable.
+                llm_latency_ms=latency_ms,
                 safety_flags=assistant_safety_flags,
             )
             await self.message_repo.db.commit()
@@ -228,6 +232,7 @@ class ChatService:
                 content_sha256=content_hash,
                 meta={"model": settings.GEMINI_MODEL, "greeting": True},
                 latency_ms=latency_ms,
+                llm_latency_ms=latency_ms,  # Fase 8.1 D-03
             )
             await self.message_repo.db.commit()
             return {"id": str(msg.id), "role": "assistant", "content": full_response, "created_at": str(msg.created_at)}
