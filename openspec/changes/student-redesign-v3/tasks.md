@@ -42,26 +42,26 @@
 ### Capability 3 — chat-redesign
 
 #### Composer + TopBar
-- [ ] 25. Create `frontend/src/components/chat/Composer.tsx`: extract from current `Chat.tsx` the input area. Card style per design.md D-06. Includes mic ASR (preserved logic), mute TTS toggle (preserved logic), send button. Auto-grow textarea max 200px. Enter sends, Shift+Enter newline.
-- [ ] 26. Create `frontend/src/components/chat/TopBar.tsx`: 48px bar with "Mabel IA" Fraunces label left, "Finalizar sesion" button right (opens existing ConfirmModal).
+- [x] 25. Create `frontend/src/components/chat/Composer.tsx`: extract from current `Chat.tsx` the input area. Card style per design.md D-06. Includes mic ASR (preserved logic), mute TTS toggle (preserved logic), send button. Auto-grow textarea max 200px. Enter sends, Shift+Enter newline.
+- [x] 26. Create `frontend/src/components/chat/TopBar.tsx`: 48px bar with "Mabel IA" Fraunces label left, "Finalizar sesion" button right (opens existing ConfirmModal).
 
 #### Welcome (Home)
-- [ ] 27. Update `frontend/src/pages/Home.tsx`: implement time-based greeting ("Buenos dias/tardes/noches, [first name]" with Fraunces italic, accent on name). Centered layout `flex-1 flex flex-col items-center justify-center`. max-w-2xl.
-- [ ] 28. In Home.tsx, render `<Composer />` below the greeting, then the 2x2 grid of 4 existing suggestions. Each suggestion: card with icon chip (accent variants per card), `hover:scale-110` on icon. Click pre-fills composer and submits.
+- [x] 27. Update `frontend/src/pages/Home.tsx`: implement time-based greeting ("Buenos dias/tardes/noches, [first name]" with Fraunces italic, accent on name). Centered layout `flex-1 flex flex-col items-center justify-center`. max-w-2xl.
+- [x] 28. In Home.tsx, render `<Composer />` below the greeting, then the 2x2 grid of 4 existing suggestions. Each suggestion: card with icon chip (accent variants per card), `hover:scale-110` on icon. Click pre-fills composer and submits.
 
 #### Chat messages
-- [ ] 29. Update `frontend/src/pages/Chat.tsx`: replace the current message rendering with asymmetric pattern. User: bubble right aligned. Assistant: full-width, 28px avatar left, content via `<Markdown />`, actions in `opacity-0 group-hover:opacity-100`. Streaming cursor preserved.
-- [ ] 30. In Chat.tsx, apply `fade-up` class on each message with `style={{ animationDelay: ${idx*30}ms }}`.
-- [ ] 31. In Chat.tsx, preserve EXACTLY: report icon (now in hover actions), "Ya reportado" badge (visible always when in reportedIds), subtitles span highlighting, draft restore from localStorage, send/streaming logic, auto-greeting effect.
-- [ ] 32. Replace the chat input area with `<Composer />` import (from task 25). Replace the chat top section with `<TopBar />` (from task 26).
-- [ ] 33. Add disclaimer below composer: "Mabel es una asistente de psicoeducacion. No reemplaza atencion profesional. Lineas de ayuda disponibles via SOS." `text-center text-[11px] text-faint mt-2.5`.
+- [x] 29. Update `frontend/src/pages/Chat.tsx`: replace the current message rendering with asymmetric pattern. User: bubble right aligned. Assistant: full-width, 28px avatar left, content via `<Markdown />`, actions in `opacity-0 group-hover:opacity-100`. Streaming cursor preserved.
+- [x] 30. In Chat.tsx, apply `fade-up` class on each message with `style={{ animationDelay: ${idx*30}ms }}`.
+- [x] 31. In Chat.tsx, preserve EXACTLY: report icon (now in hover actions), "Ya reportado" badge (visible always when in reportedIds), subtitles span highlighting, draft restore from localStorage, send/streaming logic, auto-greeting effect.
+- [x] 32. Replace the chat input area with `<Composer />` import (from task 25). Replace the chat top section with `<TopBar />` (from task 26).
+- [x] 33. Add disclaimer below composer: "Mabel es una asistente de psicoeducacion. No reemplaza atencion profesional. Lineas de ayuda disponibles via SOS." `text-center text-[11px] text-faint mt-2.5`.
 
 #### SOS preserved
-- [ ] 34. Verify `SosFab` is still rendered in `StudentLayout`. Position bottom-right preserved. Style refresh to align with design tokens but border #DC2626 and red color preserved.
-- [ ] 35. Verify the crisis automatica effect (`riskDetected` → `stopTts() + stopSubtitles() + setShowSos(true)`) still works after refactor.
+- [x] 34. Verify `SosFab` is still rendered in `StudentLayout`. Position bottom-right preserved. Style refresh to align with design tokens but border #DC2626 and red color preserved.
+- [x] 35. Verify the crisis automatica effect (`riskDetected` → `stopTts() + stopSubtitles() + setShowSos(true)`) still works after refactor.
 
 #### Verification
-- [ ] 36. `npx tsc --noEmit` clean. Smoke: open /home, see greeting time-based + grid; click suggestion → creates session → chat opens with auto-greeting from Mabel as first asistant msg (full-width avatar); send a message → streaming cursor visible; mic button shows pulsing red border when recording (need to grant permission); hover an assistant message → Copy/Report icons appear; verify SOS FAB visible bottom-right.
+- [x] 36. `npx tsc --noEmit` clean. Smoke: open /home, see greeting time-based + grid; click suggestion → creates session → chat opens with auto-greeting from Mabel as first asistant msg (full-width avatar); send a message → streaming cursor visible; mic button shows pulsing red border when recording (need to grant permission); hover an assistant message → Copy/Report icons appear; verify SOS FAB visible bottom-right.
 
 ### Capability 4 — settings-redesign
 
