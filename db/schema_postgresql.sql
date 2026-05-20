@@ -47,6 +47,7 @@ CREATE TABLE users (
   disabled_reason  TEXT,
   created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted_at       TIMESTAMP,
+  cohort           TEXT,  -- [Evolucion 006] marcador de cohorte del estudio (piloto-fase1, dev, control, etc.)
 
   -- Si disabled_at tiene valor, disabled_reason es obligatorio
   CONSTRAINT chk_users_disabled_reason
@@ -135,12 +136,17 @@ CREATE TABLE messages (
   tokens_prompt      INT,
   tokens_completion  INT,
   latency_ms         INT,
+  asr_latency_ms     INT,  -- [Evolucion 006] latency split: ASR (Whisper)
+  llm_latency_ms     INT,  -- [Evolucion 006] latency split: LLM (Gemini)
+  tts_latency_ms     INT,  -- [Evolucion 006] latency split: TTS (Piper)
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_messages_session_time ON messages(session_id, created_at);
 CREATE INDEX idx_messages_latency      ON messages(latency_ms)
                                        WHERE role = 'assistant' AND latency_ms IS NOT NULL;
+-- [Evolucion 006] indice parcial sobre cohort
+CREATE INDEX idx_users_cohort          ON users(cohort) WHERE cohort IS NOT NULL;
 -- (Opcional - habilitar post-MVP si volumen > 100K mensajes)
 -- CREATE INDEX idx_messages_meta_gin   ON messages USING GIN (meta);
 -- CREATE INDEX idx_messages_safety_gin ON messages USING GIN (safety_flags);
@@ -278,3 +284,22 @@ CREATE TABLE system_config (
   updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- =========================
+-- 14) EMPATHY RATINGS [Evolucion 006]
+-- =========================
+-- Calificaciones de empatia por evaluador entrenado (rater) sobre mensajes
+-- del asistente. Sustituye la fuente del criterio "empatia >= 4/5 en 80%".
+-- Permite multiples raters por mensaje para inter-rater reliability.
+CREATE TABLE empathy_ratings (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  rater_id    UUID REFERENCES users(id) ON DELETE SET NULL,
+  score       INT NOT NULL CHECK (score BETWEEN 1 AND 5),
+  criteria    JSONB,  -- ej: {"empathic_tone":true,"validation":true,"hallucination":false}
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_empathy_ratings_message_rater UNIQUE (message_id, rater_id)
+);
+
+CREATE INDEX idx_empathy_ratings_message ON empathy_ratings(message_id);
+CREATE INDEX idx_empathy_ratings_rater   ON empathy_ratings(rater_id);

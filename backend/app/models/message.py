@@ -28,6 +28,9 @@ class Message(Base):
     tokens_prompt: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens_completion: Mapped[int | None] = mapped_column(Integer, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    asr_latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tts_latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("CURRENT_TIMESTAMP"))
 
     session = relationship("Session", back_populates="messages")

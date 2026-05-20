@@ -29,6 +29,7 @@ class User(Base):
     disabled_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    cohort: Mapped[str | None] = mapped_column(String, nullable=True)
 
     consents = relationship("Consent", back_populates="user", cascade="all, delete-orphan")
     preferences = relationship("Preference", back_populates="user", uselist=False, cascade="all, delete-orphan")

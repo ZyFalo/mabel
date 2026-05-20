@@ -3,6 +3,7 @@ from app.models.audit_log import AuditLog
 from app.models.base import Base
 from app.models.consent import Consent
 from app.models.consent_version import ConsentVersion
+from app.models.empathy_rating import EmpathyRating
 from app.models.message import Message
 from app.models.message_report import MessageReport
 from app.models.password_reset_token import PasswordResetToken
@@ -19,6 +20,7 @@ __all__ = [
     "Base",
     "Consent",
     "ConsentVersion",
+    "EmpathyRating",
     "Message",
     "MessageReport",
     "PasswordResetToken",
