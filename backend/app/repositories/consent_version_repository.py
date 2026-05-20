@@ -21,3 +21,9 @@ class ConsentVersionRepository:
             select(ConsentVersion).where(ConsentVersion.id == version_id)
         )
         return result.scalar_one_or_none()
+
+    async def list_all(self) -> list[ConsentVersion]:
+        result = await self.db.execute(
+            select(ConsentVersion).order_by(ConsentVersion.created_at.desc())
+        )
+        return list(result.scalars().all())

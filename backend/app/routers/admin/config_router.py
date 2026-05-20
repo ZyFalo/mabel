@@ -105,6 +105,21 @@ async def patch_admin_config(
     return SystemConfigItem(key=row.key, value=row.value, updated_at=row.updated_at)
 
 
+@router.get(
+    "/admin/consent-versions",
+    response_model=list[ConsentVersionItem],
+)
+async def list_admin_consent_versions(
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[ConsentVersionItem]:
+    from app.repositories.consent_version_repository import ConsentVersionRepository
+
+    repo = ConsentVersionRepository(db)
+    rows = await repo.list_all()
+    return [ConsentVersionItem.model_validate(r) for r in rows]
+
+
 @router.post(
     "/admin/consent-versions",
     response_model=ConsentVersionItem,
