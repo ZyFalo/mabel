@@ -2,12 +2,14 @@ import { ReactNode, useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import apiClient from '../../api/client'
 import DisableUserModal from '../../components/admin/DisableUserModal'
+import { useToastStore } from '../../stores/toastStore'
 
 interface UserAdminDetail {
   id: string
   email_masked: string
   display_name: string | null
   role: string
+  cohort: string | null
   created_at: string
   disabled_at: string | null
   disabled_reason: string | null
@@ -197,6 +199,112 @@ function StatusPill({ disabled }: { disabled: boolean }) {
   )
 }
 
+// ---------- Cohort Editor ----------
+
+function CohortEditor({
+  userId,
+  currentCohort,
+  isAdminUser,
+  onChanged,
+}: {
+  userId: string
+  currentCohort: string | null
+  isAdminUser: boolean
+  onChanged: () => void
+}) {
+  const addToast = useToastStore((s) => s.addToast)
+  const [value, setValue] = useState(currentCohort ?? '')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setValue(currentCohort ?? '')
+  }, [currentCohort])
+
+  const trimmed = value.trim()
+  const dirty = trimmed !== (currentCohort ?? '')
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await apiClient.patch(`/admin/users/${userId}/cohort`, {
+        cohort: trimmed.length > 0 ? trimmed : null,
+      })
+      addToast({ type: 'success', message: 'Cohorte actualizada.' })
+      onChanged()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } }
+      addToast({
+        type: 'error',
+        message: e?.response?.data?.detail ?? 'No se pudo actualizar la cohorte.',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleClear() {
+    setSaving(true)
+    try {
+      await apiClient.patch(`/admin/users/${userId}/cohort`, { cohort: null })
+      addToast({ type: 'success', message: 'Cohorte eliminada.' })
+      setValue('')
+      onChanged()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } }
+      addToast({
+        type: 'error',
+        message: e?.response?.data?.detail ?? 'No se pudo eliminar la cohorte.',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="col-span-2 border-t border-gray-100 pt-4 mt-1">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45 mb-1.5">
+        Cohorte de estudio
+      </p>
+      {isAdminUser && (
+        <p className="text-[11px] text-warning/90 mb-2">
+          Los administradores normalmente no requieren cohorte asignada.
+        </p>
+      )}
+      <div className="flex flex-wrap items-stretch gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="piloto-fase1"
+          disabled={saving}
+          className="flex-1 min-w-[200px] border border-gray-300 rounded-md px-3 py-1.5 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-gray-50 disabled:cursor-not-allowed"
+        />
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || !dirty}
+          className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {saving ? 'Guardando…' : 'Guardar cohorte'}
+        </button>
+        {currentCohort && (
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={saving}
+            className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium border border-danger/30 text-danger hover:bg-danger/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Eliminar cohorte
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] text-text-primary/50 mt-1.5">
+        Asigna una cohorte para filtrar metricas del estudio cuasiexperimental.
+      </p>
+    </div>
+  )
+}
+
 // ---------- Page ----------
 
 export default function UserDetail() {
@@ -337,6 +445,20 @@ export default function UserDetail() {
               <Field label="Deshabilitada el">
                 {isDisabled ? formatDateTime(user.disabled_at) : '—'}
               </Field>
+              <Field label="Cohorte actual">
+                {user.cohort ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent/8 text-accent border border-accent/20 text-xs font-mono font-medium">
+                    {user.cohort}
+                  </span>
+                ) : (
+                  <span className="text-text-primary/40 italic text-xs">Sin cohorte</span>
+                )}
+              </Field>
+              <Field label="ID">
+                <span className="font-mono text-[11px] text-text-primary/60">
+                  {user.id.slice(0, 8)}…
+                </span>
+              </Field>
               {user.disabled_reason && (
                 <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
                   <Field label="Razon de deshabilitacion">
@@ -346,6 +468,12 @@ export default function UserDetail() {
                   </Field>
                 </div>
               )}
+              <CohortEditor
+                userId={user.id}
+                currentCohort={user.cohort}
+                isAdminUser={isAdminRole}
+                onChanged={fetchUser}
+              />
             </dl>
           </Card>
 

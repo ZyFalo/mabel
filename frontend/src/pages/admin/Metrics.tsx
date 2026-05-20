@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import apiClient from '../../api/client'
 import ExportCsvButton from '../../components/admin/ExportCsvButton'
 import MetricCard from '../../components/admin/MetricCard'
-import DataTable, { DataTableColumn } from '../../components/admin/DataTable'
 import BarChartWrapper from '../../components/admin/charts/BarChartWrapper'
 import DonutChartWrapper from '../../components/admin/charts/DonutChartWrapper'
 import LineChartWrapper from '../../components/admin/charts/LineChartWrapper'
@@ -68,7 +67,12 @@ function ChartCard({
   )
 }
 
-function useTabFetch<T>(endpoint: string, range: DateRange, refreshKey: number) {
+function useTabFetch<T>(
+  endpoint: string,
+  range: DateRange,
+  refreshKey: number,
+  cohort: string,
+) {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -77,8 +81,10 @@ function useTabFetch<T>(endpoint: string, range: DateRange, refreshKey: number) 
     let cancelled = false
     setLoading(true)
     setError(null)
+    const params: Record<string, string> = { from: range.from, to: range.to }
+    if (cohort.trim()) params.cohort = cohort.trim()
     apiClient
-      .get<T>(endpoint, { params: { from: range.from, to: range.to } })
+      .get<T>(endpoint, { params })
       .then((res) => {
         if (!cancelled) setData(res.data)
       })
@@ -94,7 +100,7 @@ function useTabFetch<T>(endpoint: string, range: DateRange, refreshKey: number) 
     return () => {
       cancelled = true
     }
-  }, [endpoint, range.from, range.to, refreshKey])
+  }, [endpoint, range.from, range.to, refreshKey, cohort])
 
   return { data, loading, error }
 }
@@ -144,11 +150,20 @@ interface UsageResponse {
   avg_session_duration_minutes: number | null
 }
 
-function TabUsage({ range, refreshKey }: { range: DateRange; refreshKey: number }) {
+function TabUsage({
+  range,
+  refreshKey,
+  cohort,
+}: {
+  range: DateRange
+  refreshKey: number
+  cohort: string
+}) {
   const { data, loading, error } = useTabFetch<UsageResponse>(
     '/admin/metrics/usage',
     range,
     refreshKey,
+    cohort,
   )
   const empty =
     !data ||
@@ -239,11 +254,20 @@ function fmtNum(v: number | null | undefined, digits = 2): string {
   return v.toFixed(digits)
 }
 
-function TabWellbeing({ range, refreshKey }: { range: DateRange; refreshKey: number }) {
+function TabWellbeing({
+  range,
+  refreshKey,
+  cohort,
+}: {
+  range: DateRange
+  refreshKey: number
+  cohort: string
+}) {
   const { data, loading, error } = useTabFetch<WellbeingResponse>(
     '/admin/metrics/wellbeing',
     range,
     refreshKey,
+    cohort,
   )
   const empty =
     !data ||
@@ -392,11 +416,20 @@ interface TechnicalResponse {
   gemini_cost_estimate_usd: number | null
 }
 
-function TabTechnical({ range, refreshKey }: { range: DateRange; refreshKey: number }) {
+function TabTechnical({
+  range,
+  refreshKey,
+  cohort,
+}: {
+  range: DateRange
+  refreshKey: number
+  cohort: string
+}) {
   const { data, loading, error } = useTabFetch<TechnicalResponse>(
     '/admin/metrics/technical',
     range,
     refreshKey,
+    cohort,
   )
   const empty =
     !data ||
@@ -503,11 +536,20 @@ interface SafetyResponse {
   }>
 }
 
-function TabSafety({ range, refreshKey }: { range: DateRange; refreshKey: number }) {
+function TabSafety({
+  range,
+  refreshKey,
+  cohort,
+}: {
+  range: DateRange
+  refreshKey: number
+  cohort: string
+}) {
   const { data, loading, error } = useTabFetch<SafetyResponse>(
     '/admin/metrics/safety',
     range,
     refreshKey,
+    cohort,
   )
   const empty =
     !data ||
@@ -619,27 +661,45 @@ function TabSafety({ range, refreshKey }: { range: DateRange; refreshKey: number
 
 // ---------------- Tab E: Study ----------------
 
+interface StudyComparison {
+  group: string
+  n_paired: number | null
+  n_excluded: number | null
+  mean_pre: number | null
+  mean_post: number | null
+  diff: number | null
+  cohens_d: number | null
+  p_value: number | null
+  test_used: 'paired_t' | 'wilcoxon' | null
+  shapiro_p: number | null
+  test_skipped_reason: string | null
+  // legacy fields (fallback)
+  n?: number
+}
+
 interface StudyResponse {
   sus_distribution: Array<{ bucket: string; count: number }>
   sus_mean_vs_target: { mean: number | null; target: number }
   empathy_distribution: Array<{ score: number | string; count: number }>
+  pct_empathy_4_or_above: number | null
   cohens_d_estimate: number | null
-  wellbeing_pre_post_comparison: Array<{
-    group: string
-    n: number
-    mean_pre: number
-    mean_post: number
-    diff: number
-    cohens_d: number
-    p_value: number
-  }>
+  wellbeing_pre_post_comparison: StudyComparison[]
 }
 
-function TabStudy({ range, refreshKey }: { range: DateRange; refreshKey: number }) {
+function TabStudy({
+  range,
+  refreshKey,
+  cohort,
+}: {
+  range: DateRange
+  refreshKey: number
+  cohort: string
+}) {
   const { data, loading, error } = useTabFetch<StudyResponse>(
     '/admin/metrics/study',
     range,
     refreshKey,
+    cohort,
   )
   const empty =
     !data ||
@@ -653,76 +713,21 @@ function TabStudy({ range, refreshKey }: { range: DateRange; refreshKey: number 
   const susThreshold: 'green' | 'red' | undefined =
     susMean == null ? undefined : susMean >= susTarget ? 'green' : 'red'
 
-  const cohens = data!.cohens_d_estimate
-  const cohensThreshold: 'green' | 'yellow' | 'red' | undefined =
-    cohens == null
+  const pctEmpathy = data!.pct_empathy_4_or_above
+  const empathyThreshold: 'green' | 'yellow' | 'red' | undefined =
+    pctEmpathy == null
       ? undefined
-      : Math.abs(cohens) >= 0.3
+      : pctEmpathy >= 80
         ? 'green'
-        : Math.abs(cohens) >= 0.15
+        : pctEmpathy >= 60
           ? 'yellow'
           : 'red'
 
-  const columns: DataTableColumn<StudyResponse['wellbeing_pre_post_comparison'][number]>[] = [
-    {
-      key: 'group',
-      header: 'Grupo',
-      accessor: (r) => <span className="font-medium text-text-primary">{r.group}</span>,
-    },
-    {
-      key: 'n',
-      header: 'N',
-      accessor: (r) => <span className="tabular-nums">{r.n}</span>,
-    },
-    {
-      key: 'mean_pre',
-      header: 'Pre',
-      accessor: (r) => <span className="tabular-nums">{r.mean_pre.toFixed(2)}</span>,
-    },
-    {
-      key: 'mean_post',
-      header: 'Post',
-      accessor: (r) => <span className="tabular-nums">{r.mean_post.toFixed(2)}</span>,
-    },
-    {
-      key: 'diff',
-      header: 'Δ',
-      accessor: (r) => (
-        <span
-          className={[
-            'tabular-nums font-semibold',
-            r.diff > 0 ? 'text-success' : r.diff < 0 ? 'text-danger' : 'text-text-primary',
-          ].join(' ')}
-        >
-          {r.diff > 0 ? '+' : ''}
-          {r.diff.toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      key: 'cohens_d',
-      header: "Cohen's d",
-      accessor: (r) => <span className="tabular-nums">{r.cohens_d.toFixed(2)}</span>,
-    },
-    {
-      key: 'p_value',
-      header: 'p',
-      accessor: (r) => (
-        <span
-          className={[
-            'tabular-nums',
-            r.p_value < 0.05 ? 'text-success font-semibold' : 'text-text-primary/70',
-          ].join(' ')}
-        >
-          {r.p_value < 0.001 ? '< 0.001' : r.p_value.toFixed(3)}
-        </span>
-      ),
-    },
-  ]
+  const comparisons = data!.wellbeing_pre_post_comparison ?? []
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <MetricCard
           label="SUS promedio"
           value={susMean == null ? '—' : susMean.toFixed(1)}
@@ -730,10 +735,15 @@ function TabStudy({ range, refreshKey }: { range: DateRange; refreshKey: number 
           hint={`Objetivo: >= ${susTarget}`}
         />
         <MetricCard
-          label="Cohen's d (bienestar)"
-          value={cohens == null ? '—' : cohens.toFixed(2)}
-          threshold={cohensThreshold}
-          hint="Tamano de efecto pre/post"
+          label="Empatia >= 4/5"
+          value={pctEmpathy == null ? 'Sin datos suficientes' : `${pctEmpathy.toFixed(1)} %`}
+          threshold={empathyThreshold}
+          hint="Objetivo: >= 80 %"
+        />
+        <MetricCard
+          label="Comparaciones pre/post"
+          value={comparisons.length.toString()}
+          hint="Variables emparejadas por usuario"
         />
       </div>
 
@@ -747,35 +757,197 @@ function TabStudy({ range, refreshKey }: { range: DateRange; refreshKey: number 
             height={260}
           />
         </ChartCard>
-        <ChartCard title="Distribucion de empatia" subtitle="Escala 1-5">
+        <ChartCard title="Distribucion de empatia" subtitle="Calificaciones 1-5">
           <BarChartWrapper
             data={data!.empathy_distribution.map((b) => ({
               score: String(b.score),
               count: b.count,
             }))}
-            bars={[{ key: 'count', label: 'Respuestas', color: CHART_COLORS.primary }]}
+            bars={[{ key: 'count', label: 'Calificaciones', color: CHART_COLORS.primary }]}
             xKey="score"
-            yLabel="Respuestas"
+            yLabel="Calificaciones"
             height={260}
           />
         </ChartCard>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="mb-3">
+      <div className="bg-white border border-gray-200 rounded-lg p-5">
+        <div className="mb-4">
           <h3 className="text-sm font-semibold text-text-primary">
             Comparacion bienestar pre / post
           </h3>
           <p className="text-[11px] text-text-primary/50 mt-0.5">
-            Pares emparejados por usuario
+            Estadistica inferencial con pares emparejados por usuario
           </p>
         </div>
-        <DataTable
-          columns={columns}
-          rows={data!.wellbeing_pre_post_comparison ?? []}
-          rowKey={(r) => r.group}
-          emptyMessage="Sin pares pre/post disponibles aun"
-        />
+        {comparisons.length === 0 ? (
+          <p className="text-sm text-text-primary/40 italic py-6 text-center">
+            Sin pares pre/post disponibles aun
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {comparisons.map((c) => (
+              <ComparisonCard key={c.group} comparison={c} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---- Comparison card for Tab E ----
+
+function fmt3(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return '—'
+  return v.toFixed(3)
+}
+
+function fmt2(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return '—'
+  return v.toFixed(2)
+}
+
+function testLabel(t: StudyComparison['test_used']): string {
+  if (t === 'paired_t') return 'Paired t-test (parametrico)'
+  if (t === 'wilcoxon') return 'Wilcoxon signed-rank (no parametrico)'
+  return '—'
+}
+
+function cohensInterpretation(d: number): {
+  label: string
+  cls: string
+} {
+  const abs = Math.abs(d)
+  if (abs < 0.2) return { label: 'chico', cls: 'bg-gray-100 text-text-primary/60 border-gray-300' }
+  if (abs < 0.5)
+    return { label: 'mediano', cls: 'bg-warning/10 text-warning border-warning/30' }
+  return { label: 'grande', cls: 'bg-success/10 text-success border-success/30' }
+}
+
+function ComparisonCard({ comparison }: { comparison: StudyComparison }) {
+  const c = comparison
+  const nPaired = c.n_paired ?? c.n ?? null
+  const nExcluded = c.n_excluded ?? 0
+  const diff = c.diff
+  const diffClass =
+    diff == null || diff === 0
+      ? 'text-text-primary'
+      : diff > 0
+        ? 'text-success'
+        : 'text-danger'
+
+  const cohensView = (() => {
+    if (c.cohens_d == null) {
+      return (
+        <div>
+          <p className="text-base font-semibold text-text-primary/50">No calculable</p>
+          {c.test_skipped_reason && (
+            <p className="text-[11px] text-text-primary/50 mt-1">{c.test_skipped_reason}</p>
+          )}
+        </div>
+      )
+    }
+    const { label, cls } = cohensInterpretation(c.cohens_d)
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-2xl font-semibold tabular-nums text-text-primary leading-none">
+          {c.cohens_d.toFixed(2)}
+        </span>
+        <span
+          className={[
+            'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border',
+            cls,
+          ].join(' ')}
+        >
+          {label}
+        </span>
+      </div>
+    )
+  })()
+
+  const pView =
+    c.test_skipped_reason || c.p_value == null ? (
+      <span className="text-text-primary/50">—</span>
+    ) : (
+      <span
+        className={[
+          'tabular-nums font-semibold',
+          c.p_value < 0.05 ? 'text-success' : 'text-text-primary/70',
+        ].join(' ')}
+      >
+        {c.p_value < 0.001 ? '< 0.001' : fmt3(c.p_value)}
+      </span>
+    )
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <h4 className="text-sm font-semibold text-text-primary capitalize">{c.group}</h4>
+        <div className="text-right shrink-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45">
+            N
+          </p>
+          <p className="text-2xl font-semibold text-text-primary tabular-nums leading-none">
+            {nPaired ?? '—'}
+          </p>
+          {nExcluded > 0 && (
+            <p className="text-[11px] text-text-primary/45 mt-1">
+              {nExcluded} excluido{nExcluded === 1 ? '' : 's'}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 border-y border-gray-100 py-3 my-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45">
+            Pre
+          </p>
+          <p className="text-base font-semibold tabular-nums text-text-primary">
+            {fmt2(c.mean_pre)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45">
+            Post
+          </p>
+          <p className="text-base font-semibold tabular-nums text-text-primary">
+            {fmt2(c.mean_post)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45">
+            Δ
+          </p>
+          <p className={['text-base font-semibold tabular-nums', diffClass].join(' ')}>
+            {diff == null ? '—' : `${diff > 0 ? '+' : ''}${diff.toFixed(2)}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2.5 text-[12px]">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-text-primary/50">Test estadistico</span>
+          <span className="text-text-primary font-medium text-right">
+            {testLabel(c.test_used)}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-text-primary/50">Shapiro-Wilk p</span>
+          <span className="tabular-nums text-text-primary">{fmt3(c.shapiro_p)}</span>
+        </div>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-text-primary/50">p-value</span>
+          {pView}
+        </div>
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-gray-100">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45 mb-1.5">
+          Cohen's d
+        </p>
+        {cohensView}
       </div>
     </div>
   )
@@ -800,6 +972,12 @@ export default function Metrics() {
   const [draft, setDraft] = useState<DateRange>(range)
   const [refreshKey, setRefreshKey] = useState(0)
 
+  const cohortParam = searchParams.get('cohort') ?? ''
+  const [cohortDraft, setCohortDraft] = useState<string>(cohortParam)
+  useEffect(() => {
+    setCohortDraft(cohortParam)
+  }, [cohortParam])
+
   // Keep ?tab in sync if missing/invalid
   useEffect(() => {
     if (!isTabKey(initialTab)) {
@@ -809,6 +987,31 @@ export default function Metrics() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Default cohort to piloto-fase1 on Tab E when none is set
+  useEffect(() => {
+    if (activeTab === 'study' && !searchParams.get('cohort')) {
+      const next = new URLSearchParams(searchParams)
+      next.set('cohort', 'piloto-fase1')
+      setSearchParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  function applyCohort() {
+    const next = new URLSearchParams(searchParams)
+    const v = cohortDraft.trim()
+    if (v) next.set('cohort', v)
+    else next.delete('cohort')
+    setSearchParams(next)
+  }
+
+  function clearCohort() {
+    const next = new URLSearchParams(searchParams)
+    next.delete('cohort')
+    setSearchParams(next)
+    setCohortDraft('')
+  }
 
   const changeTab = useCallback(
     (tab: TabKey) => {
@@ -854,8 +1057,13 @@ export default function Metrics() {
         </div>
         <ExportCsvButton
           url="/admin/metrics/export.csv"
-          params={{ tab: activeTab, from: range.from, to: range.to }}
-          filename={`metricas-${activeTab}-${range.from}_${range.to}.csv`}
+          params={{
+            tab: activeTab,
+            from: range.from,
+            to: range.to,
+            ...(cohortParam ? { cohort: cohortParam } : {}),
+          }}
+          filename={`metricas-${activeTab}-${range.from}_${range.to}${cohortParam ? `_${cohortParam}` : ''}.csv`}
           onError={(msg) => addToast({ type: 'error', message: msg })}
         />
       </header>
@@ -918,9 +1126,60 @@ export default function Metrics() {
           </svg>
           Actualizar
         </button>
-        <div className="ml-auto text-[11px] text-text-primary/50 tabular-nums">
-          Rango aplicado: <span className="font-medium text-text-primary/70">{range.from}</span> →{' '}
-          <span className="font-medium text-text-primary/70">{range.to}</span>
+
+        <div className="flex flex-col gap-1 min-w-[180px]">
+          <label
+            htmlFor="metrics-cohort"
+            className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/60"
+          >
+            Cohorte
+          </label>
+          <div className="flex items-stretch gap-1.5">
+            <input
+              id="metrics-cohort"
+              type="text"
+              value={cohortDraft}
+              onChange={(e) => setCohortDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  applyCohort()
+                }
+              }}
+              placeholder="piloto-fase1"
+              className="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary min-w-[140px]"
+            />
+            <button
+              type="button"
+              onClick={applyCohort}
+              className="px-2.5 py-1.5 rounded-md text-xs font-medium bg-white border border-gray-300 text-text-primary hover:bg-gray-50"
+            >
+              Aplicar
+            </button>
+          </div>
+        </div>
+
+        {cohortParam && (
+          <button
+            type="button"
+            onClick={clearCohort}
+            className="self-end inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium text-danger border border-danger/30 hover:bg-danger/5"
+          >
+            Limpiar cohorte
+          </button>
+        )}
+
+        <div className="ml-auto text-[11px] text-text-primary/50 tabular-nums text-right">
+          <div>
+            Rango: <span className="font-medium text-text-primary/70">{range.from}</span> →{' '}
+            <span className="font-medium text-text-primary/70">{range.to}</span>
+          </div>
+          {cohortParam && (
+            <div className="mt-0.5">
+              Cohorte:{' '}
+              <span className="font-medium text-accent font-mono">{cohortParam}</span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -953,11 +1212,21 @@ export default function Metrics() {
       </nav>
 
       {/* Tab content */}
-      {activeTab === 'usage' && <TabUsage range={range} refreshKey={refreshKey} />}
-      {activeTab === 'wellbeing' && <TabWellbeing range={range} refreshKey={refreshKey} />}
-      {activeTab === 'technical' && <TabTechnical range={range} refreshKey={refreshKey} />}
-      {activeTab === 'safety' && <TabSafety range={range} refreshKey={refreshKey} />}
-      {activeTab === 'study' && <TabStudy range={range} refreshKey={refreshKey} />}
+      {activeTab === 'usage' && (
+        <TabUsage range={range} refreshKey={refreshKey} cohort={cohortParam} />
+      )}
+      {activeTab === 'wellbeing' && (
+        <TabWellbeing range={range} refreshKey={refreshKey} cohort={cohortParam} />
+      )}
+      {activeTab === 'technical' && (
+        <TabTechnical range={range} refreshKey={refreshKey} cohort={cohortParam} />
+      )}
+      {activeTab === 'safety' && (
+        <TabSafety range={range} refreshKey={refreshKey} cohort={cohortParam} />
+      )}
+      {activeTab === 'study' && (
+        <TabStudy range={range} refreshKey={refreshKey} cohort={cohortParam} />
+      )}
     </div>
   )
 }

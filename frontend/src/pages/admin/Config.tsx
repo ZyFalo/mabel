@@ -104,6 +104,12 @@ function asGuardrailsEnabled(value: unknown): boolean {
   return true
 }
 
+function asBool(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') return value.toLowerCase() === 'true'
+  return false
+}
+
 // ============================================================================
 // Common section card
 // ============================================================================
@@ -410,18 +416,106 @@ function ConsentSection() {
 // Section 2 — Guardrails
 // ============================================================================
 
+// ----- Study lock override modal -----
+
+function OverrideConfirmModal({
+  open,
+  onConfirm,
+  onCancel,
+  pending,
+}: {
+  open: boolean
+  onConfirm: () => void
+  onCancel: () => void
+  pending: boolean
+}) {
+  if (!open) return null
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="override-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+    >
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
+        <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center gap-3">
+          <span className="w-8 h-8 rounded-full bg-warning/15 text-warning flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 1l7 13H1L8 1z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M8 6v3.5M8 11.5h.01"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          <h3
+            id="override-title"
+            className="text-base font-semibold text-text-primary leading-tight"
+          >
+            Override del bloqueo de estudio
+          </h3>
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-sm text-text-primary/80 leading-relaxed">
+            El bloqueo de estudio esta activo. ¿Confirmas override?
+          </p>
+          <p className="text-[12px] text-text-primary/55 mt-2 leading-relaxed">
+            Todas las acciones quedan registradas en el audit log con la marca de override.
+          </p>
+        </div>
+        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/60 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={pending}
+            className="px-3 py-1.5 text-sm font-medium text-text-primary/70 hover:text-text-primary disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={pending}
+            className="inline-flex items-center px-3.5 py-1.5 rounded-md text-sm font-semibold bg-warning text-white hover:bg-warning/90 disabled:opacity-50"
+          >
+            {pending ? 'Aplicando…' : 'Confirmar override'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function GuardrailsSection({
   initialKeywords,
   initialThreshold,
   initialEnabled,
+  initialStudyLock,
   onChanged,
 }: {
   initialKeywords: string[]
   initialThreshold: number
   initialEnabled: boolean
+  initialStudyLock: boolean
   onChanged: () => void
 }) {
   const addToast = useToastStore((s) => s.addToast)
+
+  // Study lock
+  const [studyLock, setStudyLock] = useState<boolean>(initialStudyLock)
+  const [savingLock, setSavingLock] = useState(false)
+  useEffect(() => setStudyLock(initialStudyLock), [initialStudyLock])
+
+  // Override modal state
+  const [pendingOverride, setPendingOverride] = useState<null | (() => Promise<void>)>(null)
+  const [overrideRunning, setOverrideRunning] = useState(false)
 
   // Keywords
   const [keywords, setKeywords] = useState<string[]>(initialKeywords)
@@ -449,6 +543,64 @@ function GuardrailsSection({
   const thresholdDirty = threshold !== initialThreshold
   const enabledDirty = enabled !== initialEnabled
 
+  async function saveStudyLock() {
+    setSavingLock(true)
+    try {
+      await apiClient.patch('/admin/config/study_lock_enabled', { value: studyLock })
+      addToast({
+        type: 'success',
+        message: studyLock
+          ? 'Bloqueo de estudio activado.'
+          : 'Bloqueo de estudio desactivado.',
+      })
+      onChanged()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } }
+      addToast({
+        type: 'error',
+        message: e?.response?.data?.detail ?? 'No se pudo actualizar el bloqueo de estudio.',
+      })
+    } finally {
+      setSavingLock(false)
+    }
+  }
+
+  const studyLockDirty = studyLock !== initialStudyLock
+
+  // Wraps a PATCH call: if the lock is on, prompt the override modal first.
+  function guardedSave(performPatch: (override: boolean) => Promise<void>) {
+    if (!studyLock) {
+      // No lock — just run
+      return performPatch(false)
+    }
+    // Lock on — open modal
+    setPendingOverride(() => async () => {
+      setOverrideRunning(true)
+      try {
+        await performPatch(true)
+        setPendingOverride(null)
+      } finally {
+        setOverrideRunning(false)
+      }
+    })
+    return Promise.resolve()
+  }
+
+  function handleLockedError(err: unknown, fallback: string) {
+    const e = err as { response?: { status?: number; data?: { detail?: string } } }
+    if (e?.response?.status === 423) {
+      addToast({
+        type: 'error',
+        message: 'Bloqueo de estudio activo: usa override explicito para modificar guardrails.',
+      })
+    } else {
+      addToast({
+        type: 'error',
+        message: e?.response?.data?.detail ?? fallback,
+      })
+    }
+  }
+
   function addKeyword() {
     const v = normalizeKeyword(newKeyword)
     if (!v) return
@@ -464,59 +616,72 @@ function GuardrailsSection({
     setKeywords((prev) => prev.filter((k) => k !== kw))
   }
 
-  async function saveKeywords() {
+  async function patchKeywords(override: boolean) {
     setSavingKeywords(true)
     try {
-      await apiClient.patch('/admin/config/safety_keywords', { value: keywords })
+      await apiClient.patch(
+        '/admin/config/safety_keywords',
+        { value: keywords },
+        override ? { headers: { 'X-Study-Lock-Override': 'true' } } : undefined,
+      )
       addToast({ type: 'success', message: 'Lista de palabras clave actualizada.' })
       onChanged()
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
-      addToast({
-        type: 'error',
-        message: e?.response?.data?.detail ?? 'No se pudo actualizar las palabras clave.',
-      })
+    } catch (err) {
+      handleLockedError(err, 'No se pudo actualizar las palabras clave.')
     } finally {
       setSavingKeywords(false)
     }
   }
+  function saveKeywords() {
+    return guardedSave(patchKeywords)
+  }
 
-  async function saveThreshold() {
+  async function patchThreshold(override: boolean) {
     setSavingThreshold(true)
     try {
-      await apiClient.patch('/admin/config/sos_severity_threshold', { value: threshold })
+      await apiClient.patch(
+        '/admin/config/sos_severity_threshold',
+        { value: threshold },
+        override ? { headers: { 'X-Study-Lock-Override': 'true' } } : undefined,
+      )
       addToast({ type: 'success', message: 'Umbral de severidad actualizado.' })
       onChanged()
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
-      addToast({
-        type: 'error',
-        message: e?.response?.data?.detail ?? 'No se pudo actualizar el umbral.',
-      })
+    } catch (err) {
+      handleLockedError(err, 'No se pudo actualizar el umbral.')
     } finally {
       setSavingThreshold(false)
     }
   }
+  function saveThreshold() {
+    return guardedSave(patchThreshold)
+  }
 
-  async function saveEnabled() {
+  async function patchEnabled(override: boolean) {
     setSavingEnabled(true)
     try {
-      await apiClient.patch('/admin/config/guardrails_enabled', { value: enabled })
+      await apiClient.patch(
+        '/admin/config/guardrails_enabled',
+        { value: enabled },
+        override ? { headers: { 'X-Study-Lock-Override': 'true' } } : undefined,
+      )
       addToast({
         type: 'success',
         message: enabled ? 'Guardrails activados.' : 'Guardrails desactivados.',
       })
       onChanged()
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
-      addToast({
-        type: 'error',
-        message: e?.response?.data?.detail ?? 'No se pudo actualizar el estado de guardrails.',
-      })
+    } catch (err) {
+      handleLockedError(err, 'No se pudo actualizar el estado de guardrails.')
     } finally {
       setSavingEnabled(false)
     }
   }
+  function saveEnabled() {
+    return guardedSave(patchEnabled)
+  }
+
+  const lockedClass = studyLock
+    ? 'opacity-60 pointer-events-none select-none'
+    : ''
 
   return (
     <SectionCard
@@ -525,8 +690,101 @@ function GuardrailsSection({
       description="Palabras clave para deteccion, umbral de severidad y activacion global del filtro."
     >
       <div className="flex flex-col gap-6">
+        {/* Study lock sub-section */}
+        <div className="border border-warning/30 bg-warning/5 rounded-md p-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-warning/15 text-warning flex items-center justify-center shrink-0">
+                  <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+                    <rect
+                      x="2.5"
+                      y="5"
+                      width="7"
+                      height="5"
+                      rx="1"
+                      stroke="currentColor"
+                      strokeWidth="1.2"
+                    />
+                    <path
+                      d="M4 5V3.5a2 2 0 0 1 4 0V5"
+                      stroke="currentColor"
+                      strokeWidth="1.2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
+                <p className="text-sm font-semibold text-text-primary">
+                  Bloqueo de configuracion para estudio
+                </p>
+              </div>
+              <p className="text-[12px] text-text-primary/65 mt-1 max-w-[520px]">
+                Al activar este bloqueo, los cambios en palabras clave, umbral de severidad y
+                activacion de guardrails requieren un override explicito durante la fase de
+                estudio cuasiexperimental.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setStudyLock((v) => !v)}
+                role="switch"
+                aria-checked={studyLock}
+                className={[
+                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-warning/30',
+                  studyLock ? 'bg-warning' : 'bg-gray-300',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                    studyLock ? 'translate-x-5' : 'translate-x-0.5',
+                  ].join(' ')}
+                />
+              </button>
+              <SaveButton
+                onClick={saveStudyLock}
+                loading={savingLock}
+                disabled={!studyLockDirty}
+                label="Aplicar"
+              />
+            </div>
+          </div>
+
+          {studyLock && (
+            <div className="mt-3 pt-3 border-t border-warning/20 flex items-start gap-2">
+              <span className="text-warning shrink-0 mt-0.5" aria-hidden="true">
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M8 1l7 13H1L8 1z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M8 6v3.5M8 11.5h.01"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              <p className="text-[12px] text-warning leading-relaxed">
+                <strong className="font-semibold">Bloqueo activo:</strong> los cambios a
+                guardrails requieren override explicito y quedan registrados en el audit log.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Toggle enabled */}
-        <div className="flex items-center justify-between gap-4 border-b border-gray-100 pb-5">
+        <div
+          className={[
+            'flex items-center justify-between gap-4 border-b border-gray-100 pb-5',
+            lockedClass,
+          ].join(' ')}
+          aria-disabled={studyLock}
+        >
           <div>
             <p className="text-sm font-semibold text-text-primary">Filtro de guardrails activo</p>
             <p className="text-[12px] text-text-primary/60 mt-0.5">
@@ -540,9 +798,11 @@ function GuardrailsSection({
               onClick={() => setEnabled((v) => !v)}
               role="switch"
               aria-checked={enabled}
+              disabled={studyLock}
               className={[
                 'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30',
                 enabled ? 'bg-success' : 'bg-gray-300',
+                studyLock ? 'cursor-not-allowed' : '',
               ].join(' ')}
             >
               <span
@@ -562,7 +822,9 @@ function GuardrailsSection({
         </div>
 
         {/* Severity threshold */}
-        <div className="border-b border-gray-100 pb-5">
+        <div className={['border-b border-gray-100 pb-5', lockedClass].join(' ')}
+          aria-disabled={studyLock}
+        >
           <div className="flex items-baseline justify-between mb-3">
             <div>
               <p className="text-sm font-semibold text-text-primary">
@@ -584,7 +846,11 @@ function GuardrailsSection({
             step={1}
             value={threshold}
             onChange={(e) => setThreshold(Number(e.target.value))}
-            className="w-full accent-primary"
+            disabled={studyLock}
+            className={[
+              'w-full accent-primary',
+              studyLock ? 'cursor-not-allowed' : '',
+            ].join(' ')}
             aria-label="Umbral de severidad"
           />
           <div className="flex items-center justify-between text-[11px] text-text-primary/50 mt-1 tabular-nums">
@@ -605,7 +871,7 @@ function GuardrailsSection({
         </div>
 
         {/* Keywords */}
-        <div>
+        <div className={lockedClass} aria-disabled={studyLock}>
           <p className="text-sm font-semibold text-text-primary">Palabras clave de seguridad</p>
           <p className="text-[12px] text-text-primary/60 mt-0.5">
             Lista de terminos que activan revision manual o filtros de respuesta.
@@ -621,13 +887,21 @@ function GuardrailsSection({
                   addKeyword()
                 }
               }}
+              disabled={studyLock}
               placeholder="Agregar palabra clave"
-              className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className={[
+                'flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary',
+                studyLock ? 'bg-gray-100 cursor-not-allowed' : '',
+              ].join(' ')}
             />
             <button
               type="button"
               onClick={addKeyword}
-              className="px-3 py-2 rounded-md text-sm font-medium bg-white border border-gray-300 text-text-primary hover:bg-gray-50 transition-colors"
+              disabled={studyLock}
+              className={[
+                'px-3 py-2 rounded-md text-sm font-medium bg-white border border-gray-300 text-text-primary hover:bg-gray-50 transition-colors',
+                studyLock ? 'cursor-not-allowed opacity-60' : '',
+              ].join(' ')}
             >
               Agregar
             </button>
@@ -671,6 +945,17 @@ function GuardrailsSection({
           </div>
         </div>
       </div>
+
+      <OverrideConfirmModal
+        open={pendingOverride !== null}
+        pending={overrideRunning}
+        onCancel={() => setPendingOverride(null)}
+        onConfirm={() => {
+          if (pendingOverride) {
+            pendingOverride()
+          }
+        }}
+      />
     </SectionCard>
   )
 }
@@ -1096,6 +1381,7 @@ export default function Config() {
   const initialKeywords = asKeywordArray(configMap['safety_keywords']?.value)
   const initialThreshold = asThreshold(configMap['sos_severity_threshold']?.value)
   const initialEnabled = asGuardrailsEnabled(configMap['guardrails_enabled']?.value)
+  const initialStudyLock = asBool(configMap['study_lock_enabled']?.value)
   const initialHotlines = asHotlineArray(configMap['sos_hotline_numbers']?.value)
 
   return (
@@ -1147,6 +1433,7 @@ export default function Config() {
             initialKeywords={initialKeywords}
             initialThreshold={initialThreshold}
             initialEnabled={initialEnabled}
+            initialStudyLock={initialStudyLock}
             onChanged={loadConfig}
           />
           <HotlinesSection initial={initialHotlines} onChanged={loadConfig} />

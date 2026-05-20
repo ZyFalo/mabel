@@ -8,6 +8,7 @@ import RoleGuard from './guards/RoleGuard'
 import AdminLayout from './components/admin/AdminLayout'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminMetrics from './pages/admin/Metrics'
+import AdminEmpathyRatings from './pages/admin/EmpathyRatings'
 import AdminUsers from './pages/admin/Users'
 import AdminUserDetail from './pages/admin/UserDetail'
 import AdminReports from './pages/admin/Reports'
@@ -113,6 +114,7 @@ export default function App() {
               <Route path="/admin/reports" element={<AdminReports />} />
               <Route path="/admin/safety-events" element={<AdminSafetyEvents />} />
               <Route path="/admin/metrics" element={<AdminMetrics />} />
+              <Route path="/admin/empathy-ratings" element={<AdminEmpathyRatings />} />
               <Route path="/admin/config" element={<AdminConfig />} />
               <Route path="/admin/logs" element={<AdminAuditLogs />} />
             </Route>

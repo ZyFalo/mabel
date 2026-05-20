@@ -14,6 +14,7 @@ interface UserAdminListItem {
   email_masked: string
   display_name: string | null
   role: string
+  cohort: string | null
   created_at: string
   last_session_at: string | null
   consent_status: 'ok' | 'no_consent' | 'revoked' | 'new_version_required' | string
@@ -32,6 +33,7 @@ interface FiltersState {
   q: string
   status: StatusFilter
   consent_status: ConsentFilter
+  cohort: string
   created_from: string
   created_to: string
 }
@@ -40,6 +42,7 @@ const DEFAULT_FILTERS: FiltersState = {
   q: '',
   status: 'todos',
   consent_status: 'todos',
+  cohort: '',
   created_from: '',
   created_to: '',
 }
@@ -150,6 +153,7 @@ export default function Users() {
       if (filters.q.trim()) params.q = filters.q.trim()
       if (filters.status !== 'todos') params.status = filters.status
       if (filters.consent_status !== 'todos') params.consent_status = filters.consent_status
+      if (filters.cohort.trim()) params.cohort = filters.cohort.trim()
       if (filters.created_from) params.created_from = filters.created_from
       if (filters.created_to) params.created_to = filters.created_to
 
@@ -205,6 +209,21 @@ export default function Users() {
             )}
           </div>
         ),
+      },
+      {
+        key: 'cohort',
+        header: 'Cohorte',
+        sortable: true,
+        sortValue: (row) => row.cohort ?? '',
+        accessor: (row) =>
+          row.cohort ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent/8 text-accent border border-accent/20 text-[11px] font-medium font-mono tracking-tight">
+              {row.cohort}
+            </span>
+          ) : (
+            <span className="text-[11px] text-text-primary/30">—</span>
+          ),
+        className: 'w-[140px]',
       },
       {
         key: 'created_at',
@@ -290,6 +309,7 @@ export default function Users() {
     (filters.q.trim() ? 1 : 0) +
     (filters.status !== 'todos' ? 1 : 0) +
     (filters.consent_status !== 'todos' ? 1 : 0) +
+    (filters.cohort.trim() ? 1 : 0) +
     (filters.created_from ? 1 : 0) +
     (filters.created_to ? 1 : 0)
 
@@ -384,6 +404,23 @@ export default function Users() {
             <option value="revoked">Revocado</option>
             <option value="new_version_required">Nueva version requerida</option>
           </select>
+        </div>
+
+        <div className="flex flex-col gap-1 min-w-[160px]">
+          <label
+            htmlFor="filter-cohort"
+            className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/60"
+          >
+            Cohorte
+          </label>
+          <input
+            id="filter-cohort"
+            type="text"
+            value={filters.cohort}
+            onChange={(e) => updateFilter('cohort', e.target.value)}
+            placeholder="piloto-fase1"
+            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+          />
         </div>
 
         <div className="flex flex-col gap-1 min-w-[150px]">

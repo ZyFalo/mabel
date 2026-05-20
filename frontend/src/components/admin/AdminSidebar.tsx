@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/admin/safety-events', label: 'Safety Events', badge: 'safety' },
   { to: '/admin/reports', label: 'Reportes', badge: 'reports' },
   { to: '/admin/metrics', label: 'Metricas' },
+  { to: '/admin/empathy-ratings', label: 'Calificacion Empatia' },
   { to: '/admin/users', label: 'Usuarios' },
   { to: '/admin/config', label: 'Configuracion' },
   { to: '/admin/logs', label: 'Logs' },

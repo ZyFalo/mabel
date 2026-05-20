@@ -37,27 +37,27 @@
 
 ### Capability 4 — research-frontend
 
-- [ ] 27. Update `frontend/src/pages/admin/Users.tsx`: add "Cohorte" column to DataTable and "Cohorte" filter input to FilterBar (passes `cohort` query param).
-- [ ] 28. Update `frontend/src/pages/admin/UserDetail.tsx`: add a "Cohorte" control to "Informacion general" card (text input + save button + clear button); calls `PATCH /admin/users/:id/cohort`.
-- [ ] 29. Update `frontend/src/pages/admin/Metrics.tsx`:
+- [x] 27. Update `frontend/src/pages/admin/Users.tsx`: add "Cohorte" column to DataTable and "Cohorte" filter input to FilterBar (passes `cohort` query param).
+- [x] 28. Update `frontend/src/pages/admin/UserDetail.tsx`: add a "Cohorte" control to "Informacion general" card (text input + save button + clear button); calls `PATCH /admin/users/:id/cohort`.
+- [x] 29. Update `frontend/src/pages/admin/Metrics.tsx`:
   - Add "Cohorte" filter to top toolbar (text input or select)
   - Persist in URL via `useSearchParams` (param `cohort`)
   - Tab E: if URL has no `cohort` param, default to `?cohort=piloto-fase1` (via `useEffect` redirect on mount)
   - All tab fetches pass `cohort` query param
-- [ ] 30. Update `Metrics.tsx` Tab E ("Estudio") rendering:
+- [x] 30. Update `Metrics.tsx` Tab E ("Estudio") rendering:
   - Display `n_paired` and `n_excluded` per comparison
   - Display `test_used` label ("Paired t-test" / "Wilcoxon signed-rank")
   - Display `shapiro_p` value with hint
   - Cohen's d card: if `null` show "No calculable (n_paired < 10)"; else show value + size badge (chico/mediano/grande)
   - Use `pct_empathy_4_or_above` for the empathy criterion display
-- [ ] 31. Create `frontend/src/pages/admin/EmpathyRatings.tsx`:
+- [x] 31. Create `frontend/src/pages/admin/EmpathyRatings.tsx`:
   - Top stats panel (n, mean, pct>=4, distribution bar)
   - Cohort filter (default `piloto-fase1`)
   - Queue (up to 20 cards) each with: message content, session timestamp, scoring widget (1-5 + criteria checkboxes), "Calificar" button
   - After successful POST: card disappears + stats refresh
-- [ ] 32. Update `frontend/src/components/admin/AdminSidebar.tsx`: add "Calificacion Empatia" link to `/admin/empathy-ratings`, positioned after "Metricas".
-- [ ] 33. Update `frontend/src/App.tsx`: add route `/admin/empathy-ratings` → `<EmpathyRatings />` inside the admin RoleGuard + AdminLayout block.
-- [ ] 34. Update `frontend/src/pages/admin/Config.tsx`:
+- [x] 32. Update `frontend/src/components/admin/AdminSidebar.tsx`: add "Calificacion Empatia" link to `/admin/empathy-ratings`, positioned after "Metricas".
+- [x] 33. Update `frontend/src/App.tsx`: add route `/admin/empathy-ratings` → `<EmpathyRatings />` inside the admin RoleGuard + AdminLayout block.
+- [x] 34. Update `frontend/src/pages/admin/Config.tsx`:
   - Add "Bloqueo de configuracion para estudio" toggle section at the top of "Guardrails de seguridad" section
   - When ON: show warning banner, gray-out guardrails inputs (visual + `disabled`)
   - Save attempts on guardrails when locked: open confirmation modal "El bloqueo de estudio esta activo. Confirma override?"
@@ -66,7 +66,7 @@
 
 ### Verification
 
-- [ ] 35. Backend: `python -c "from app.main import app; routes = [r.path for r in app.routes if 'admin' in r.path]; print(len(routes), 'admin routes')"` — should be 26+ (was 23 in Fase 8).
-- [ ] 36. Frontend: `npx tsc --noEmit` clean.
-- [ ] 37. Migration verification: `alembic current` returns head; query `SELECT key FROM system_config WHERE key='study_lock_enabled'` returns 1 row.
+- [x] 3- [ ] 35. Backend: `python -c "from app.main import app; routes = [r.path for r in app.routes if 'admin' in r.path]; print(len(routes), 'admin routes')"` — should be 26+ (was 23 in Fase 8).
+- [x] 3- [ ] 36. Frontend: `npx tsc --noEmit` clean.
+- [x] 3- [ ] 37. Migration verification: `alembic current` returns head; query `SELECT key FROM system_config WHERE key='study_lock_enabled'` returns 1 row.
 - [ ] 38. Smoke test: login admin → /admin/users (cohort filter works) → assign a user to piloto-fase1 → /admin/metrics?tab=study (sees ?cohort=piloto-fase1 default) → /admin/empathy-ratings (queue loads, can submit a rating) → /admin/config (toggle study_lock_enabled = true, attempt to change safety_keywords → 423 + override modal).
