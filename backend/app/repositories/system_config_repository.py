@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -80,7 +80,7 @@ class SystemConfigRepository:
         if row is None:
             raise ValueError("KEY_NOT_FOUND")
         row.value = new_value
-        row.updated_at = datetime.now(UTC)
+        row.updated_at = datetime.utcnow()
         await self.db.flush()
         # Invalidate local cache (next read re-fetches).
         self._cache = None

@@ -42,64 +42,70 @@ def _client_ip(request: Request) -> str | None:
 
 @router.get("/admin/dashboard")
 async def get_dashboard(
+    cohort: str | None = Query(default=None),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     service = AdminMetricsService(db)
-    return await service.dashboard_kpis()
+    return await service.dashboard_kpis(cohort=cohort)
 
 
 @router.get("/admin/metrics/usage")
 async def get_metrics_usage(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    cohort: str | None = Query(default=None),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     service = AdminMetricsService(db)
-    return await service.metrics_usage(from_date, to_date)
+    return await service.metrics_usage(from_date, to_date, cohort=cohort)
 
 
 @router.get("/admin/metrics/wellbeing")
 async def get_metrics_wellbeing(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    cohort: str | None = Query(default=None),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     service = AdminMetricsService(db)
-    return await service.metrics_wellbeing(from_date, to_date)
+    return await service.metrics_wellbeing(from_date, to_date, cohort=cohort)
 
 
 @router.get("/admin/metrics/technical")
 async def get_metrics_technical(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    cohort: str | None = Query(default=None),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     service = AdminMetricsService(db)
-    return await service.metrics_technical(from_date, to_date)
+    return await service.metrics_technical(from_date, to_date, cohort=cohort)
 
 
 @router.get("/admin/metrics/safety")
 async def get_metrics_safety(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    cohort: str | None = Query(default=None),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     service = AdminMetricsService(db)
-    return await service.metrics_safety(from_date, to_date)
+    return await service.metrics_safety(from_date, to_date, cohort=cohort)
 
 
 @router.get("/admin/metrics/study")
 async def get_metrics_study(
+    cohort: str | None = Query(default=None),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     service = AdminMetricsService(db)
-    return await service.metrics_study()
+    return await service.metrics_study(cohort=cohort)
 
 
 @router.get("/admin/metrics/export.csv")
@@ -108,6 +114,7 @@ async def export_metrics_csv(
     tab: Literal["usage", "wellbeing", "technical", "safety", "study"] = Query(...),
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    cohort: str | None = Query(default=None),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -124,13 +131,16 @@ async def export_metrics_csv(
             "tab": tab,
             "from": from_date.isoformat() if from_date else None,
             "to": to_date.isoformat() if to_date else None,
+            "cohort": cohort,
         },
         ip=_client_ip(request),
     )
     await db.commit()
 
     async def row_generator():
-        async for row in service.export_csv(tab=tab, from_date=from_date, to_date=to_date):
+        async for row in service.export_csv(
+            tab=tab, from_date=from_date, to_date=to_date, cohort=cohort
+        ):
             buf = io.StringIO()
             csv.writer(buf).writerow(row)
             yield buf.getvalue()

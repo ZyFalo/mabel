@@ -12,17 +12,17 @@
 
 ### Capability 2 — research-ops-backend
 
-- [ ] 8. Add `cohort: str | None` field to `UserAdminListItem` and `UserAdminDetail` in `backend/app/schemas/admin.py`.
-- [ ] 9. Add `cohort` filter to `AdminUsersService.list_users(...)` and `get_user_detail(...)`. Update SQL queries to include `cohort` column.
-- [ ] 10. Add `cohort` query param to GET `/admin/users` in `backend/app/routers/admin/users_router.py`.
-- [ ] 11. Add `async def set_cohort(user_id, cohort, admin_id)` to `AdminUsersService`. Writes audit_logs (`action="change_config"`, `target_type="user_cohort"`).
-- [ ] 12. Add `PATCH /admin/users/{user_id}/cohort` endpoint (body `{cohort: str | null}`) in users_router. Use require_admin.
-- [ ] 13. Add `cohort` query param to all metrics endpoints (`/admin/dashboard`, `/admin/metrics/usage`, `wellbeing`, `technical`, `safety`, `study`, `metrics/export.csv`). Propagate to `AdminMetricsService` methods.
-- [ ] 14. Update all aggregation queries in `metrics_service.py` to JOIN `sessions` → `users` (or `messages` → `sessions` → `users` for message-level) and add `WHERE users.cohort = :cohort` when cohort is provided.
-- [ ] 15. Modify PATCH `/admin/config/{key}` in `backend/app/routers/admin/config_router.py`: before performing the update, if key is in `{"safety_keywords", "sos_severity_threshold", "guardrails_enabled"}` AND `system_config.study_lock_enabled.value == true`, AND header `X-Study-Lock-Override` is NOT `"true"`, return 423 Locked with `{"detail":"STUDY_LOCK_ENABLED","key":key}`.
-- [ ] 16. When override header is present, include `details.override = true` in the audit_log entry.
-- [ ] 17. In `backend/app/routers/auth_router.py` login endpoint, on successful response call `audit_log_action(db, admin_id=user.id, action="login", target_type="user", target_id=user.id, details={"role": user.role, "remember_me": body.remember_me}, ip=request.client.host)` then commit.
-- [ ] 18. Update `ALLOWED_ACTIONS` in `audit_service.py` to include `"login"` and `"empathy_rate"` (the latter used by Cap 3).
+- [x] 8. Add `cohort: str | None` field to `UserAdminListItem` and `UserAdminDetail` in `backend/app/schemas/admin.py`.
+- [x] 9. Add `cohort` filter to `AdminUsersService.list_users(...)` and `get_user_detail(...)`. Update SQL queries to include `cohort` column.
+- [x] 10. Add `cohort` query param to GET `/admin/users` in `backend/app/routers/admin/users_router.py`.
+- [x] 11. Add `async def set_cohort(user_id, cohort, admin_id)` to `AdminUsersService`. Writes audit_logs (`action="change_config"`, `target_type="user_cohort"`).
+- [x] 12. Add `PATCH /admin/users/{user_id}/cohort` endpoint (body `{cohort: str | null}`) in users_router. Use require_admin.
+- [x] 13. Add `cohort` query param to all metrics endpoints (`/admin/dashboard`, `/admin/metrics/usage`, `wellbeing`, `technical`, `safety`, `study`, `metrics/export.csv`). Propagate to `AdminMetricsService` methods.
+- [x] 14. Update all aggregation queries in `metrics_service.py` to JOIN `sessions` → `users` (or `messages` → `sessions` → `users` for message-level) and add `WHERE users.cohort = :cohort` when cohort is provided.
+- [x] 15. Modify PATCH `/admin/config/{key}` in `backend/app/routers/admin/config_router.py`: before performing the update, if key is in `{"safety_keywords", "sos_severity_threshold", "guardrails_enabled"}` AND `system_config.study_lock_enabled.value == true`, AND header `X-Study-Lock-Override` is NOT `"true"`, return 423 Locked with `{"detail":"STUDY_LOCK_ENABLED","key":key}`.
+- [x] 16. When override header is present, include `details.override = true` in the audit_log entry.
+- [x] 17. In `backend/app/routers/auth_router.py` login endpoint, on successful response call `audit_log_action(db, admin_id=user.id, action="login", target_type="user", target_id=user.id, details={"role": user.role, "remember_me": body.remember_me}, ip=request.client.host)` then commit.
+- [x] 18. Update `ALLOWED_ACTIONS` in `audit_service.py` to include `"login"` and `"empathy_rate"` (the latter used by Cap 3).
 
 ### Capability 3 — research-analytics-backend
 

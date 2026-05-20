@@ -23,6 +23,7 @@ from app.models.user import User
 from app.schemas.admin import (
     DisableUserRequest,
     PaginatedResponse,
+    SetCohortRequest,
     UserAdminDetail,
     UserAdminListItem,
 )
@@ -45,6 +46,7 @@ async def list_admin_users(
     | None = Query(default=None),
     created_from: date | None = Query(default=None),
     created_to: date | None = Query(default=None),
+    cohort: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: User = Depends(require_admin),
@@ -57,6 +59,7 @@ async def list_admin_users(
         consent_status=consent_status,
         created_from=created_from,
         created_to=created_to,
+        cohort=cohort,
         page=page,
         page_size=page_size,
     )
@@ -123,3 +126,30 @@ async def disable_admin_user(
         raise
 
     return {"status": "disabled", "user_id": str(user_id)}
+
+
+@router.patch("/{user_id}/cohort")
+async def set_user_cohort(
+    user_id: uuid.UUID,
+    body: SetCohortRequest,
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Assign or clear a user's research cohort. Admin-only (Fase 8.1)."""
+    service = AdminUsersService(db)
+    try:
+        user = await service.set_cohort(
+            user_id=user_id,
+            cohort=body.cohort,
+            admin_id=current_user.id,
+            ip=_client_ip(request),
+        )
+    except ValueError as e:
+        if str(e) == "USER_NOT_FOUND":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado"
+            )
+        raise
+
+    return {"id": str(user.id), "cohort": user.cohort}

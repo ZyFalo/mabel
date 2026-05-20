@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -18,6 +18,7 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.services.account_service import AccountService
+from app.services.audit_service import audit_log_action
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -38,9 +39,14 @@ async def register(request: RegisterRequest, service: AuthService = Depends(_get
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest, service: AuthService = Depends(_get_auth_service)):
+async def login(
+    body: LoginRequest,
+    request: Request,
+    service: AuthService = Depends(_get_auth_service),
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        return await service.login(request.email, request.password, request.remember_me)
+        response = await service.login(body.email, body.password, body.remember_me)
     except ValueError as e:
         msg = str(e)
         if msg == "INVALID_CREDENTIALS":
@@ -49,6 +55,20 @@ async def login(request: LoginRequest, service: AuthService = Depends(_get_auth_
             reason = msg.split(":", 1)[1]
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Cuenta deshabilitada: {reason}")
         raise
+
+    # D-09: Audit successful logins (failed logins are NOT audited).
+    await audit_log_action(
+        db,
+        admin_id=response.user.id,
+        action="login",
+        target_type="user",
+        target_id=response.user.id,
+        details={"role": response.user.role, "remember_me": body.remember_me},
+        ip=request.client.host if request.client else None,
+    )
+    await db.commit()
+
+    return response
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)

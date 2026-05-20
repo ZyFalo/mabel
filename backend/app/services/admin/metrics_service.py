@@ -25,6 +25,7 @@ from app.models.message import Message
 from app.models.message_report import MessageReport
 from app.models.safety_event import SafetyEvent
 from app.models.session import Session as SessionModel
+from app.models.survey_response import SurveyResponse
 from app.models.user import User
 from app.repositories.survey_response_repository import SurveyResponseRepository
 
@@ -139,7 +140,7 @@ class AdminMetricsService:
     # Dashboard
     # -----------------------------------------------------------------------
 
-    async def dashboard_kpis(self) -> dict[str, Any]:
+    async def dashboard_kpis(self, cohort: str | None = None) -> dict[str, Any]:
         now = _utc_now()
         today = date.today()
         week_ago = now - timedelta(days=7)
@@ -148,37 +149,58 @@ class AdminMetricsService:
         fourteen_days_ago = now - timedelta(days=14)
 
         # KPI: total active users
-        total_users = await self._scalar(
+        total_users_stmt = (
             select(func.count()).select_from(User).where(User.deleted_at.is_(None))
         )
+        if cohort is not None:
+            total_users_stmt = total_users_stmt.where(User.cohort == cohort)
+        total_users = await self._scalar(total_users_stmt)
 
         # KPI: new users this week
-        users_new_this_week = await self._scalar(
+        new_week_stmt = (
             select(func.count())
             .select_from(User)
             .where(User.deleted_at.is_(None), User.created_at >= week_ago)
         )
+        if cohort is not None:
+            new_week_stmt = new_week_stmt.where(User.cohort == cohort)
+        users_new_this_week = await self._scalar(new_week_stmt)
 
         # KPI: sessions today (by date of started_at)
-        sessions_today = await self._scalar(
+        sessions_today_stmt = (
             select(func.count())
             .select_from(SessionModel)
             .where(func.date(SessionModel.started_at) == today)
         )
+        if cohort is not None:
+            sessions_today_stmt = sessions_today_stmt.join(
+                User, SessionModel.user_id == User.id
+            ).where(User.cohort == cohort)
+        sessions_today = await self._scalar(sessions_today_stmt)
 
         # KPI: safety events in last 24h
-        safety_events_24h = await self._scalar(
+        safety_24h_stmt = (
             select(func.count())
             .select_from(SafetyEvent)
             .where(SafetyEvent.created_at >= day_ago)
         )
+        if cohort is not None:
+            safety_24h_stmt = safety_24h_stmt.join(
+                User, SafetyEvent.user_id == User.id
+            ).where(User.cohort == cohort)
+        safety_events_24h = await self._scalar(safety_24h_stmt)
 
         # KPI: open reports
-        reports_pending = await self._scalar(
+        reports_pending_stmt = (
             select(func.count())
             .select_from(MessageReport)
             .where(MessageReport.status == "open")
         )
+        if cohort is not None:
+            reports_pending_stmt = reports_pending_stmt.join(
+                User, MessageReport.reporter_id == User.id
+            ).where(User.cohort == cohort)
+        reports_pending = await self._scalar(reports_pending_stmt)
 
         # KPI: avg latency over last 30 days (assistant messages only)
         latency_avg_stmt = (
@@ -189,29 +211,37 @@ class AdminMetricsService:
                 Message.created_at >= thirty_days_ago,
             )
         )
+        if cohort is not None:
+            latency_avg_stmt = (
+                latency_avg_stmt.join(SessionModel, Message.session_id == SessionModel.id)
+                .join(User, SessionModel.user_id == User.id)
+                .where(User.cohort == cohort)
+            )
         latency_result = await self.db.execute(latency_avg_stmt)
         latency_raw = latency_result.scalar()
         latency_avg_ms = int(latency_raw) if latency_raw is not None else 0
 
         # KPI: SUS average
-        sus_scores = await self.survey_repo.get_sus_scores()
+        sus_scores = await self._sus_scores(cohort=cohort)
         sus_avg = _safe_mean(sus_scores)
 
         # Series: sessions per day (last 30d)
-        sessions_per_day_30d = await self._sessions_per_day(thirty_days_ago, now)
+        sessions_per_day_30d = await self._sessions_per_day(thirty_days_ago, now, cohort=cohort)
 
         # Series: mood distribution (last 30d)
-        mood_distribution_30d = await self._mood_distribution(thirty_days_ago, now)
+        mood_distribution_30d = await self._mood_distribution(thirty_days_ago, now, cohort=cohort)
 
         # Series: latency per day (last 30d)
-        latency_per_day_30d = await self._latency_per_day(thirty_days_ago, now)
+        latency_per_day_30d = await self._latency_per_day(thirty_days_ago, now, cohort=cohort)
 
         # Series: safety events by type (last 30d)
-        safety_events_by_type_30d = await self._safety_events_by_type(thirty_days_ago, now)
+        safety_events_by_type_30d = await self._safety_events_by_type(
+            thirty_days_ago, now, cohort=cohort
+        )
 
         # Series: guardrails activations (last 14d) — event_type 'risk_detected'
         guardrails_activations_14d = await self._guardrails_per_day(
-            fourteen_days_ago, now, event_type="risk_detected"
+            fourteen_days_ago, now, event_type="risk_detected", cohort=cohort
         )
 
         # Last 5 safety events
@@ -220,6 +250,14 @@ class AdminMetricsService:
             .order_by(SafetyEvent.created_at.desc())
             .limit(5)
         )
+        if cohort is not None:
+            last_5_stmt = (
+                select(SafetyEvent)
+                .join(User, SafetyEvent.user_id == User.id)
+                .where(User.cohort == cohort)
+                .order_by(SafetyEvent.created_at.desc())
+                .limit(5)
+            )
         last_5_result = await self.db.execute(last_5_stmt)
         last_5_safety_events = []
         for ev in last_5_result.scalars().all():
@@ -258,7 +296,12 @@ class AdminMetricsService:
     # Tab A — Uso
     # -----------------------------------------------------------------------
 
-    async def metrics_usage(self, from_date: date | None, to_date: date | None) -> dict[str, Any]:
+    async def metrics_usage(
+        self,
+        from_date: date | None,
+        to_date: date | None,
+        cohort: str | None = None,
+    ) -> dict[str, Any]:
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
 
@@ -270,6 +313,10 @@ class AdminMetricsService:
             .group_by(day_col)
             .order_by(day_col)
         )
+        if cohort is not None:
+            active_users_stmt = active_users_stmt.join(
+                User, SessionModel.user_id == User.id
+            ).where(User.cohort == cohort)
         active_users_result = await self.db.execute(active_users_stmt)
         active_users_per_day = [
             {"date": _date_str(d), "count": int(c)} for d, c in active_users_result.all()
@@ -281,6 +328,10 @@ class AdminMetricsService:
             .where(SessionModel.started_at >= from_dt, SessionModel.started_at <= to_dt)
             .group_by(SessionModel.user_id)
         )
+        if cohort is not None:
+            per_user_stmt = per_user_stmt.join(
+                User, SessionModel.user_id == User.id
+            ).where(User.cohort == cohort)
         per_user_result = await self.db.execute(per_user_stmt)
         buckets = {"1-2": 0, "3-5": 0, "6-10": 0, "10+": 0}
         for _, count in per_user_result.all():
@@ -302,6 +353,10 @@ class AdminMetricsService:
             .where(SessionModel.started_at >= from_dt, SessionModel.started_at <= to_dt)
             .group_by(Message.session_id)
         )
+        if cohort is not None:
+            msg_stmt = msg_stmt.join(User, SessionModel.user_id == User.id).where(
+                User.cohort == cohort
+            )
         msg_result = await self.db.execute(msg_stmt)
         counts = [int(c) for (c,) in msg_result.all()]
         avg_messages_per_session = float(np.mean(counts)) if counts else 0.0
@@ -319,6 +374,10 @@ class AdminMetricsService:
                 SessionModel.ended_at.is_not(None),
             )
         )
+        if cohort is not None:
+            duration_stmt = duration_stmt.join(
+                User, SessionModel.user_id == User.id
+            ).where(User.cohort == cohort)
         duration_result = await self.db.execute(duration_stmt)
         duration_raw = duration_result.scalar()
         avg_session_duration_minutes = float(duration_raw) if duration_raw is not None else 0.0
@@ -334,7 +393,12 @@ class AdminMetricsService:
     # Tab B — Bienestar
     # -----------------------------------------------------------------------
 
-    async def metrics_wellbeing(self, from_date: date | None, to_date: date | None) -> dict[str, Any]:
+    async def metrics_wellbeing(
+        self,
+        from_date: date | None,
+        to_date: date | None,
+        cohort: str | None = None,
+    ) -> dict[str, Any]:
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
 
@@ -345,6 +409,13 @@ class AdminMetricsService:
             SessionModel.checkin_completed_at <= to_dt,
             SessionModel.checkin_payload.is_not(None),
         )
+
+        def _apply_cohort(stmt):
+            if cohort is None:
+                return stmt
+            return stmt.join(User, SessionModel.user_id == User.id).where(
+                User.cohort == cohort
+            )
 
         mood_expr = cast(SessionModel.checkin_payload["mood"].astext, Float)
         sleep_expr = cast(SessionModel.checkin_payload["sleep"].astext, Float)
@@ -358,6 +429,7 @@ class AdminMetricsService:
             .group_by(day_col)
             .order_by(day_col)
         )
+        mood_stmt = _apply_cohort(mood_stmt)
         mood_result = await self.db.execute(mood_stmt)
         mood_per_day = [
             {"date": _date_str(d), "mean": float(m) if m is not None else None}
@@ -371,6 +443,7 @@ class AdminMetricsService:
             .group_by(day_col)
             .order_by(day_col)
         )
+        sleep_stmt = _apply_cohort(sleep_stmt)
         sleep_result = await self.db.execute(sleep_stmt)
         sleep_per_day = [
             {"date": _date_str(d), "mean": float(m) if m is not None else None}
@@ -385,6 +458,7 @@ class AdminMetricsService:
             .group_by(week_col, focus_expr)
             .order_by(week_col)
         )
+        focus_stmt = _apply_cohort(focus_stmt)
         focus_result = await self.db.execute(focus_stmt)
         focus_distribution_per_week = [
             {
@@ -397,6 +471,7 @@ class AdminMetricsService:
 
         # Mood summary (numpy)
         mood_values_stmt = select(mood_expr).where(*completed_filter)
+        mood_values_stmt = _apply_cohort(mood_values_stmt)
         mood_values_result = await self.db.execute(mood_values_stmt)
         mood_values = [float(v) for v in mood_values_result.scalars().all() if v is not None]
         if mood_values:
@@ -432,9 +507,23 @@ class AdminMetricsService:
     # Tab C — Tecnicas
     # -----------------------------------------------------------------------
 
-    async def metrics_technical(self, from_date: date | None, to_date: date | None) -> dict[str, Any]:
+    async def metrics_technical(
+        self,
+        from_date: date | None,
+        to_date: date | None,
+        cohort: str | None = None,
+    ) -> dict[str, Any]:
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
+
+        def _apply_msg_cohort(stmt):
+            if cohort is None:
+                return stmt
+            return (
+                stmt.join(SessionModel, Message.session_id == SessionModel.id)
+                .join(User, SessionModel.user_id == User.id)
+                .where(User.cohort == cohort)
+            )
 
         # Latency percentiles per day (assistant messages)
         day_col = func.date_trunc("day", Message.created_at).label("day")
@@ -455,6 +544,7 @@ class AdminMetricsService:
             .group_by(day_col)
             .order_by(day_col)
         )
+        percentiles_stmt = _apply_msg_cohort(percentiles_stmt)
         percentiles_result = await self.db.execute(percentiles_stmt)
         latency_percentiles_per_day = [
             {
@@ -473,6 +563,8 @@ class AdminMetricsService:
             .select_from(Message)
             .where(*latency_filter, Message.latency_ms < 20000)
         )
+        total_turns_stmt = _apply_msg_cohort(total_turns_stmt)
+        under_20s_stmt = _apply_msg_cohort(under_20s_stmt)
         total_turns = int((await self.db.execute(total_turns_stmt)).scalar_one())
         under_20s = int((await self.db.execute(under_20s_stmt)).scalar_one())
         pct_turns_under_20s = (under_20s / total_turns * 100.0) if total_turns > 0 else 0.0
@@ -492,6 +584,7 @@ class AdminMetricsService:
             .group_by(token_day_col)
             .order_by(token_day_col)
         )
+        tokens_stmt = _apply_msg_cohort(tokens_stmt)
         tokens_result = await self.db.execute(tokens_stmt)
         tokens_per_day = []
         total_prompt = 0
@@ -523,9 +616,21 @@ class AdminMetricsService:
     # Tab D — Seguridad
     # -----------------------------------------------------------------------
 
-    async def metrics_safety(self, from_date: date | None, to_date: date | None) -> dict[str, Any]:
+    async def metrics_safety(
+        self,
+        from_date: date | None,
+        to_date: date | None,
+        cohort: str | None = None,
+    ) -> dict[str, Any]:
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
+
+        def _apply_safety_cohort(stmt):
+            if cohort is None:
+                return stmt
+            return stmt.join(User, SafetyEvent.user_id == User.id).where(
+                User.cohort == cohort
+            )
 
         # Safety events per day
         day_col = func.date_trunc("day", SafetyEvent.created_at).label("day")
@@ -535,6 +640,7 @@ class AdminMetricsService:
             .group_by(day_col)
             .order_by(day_col)
         )
+        per_day_stmt = _apply_safety_cohort(per_day_stmt)
         per_day_result = await self.db.execute(per_day_stmt)
         safety_events_per_day = [
             {"date": _date_str(d), "count": int(c)} for d, c in per_day_result.all()
@@ -547,6 +653,7 @@ class AdminMetricsService:
             .group_by(SafetyEvent.event_type)
             .order_by(func.count().desc())
         )
+        type_stmt = _apply_safety_cohort(type_stmt)
         type_result = await self.db.execute(type_stmt)
         guardrails_type_distribution = [
             {"event_type": t, "count": int(c)} for t, c in type_result.all()
@@ -554,24 +661,28 @@ class AdminMetricsService:
 
         # Infraction rate (events / messages) — last 30 days, regardless of window
         thirty_days_ago = _utc_now() - timedelta(days=30)
-        events_30d = int(
-            (
-                await self.db.execute(
-                    select(func.count())
-                    .select_from(SafetyEvent)
-                    .where(SafetyEvent.created_at >= thirty_days_ago)
-                )
-            ).scalar_one()
+        events_30d_stmt = (
+            select(func.count())
+            .select_from(SafetyEvent)
+            .where(SafetyEvent.created_at >= thirty_days_ago)
         )
-        messages_30d = int(
-            (
-                await self.db.execute(
-                    select(func.count())
-                    .select_from(Message)
-                    .where(Message.created_at >= thirty_days_ago)
-                )
-            ).scalar_one()
+        if cohort is not None:
+            events_30d_stmt = events_30d_stmt.join(
+                User, SafetyEvent.user_id == User.id
+            ).where(User.cohort == cohort)
+        messages_30d_stmt = (
+            select(func.count())
+            .select_from(Message)
+            .where(Message.created_at >= thirty_days_ago)
         )
+        if cohort is not None:
+            messages_30d_stmt = (
+                messages_30d_stmt.join(SessionModel, Message.session_id == SessionModel.id)
+                .join(User, SessionModel.user_id == User.id)
+                .where(User.cohort == cohort)
+            )
+        events_30d = int((await self.db.execute(events_30d_stmt)).scalar_one())
+        messages_30d = int((await self.db.execute(messages_30d_stmt)).scalar_one())
         infraction_rate = (events_30d / messages_30d) if messages_30d > 0 else 0.0
 
         # Top keywords (anonymized) — extract from safety_events.payload->>'keywords' (array)
@@ -583,6 +694,7 @@ class AdminMetricsService:
                 SafetyEvent.payload.is_not(None),
             )
         )
+        keywords_stmt = _apply_safety_cohort(keywords_stmt)
         keywords_result = await self.db.execute(keywords_stmt)
         counter: dict[str, int] = {}
         total_kw = 0
@@ -620,10 +732,10 @@ class AdminMetricsService:
     # Tab E — Estudio
     # -----------------------------------------------------------------------
 
-    async def metrics_study(self) -> dict[str, Any]:
-        sus_scores = await self.survey_repo.get_sus_scores()
-        empathy_scores = await self.survey_repo.get_empathy_scores()
-        pairs = await self.survey_repo.get_wellbeing_pairs()
+    async def metrics_study(self, cohort: str | None = None) -> dict[str, Any]:
+        sus_scores = await self._sus_scores(cohort=cohort)
+        empathy_scores = await self._empathy_scores(cohort=cohort)
+        pairs = await self._wellbeing_pairs(cohort=cohort)
 
         sus_buckets = _bucket_score(
             sus_scores,
@@ -677,6 +789,7 @@ class AdminMetricsService:
         tab: str,
         from_date: date | None,
         to_date: date | None,
+        cohort: str | None = None,
     ) -> AsyncGenerator[list[str], None]:
         """Yield CSV rows (lists of str) for the chosen tab.
 
@@ -704,6 +817,10 @@ class AdminMetricsService:
                 .group_by(SessionModel.id)
                 .order_by(SessionModel.started_at)
             )
+            if cohort is not None:
+                stmt = stmt.join(User, SessionModel.user_id == User.id).where(
+                    User.cohort == cohort
+                )
             result = await self.db.execute(stmt)
             for sid, uid, started, ended, mc in result.all():
                 yield [
@@ -731,6 +848,10 @@ class AdminMetricsService:
                 )
                 .order_by(SessionModel.checkin_completed_at)
             )
+            if cohort is not None:
+                stmt = stmt.join(User, SessionModel.user_id == User.id).where(
+                    User.cohort == cohort
+                )
             result = await self.db.execute(stmt)
             for sid, uid, when, payload in result.all():
                 payload = payload or {}
@@ -768,6 +889,12 @@ class AdminMetricsService:
                 )
                 .order_by(Message.created_at)
             )
+            if cohort is not None:
+                stmt = (
+                    stmt.join(SessionModel, Message.session_id == SessionModel.id)
+                    .join(User, SessionModel.user_id == User.id)
+                    .where(User.cohort == cohort)
+                )
             result = await self.db.execute(stmt)
             for mid, sid, when, lat, tp, tc in result.all():
                 yield [
@@ -797,6 +924,10 @@ class AdminMetricsService:
                 )
                 .order_by(SafetyEvent.created_at)
             )
+            if cohort is not None:
+                stmt = stmt.join(User, SafetyEvent.user_id == User.id).where(
+                    User.cohort == cohort
+                )
             result = await self.db.execute(stmt)
             for ev in result.scalars().all():
                 sev = None
@@ -822,8 +953,13 @@ class AdminMetricsService:
                 "score",
                 "administered_at",
             ]
-            surveys = await self.survey_repo.list_by_filters()
-            for s in surveys:
+            stmt = select(SurveyResponse).order_by(SurveyResponse.administered_at.desc())
+            if cohort is not None:
+                stmt = stmt.join(User, SurveyResponse.user_id == User.id).where(
+                    User.cohort == cohort
+                )
+            surveys_result = await self.db.execute(stmt)
+            for s in surveys_result.scalars().all():
                 yield [
                     _hash16(s.user_id) if s.user_id else "",
                     s.instrument,
@@ -845,7 +981,9 @@ class AdminMetricsService:
         value = result.scalar()
         return int(value) if value is not None else 0
 
-    async def _sessions_per_day(self, from_dt: datetime, to_dt: datetime) -> list[dict]:
+    async def _sessions_per_day(
+        self, from_dt: datetime, to_dt: datetime, cohort: str | None = None
+    ) -> list[dict]:
         day_col = func.date_trunc("day", SessionModel.started_at).label("day")
         stmt = (
             select(day_col, func.count().label("count"))
@@ -853,10 +991,16 @@ class AdminMetricsService:
             .group_by(day_col)
             .order_by(day_col)
         )
+        if cohort is not None:
+            stmt = stmt.join(User, SessionModel.user_id == User.id).where(
+                User.cohort == cohort
+            )
         result = await self.db.execute(stmt)
         return [{"date": _date_str(d), "count": int(c)} for d, c in result.all()]
 
-    async def _mood_distribution(self, from_dt: datetime, to_dt: datetime) -> dict[str, int]:
+    async def _mood_distribution(
+        self, from_dt: datetime, to_dt: datetime, cohort: str | None = None
+    ) -> dict[str, int]:
         mood_expr = cast(SessionModel.checkin_payload["mood"].astext, Float)
         stmt = select(mood_expr).where(
             SessionModel.checkin_completed_at.is_not(None),
@@ -864,6 +1008,10 @@ class AdminMetricsService:
             SessionModel.checkin_completed_at <= to_dt,
             SessionModel.checkin_payload.is_not(None),
         )
+        if cohort is not None:
+            stmt = stmt.join(User, SessionModel.user_id == User.id).where(
+                User.cohort == cohort
+            )
         result = await self.db.execute(stmt)
         bajo = medio = alto = 0
         for v in result.scalars().all():
@@ -878,7 +1026,9 @@ class AdminMetricsService:
                 alto += 1
         return {"bajo": bajo, "medio": medio, "alto": alto}
 
-    async def _latency_per_day(self, from_dt: datetime, to_dt: datetime) -> list[dict]:
+    async def _latency_per_day(
+        self, from_dt: datetime, to_dt: datetime, cohort: str | None = None
+    ) -> list[dict]:
         day_col = func.date_trunc("day", Message.created_at).label("day")
         stmt = (
             select(day_col, func.avg(Message.latency_ms).label("avg_ms"))
@@ -891,19 +1041,31 @@ class AdminMetricsService:
             .group_by(day_col)
             .order_by(day_col)
         )
+        if cohort is not None:
+            stmt = (
+                stmt.join(SessionModel, Message.session_id == SessionModel.id)
+                .join(User, SessionModel.user_id == User.id)
+                .where(User.cohort == cohort)
+            )
         result = await self.db.execute(stmt)
         return [
             {"date": _date_str(d), "avg_ms": int(a) if a is not None else 0}
             for d, a in result.all()
         ]
 
-    async def _safety_events_by_type(self, from_dt: datetime, to_dt: datetime) -> list[dict]:
+    async def _safety_events_by_type(
+        self, from_dt: datetime, to_dt: datetime, cohort: str | None = None
+    ) -> list[dict]:
         stmt = (
             select(SafetyEvent.event_type, func.count().label("count"))
             .where(SafetyEvent.created_at >= from_dt, SafetyEvent.created_at <= to_dt)
             .group_by(SafetyEvent.event_type)
             .order_by(func.count().desc())
         )
+        if cohort is not None:
+            stmt = stmt.join(User, SafetyEvent.user_id == User.id).where(
+                User.cohort == cohort
+            )
         result = await self.db.execute(stmt)
         return [{"event_type": t, "count": int(c)} for t, c in result.all()]
 
@@ -912,6 +1074,7 @@ class AdminMetricsService:
         from_dt: datetime,
         to_dt: datetime,
         event_type: str,
+        cohort: str | None = None,
     ) -> list[dict]:
         day_col = func.date_trunc("day", SafetyEvent.created_at).label("day")
         stmt = (
@@ -924,8 +1087,74 @@ class AdminMetricsService:
             .group_by(day_col)
             .order_by(day_col)
         )
+        if cohort is not None:
+            stmt = stmt.join(User, SafetyEvent.user_id == User.id).where(
+                User.cohort == cohort
+            )
         result = await self.db.execute(stmt)
         return [{"date": _date_str(d), "count": int(c)} for d, c in result.all()]
+
+    # ----- Survey helpers (cohort-aware) ------------------------------------
+
+    async def _sus_scores(self, cohort: str | None = None) -> list[float]:
+        stmt = select(SurveyResponse.score).where(
+            SurveyResponse.instrument == "sus",
+            SurveyResponse.score.is_not(None),
+        )
+        if cohort is not None:
+            stmt = stmt.join(User, SurveyResponse.user_id == User.id).where(
+                User.cohort == cohort
+            )
+        result = await self.db.execute(stmt)
+        return [float(row) for row in result.scalars().all() if row is not None]
+
+    async def _empathy_scores(self, cohort: str | None = None) -> list[float]:
+        stmt = select(SurveyResponse.score).where(
+            SurveyResponse.instrument == "empathy_rubric",
+            SurveyResponse.score.is_not(None),
+        )
+        if cohort is not None:
+            stmt = stmt.join(User, SurveyResponse.user_id == User.id).where(
+                User.cohort == cohort
+            )
+        result = await self.db.execute(stmt)
+        return [float(row) for row in result.scalars().all() if row is not None]
+
+    async def _wellbeing_pairs(
+        self, cohort: str | None = None
+    ) -> list[tuple[float, float]]:
+        stmt = select(
+            SurveyResponse.user_id,
+            SurveyResponse.instrument,
+            SurveyResponse.phase,
+            SurveyResponse.score,
+        ).where(
+            SurveyResponse.instrument.in_(["wellbeing_pre", "wellbeing_post"]),
+            SurveyResponse.score.is_not(None),
+            SurveyResponse.user_id.is_not(None),
+        )
+        if cohort is not None:
+            stmt = stmt.join(User, SurveyResponse.user_id == User.id).where(
+                User.cohort == cohort
+            )
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        pre: dict[uuid.UUID, float] = {}
+        post: dict[uuid.UUID, float] = {}
+        for user_id, instrument, _phase, score in rows:
+            if score is None or user_id is None:
+                continue
+            if instrument == "wellbeing_pre":
+                pre[user_id] = float(score)
+            elif instrument == "wellbeing_post":
+                post[user_id] = float(score)
+
+        pairs: list[tuple[float, float]] = []
+        for uid, pre_val in pre.items():
+            if uid in post:
+                pairs.append((pre_val, post[uid]))
+        return pairs
 
 
 def _date_str(d: Any) -> str:

@@ -75,11 +75,17 @@ def validate_guardrails_enabled(value: Any) -> None:
         _invalid("guardrails_enabled must be a boolean")
 
 
+def validate_study_lock_enabled(value: Any) -> None:
+    if not isinstance(value, bool):
+        _invalid("study_lock_enabled must be a boolean")
+
+
 _VALIDATORS = {
     "sos_hotline_numbers": validate_sos_hotline_numbers,
     "safety_keywords": validate_safety_keywords,
     "sos_severity_threshold": validate_sos_severity_threshold,
     "guardrails_enabled": validate_guardrails_enabled,
+    "study_lock_enabled": validate_study_lock_enabled,
 }
 
 

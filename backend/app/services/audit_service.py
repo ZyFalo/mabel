@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.audit_log_repository import AuditLogRepository
 
 # Allowed actions per spec admin-foundation Requirement: Audit log utility
+# Extended in Fase 8.1 with `empathy_rate` (research-analytics).
 ALLOWED_ACTIONS = frozenset(
     {
         "login",
@@ -14,6 +15,7 @@ ALLOWED_ACTIONS = frozenset(
         "review_report",
         "review_safety_event",
         "export_data",
+        "empathy_rate",
     }
 )
 

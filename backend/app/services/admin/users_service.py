@@ -108,6 +108,7 @@ class AdminUsersService:
         consent_status: str | None = None,  # "ok"|"no_consent"|"revoked"|"new_version_required"
         created_from: date | None = None,
         created_to: date | None = None,
+        cohort: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[list[UserAdminListItem], int]:
@@ -139,6 +140,8 @@ class AdminUsersService:
             conditions.append(
                 User.created_at <= datetime.combine(created_to, time.max, tzinfo=timezone.utc)
             )
+        if cohort is not None:
+            conditions.append(User.cohort == cohort)
 
         where_clause = and_(*conditions) if conditions else None
 
@@ -200,6 +203,7 @@ class AdminUsersService:
                     consent_status=cs,
                     total_sessions=total_sessions,
                     disabled_at=u.disabled_at,
+                    cohort=u.cohort,
                 )
             )
 
@@ -283,6 +287,7 @@ class AdminUsersService:
             created_at=user.created_at,
             disabled_at=user.disabled_at,
             disabled_reason=user.disabled_reason,
+            cohort=user.cohort,
             consent_status=cs,
             consent_version=consent_version_label,
             consent_accepted_at=latest_consent.accepted_at if latest_consent else None,
@@ -342,6 +347,39 @@ class AdminUsersService:
             target_type="user",
             target_id=user.id,
             details={"reason": reason},
+            ip=ip,
+        )
+
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
+    # ----- cohort assignment ------------------------------------------------
+
+    async def set_cohort(
+        self,
+        user_id: uuid.UUID,
+        cohort: str | None,
+        admin_id: uuid.UUID,
+        ip: str | None = None,
+    ) -> User:
+        """Set or clear `users.cohort`. Writes audit_logs + commits atomically (D-12)."""
+        result = await self.db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise ValueError("USER_NOT_FOUND")
+
+        old_cohort = user.cohort
+        user.cohort = cohort
+        await self.db.flush()
+
+        await audit_log_action(
+            self.db,
+            admin_id=admin_id,
+            action="change_config",
+            target_type="user_cohort",
+            target_id=user.id,
+            details={"old": old_cohort, "new": cohort},
             ip=ip,
         )
 

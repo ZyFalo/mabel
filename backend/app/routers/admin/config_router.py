@@ -29,8 +29,14 @@ from app.schemas.admin import (
     GeminiTestResponse,
     SystemConfigItem,
 )
+from app.repositories.system_config_repository import SystemConfigRepository
 from app.services.admin.config_service import AdminConfigService
 from app.services.audit_service import audit_log_action
+
+# Keys protected by the research study lock (Fase 8.1, D-04).
+STUDY_LOCKED_KEYS = frozenset(
+    {"safety_keywords", "sos_severity_threshold", "guardrails_enabled"}
+)
 
 router = APIRouter(tags=["admin"])
 
@@ -74,6 +80,21 @@ async def patch_admin_config(
             )
         raise
 
+    # Study lock middleware (Fase 8.1, D-04). The `study_lock_enabled` key is
+    # itself exempt — admins must always be able to toggle the lock off.
+    override_header = request.headers.get("X-Study-Lock-Override", "").lower() == "true"
+    if key in STUDY_LOCKED_KEYS:
+        config_repo = SystemConfigRepository(db)
+        lock_row = await config_repo.get_row("study_lock_enabled")
+        lock_value = lock_row.value if lock_row is not None else False
+        if isinstance(lock_value, str):
+            lock_value = lock_value.lower() == "true"
+        if bool(lock_value) and not override_header:
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail=f"STUDY_LOCK_ENABLED:{key}",
+            )
+
     # Validate + update (no commit).
     try:
         row = await service.update_config(key, body.value)
@@ -91,13 +112,21 @@ async def patch_admin_config(
             )
         raise
 
+    audit_details: dict = {
+        "key": key,
+        "old_value": old_value,
+        "new_value": body.value,
+    }
+    if key in STUDY_LOCKED_KEYS and override_header:
+        audit_details["override"] = True
+
     await audit_log_action(
         db,
         admin_id=current_user.id,
         action="change_config",
         target_type="system_config",
         target_id=None,
-        details={"key": key, "old_value": old_value, "new_value": body.value},
+        details=audit_details,
         ip=_client_ip(request),
     )
     await db.commit()

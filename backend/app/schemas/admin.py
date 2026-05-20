@@ -28,8 +28,15 @@ class UserAdminListItem(BaseModel):
     consent_status: str
     total_sessions: int = 0
     disabled_at: datetime | None = None
+    cohort: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SetCohortRequest(BaseModel):
+    """Payload for PATCH /admin/users/:id/cohort. None clears the cohort."""
+
+    cohort: str | None = Field(default=None, max_length=64)
 
 
 class UserAdminDetail(BaseModel):
@@ -43,6 +50,7 @@ class UserAdminDetail(BaseModel):
     created_at: datetime
     disabled_at: datetime | None = None
     disabled_reason: str | None = None
+    cohort: str | None = None
 
     # Consent
     consent_status: str
