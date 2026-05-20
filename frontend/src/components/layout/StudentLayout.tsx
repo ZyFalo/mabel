@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
-import Header from './Header'
+import { Menu } from 'lucide-react'
 import StudentSidebarV3 from './StudentSidebarV3'
 import SosFab from '../ui/SosFab'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
@@ -96,10 +96,25 @@ export default function StudentLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-[var(--bg)]">
-      <Header
-        onToggleSidebar={toggleSidebar}
-        showHamburger={isMobile}
-      />
+      {/* Mobile floating hamburger — solo cuando el sidebar esta cerrado en mobile.
+          Desktop/tablet usan el toggle propio del sidebar; admin mantiene su header. */}
+      {isMobile && !sidebarOpen && (
+        <button
+          onClick={toggleSidebar}
+          aria-label="Abrir menu"
+          title="Abrir menu"
+          className="fixed top-3 left-3 z-30 p-2 rounded-lg shadow-sm transition-opacity hover:opacity-80"
+          style={{
+            backgroundColor: 'var(--bg-elevated)',
+            color: 'var(--text-strong)',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            borderColor: 'var(--border)',
+          }}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
       <div className="flex flex-1 overflow-hidden relative">
         {isMobile ? (
           <>

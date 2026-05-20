@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Lock,
   Eye,
@@ -208,8 +208,18 @@ function SettingsNav({ activeTab, onChange }: SettingsNavProps) {
 // Settings parent component
 // ---------------------------------------------------------------------------
 
+const VALID_TABS: ReadonlySet<TabId> = new Set([
+  'privacy',
+  'accessibility',
+  'voice',
+  'appearance',
+  'account',
+  'arco',
+])
+
 export default function Settings() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const preferences = usePreferencesStore((s) => s.preferences)
   const updatePreferences = usePreferencesStore((s) => s.updatePreferences)
   const user = useAuthStore((s) => s.user)
@@ -230,8 +240,29 @@ export default function Settings() {
   const [previewPlaying, setPreviewPlaying] = useState(false)
   const [consentScope, setConsentScope] = useState<string>('')
 
-  // Active tab
-  const [activeTab, setActiveTab] = useState<TabId>('privacy')
+  // Active tab — read initial from ?tab= query param (deeplink from UserMenu)
+  const initialTab = (() => {
+    const fromUrl = searchParams.get('tab')
+    return fromUrl && VALID_TABS.has(fromUrl as TabId) ? (fromUrl as TabId) : 'privacy'
+  })()
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab)
+
+  // Sync activeTab → URL (so refresh keeps the tab)
+  useEffect(() => {
+    if (searchParams.get('tab') !== activeTab) {
+      const next = new URLSearchParams(searchParams)
+      next.set('tab', activeTab)
+      setSearchParams(next, { replace: true })
+    }
+  }, [activeTab, searchParams, setSearchParams])
+
+  // React to URL changes (e.g. user clicks another tab shortcut in UserMenu while already on /settings)
+  useEffect(() => {
+    const fromUrl = searchParams.get('tab')
+    if (fromUrl && VALID_TABS.has(fromUrl as TabId) && fromUrl !== activeTab) {
+      setActiveTab(fromUrl as TabId)
+    }
+  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Modal states
   const [showDelete, setShowDelete] = useState(false)

@@ -1,10 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   PanelLeft,
   Plus,
   Search,
-  Settings,
   FolderClosed,
 } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
@@ -13,6 +12,7 @@ import { usePreferencesStore } from '../../stores/preferencesStore'
 import { useToastStore } from '../../stores/toastStore'
 import { SkeletonText } from '../ui/Skeleton'
 import CollapsedSidebar from './CollapsedSidebar'
+import UserMenu from './UserMenu'
 
 interface StudentSidebarV3Props {
   open: boolean
@@ -85,6 +85,8 @@ export default function StudentSidebarV3({
   const navigate = useNavigate()
   const params = useParams()
   const user = useAuthStore((s) => s.user)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const profileButtonRef = useRef<HTMLButtonElement | null>(null)
   const { sessions, loadSessions, createSession, isLoadingSessions, saveHistoryEnabled } =
     useChatStore()
   const preferences = usePreferencesStore((s) => s.preferences)
@@ -287,13 +289,16 @@ export default function StudentSidebarV3({
         )}
       </div>
 
-      {/* Footer — user pill + settings */}
-      <div className="border-t border-[var(--border-subtle)] p-3 flex items-center gap-1.5">
+      {/* Footer — user pill opens UserMenu popover with shortcuts to Settings tabs + Cerrar sesion */}
+      <div className="border-t border-[var(--border-subtle)] p-3 relative">
         <button
+          ref={profileButtonRef}
           type="button"
-          onClick={() => navigate('/settings')}
-          className="flex-1 flex items-center gap-2.5 p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors min-w-0 text-left"
-          aria-label="Abrir cuenta"
+          onClick={() => setUserMenuOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={userMenuOpen}
+          className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors min-w-0 text-left"
+          aria-label="Abrir menu de cuenta"
         >
           <span
             className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[10.5px] font-semibold text-white"
@@ -314,15 +319,11 @@ export default function StudentSidebarV3({
             </span>
           </span>
         </button>
-        <button
-          type="button"
-          onClick={handleSettings}
-          title="Configuracion (Cmd+,)"
-          aria-label="Configuracion"
-          className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-strong)] hover:bg-[var(--bg-hover)] transition-colors"
-        >
-          <Settings size={15} />
-        </button>
+        <UserMenu
+          open={userMenuOpen}
+          onClose={() => setUserMenuOpen(false)}
+          anchorRef={profileButtonRef}
+        />
       </div>
     </aside>
   )
