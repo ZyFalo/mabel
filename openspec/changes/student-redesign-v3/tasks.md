@@ -29,15 +29,15 @@
 
 ### Capability 2 — sidebar-redesign
 
-- [ ] 16. Create `frontend/src/components/layout/CollapsedSidebar.tsx`: 56px rail with icon buttons (Expand, Plus prominent, Search, MessageSquare, Settings, User avatar at bottom). Each button has tooltip on hover + `title` attribute.
-- [ ] 17. Create `frontend/src/components/layout/StudentSidebarV3.tsx`: accepts `open` prop. When `open=true` renders 272px expanded with grouped conversations + footer; when `open=false` renders `<CollapsedSidebar />`. Animates width 300ms `ease-out`.
-- [ ] 18. Implement temporal grouping in `StudentSidebarV3` (Hoy, Ayer, Esta semana, Hace 30 dias, Anteriores). Reuse logic from existing `Sidebar.tsx`.
-- [ ] 19. Implement "Historial desactivado" variant when `preferences.save_history === false` (mantener mensaje + link a /settings).
-- [ ] 20. Implement footer: 28px avatar with linear-gradient + initials, display_name + role label, separate Settings icon button.
-- [ ] 21. Update `frontend/src/components/layout/StudentLayout.tsx` to use `StudentSidebarV3`. Persist `open` state in `localStorage` (`mabel_sidebar_open`). Apply responsive defaults via `useEffect + window.matchMedia`.
-- [ ] 22. Register Cmd+B shortcut in `StudentLayout` via `useKeyboardShortcuts` to toggle sidebar.
-- [ ] 23. Mobile behavior: when viewport `< md`, render sidebar as a drawer overlay (`fixed inset-y-0 left-0 z-50` + backdrop `bg-black/50 z-40`). Add a hamburger button in `Header.tsx` for mobile.
-- [ ] 24. Verify `npx tsc --noEmit` clean. Smoke: open `/home`, toggle sidebar with button and with Cmd+B; verify on mobile width opens as overlay.
+- [x] 16. Create `frontend/src/components/layout/CollapsedSidebar.tsx`: 56px rail with icon buttons (Expand, Plus prominent, Search, MessageSquare, Settings, User avatar at bottom). Each button has tooltip on hover + `title` attribute.
+- [x] 17. Create `frontend/src/components/layout/StudentSidebarV3.tsx`: accepts `open` prop. When `open=true` renders 272px expanded with grouped conversations + footer; when `open=false` renders `<CollapsedSidebar />`. Animates width 300ms `ease-out`.
+- [x] 18. Implement temporal grouping in `StudentSidebarV3` (Hoy, Ayer, Esta semana, Hace 30 dias, Anteriores). Reuse logic from existing `Sidebar.tsx`.
+- [x] 19. Implement "Historial desactivado" variant when `preferences.save_history === false` (mantener mensaje + link a /settings).
+- [x] 20. Implement footer: 28px avatar with linear-gradient + initials, display_name + role label, separate Settings icon button.
+- [x] 21. Update `frontend/src/components/layout/StudentLayout.tsx` to use `StudentSidebarV3`. Persist `open` state in `localStorage` (`mabel_sidebar_open`). Apply responsive defaults via `useEffect + window.matchMedia`.
+- [x] 22. Register Cmd+B shortcut in `StudentLayout` via `useKeyboardShortcuts` to toggle sidebar.
+- [x] 23. Mobile behavior: when viewport `< md`, render sidebar as a drawer overlay (`fixed inset-y-0 left-0 z-50` + backdrop `bg-black/50 z-40`). Add a hamburger button in `Header.tsx` for mobile.
+- [x] 24. Verify `npx tsc --noEmit` clean. Smoke: open `/home`, toggle sidebar with button and with Cmd+B; verify on mobile width opens as overlay.
 
 ### Capability 3 — chat-redesign
 

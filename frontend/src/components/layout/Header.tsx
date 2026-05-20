@@ -1,11 +1,17 @@
+import { Menu } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 
 interface HeaderProps {
   onToggleSidebar?: () => void
+  /**
+   * When true (mobile breakpoint), the hamburger button is shown. Desktop/tablet
+   * use the sidebar's own toggle instead, so the header stays clean.
+   */
+  showHamburger?: boolean
 }
 
-export default function Header({ onToggleSidebar }: HeaderProps) {
+export default function Header({ onToggleSidebar, showHamburger = false }: HeaderProps) {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
 
@@ -22,16 +28,15 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   return (
     <header className="h-14 bg-primary flex items-center px-4 justify-between shrink-0">
       <div className="flex items-center gap-3">
-        {/* Student: hamburger for sidebar toggle */}
-        {!isAdmin && onToggleSidebar && (
+        {/* Student mobile: hamburger to open sidebar drawer */}
+        {!isAdmin && onToggleSidebar && showHamburger && (
           <button
             onClick={onToggleSidebar}
-            className="text-white p-1 hover:bg-white/10 rounded"
-            aria-label="Toggle sidebar"
+            className="text-white p-1 hover:bg-white/10 rounded transition-colors"
+            aria-label="Abrir menu"
+            title="Abrir menu"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Menu className="w-6 h-6" />
           </button>
         )}
 
