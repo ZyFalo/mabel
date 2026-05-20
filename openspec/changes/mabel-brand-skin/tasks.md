@@ -87,7 +87,7 @@
 
 ### Capability 6.5 — crisis-overlay
 
-- [ ] 24. Refactor `frontend/src/components/sos/SosPanel.tsx` to match `crisis.jsx`:
+- [x] 24. Refactor `frontend/src/components/sos/SosPanel.tsx` to match `crisis.jsx`:
   - Backdrop: rgba(26,17,16,0.32) backdrop-blur 4 fade-in
   - Card: min(100%, 720px) max-h 92%, bg white, radius 18, border ink-200, shadow-xl, scale-in
   - Hero band: bg mabel-50, border-bottom mabel-100, padding 32 32 28, text-center
@@ -97,9 +97,9 @@
     - Subtitle "Si estas pasando por un momento dificil..."
   - Hotline lines as cards (bg white, border ink-200, radius 12, padding 14 16) with phone icon left + name/number center + "Llamar" button right
   - Footer: outline "Continuar con Mabel" button — closes overlay, returns to chat
-- [ ] 25. Hotline lines: read from existing `/sos` endpoint (system_config.sos_hotline_numbers) — PRESERVE existing fetch + fallback list (Linea 106, Linea 141, UMB Bienestar with phones).
-- [ ] 26. PRESERVE existing safety_event registration (`POST /safety-events`) with `trigger: "manual"` when the overlay opens, regardless of source (SosFab, sidebar button, or auto).
-- [ ] 27. The SosFab in StudentLayout stays unchanged (still works as a trigger).
+- [x] 25. Hotline lines: read from existing `/sos` endpoint (system_config.sos_hotline_numbers) — PRESERVE existing fetch + fallback list (Linea 106, Linea 141, UMB Bienestar with phones).
+- [x] 26. PRESERVE existing safety_event registration (`POST /safety-events`) with `trigger: "manual"` when the overlay opens, regardless of source (SosFab, sidebar button, or auto).
+- [x] 27. The SosFab in StudentLayout stays unchanged (still works as a trigger).
 
 ### Capability 6.6 — auth-onboarding-skin
 

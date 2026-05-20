@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Heart, Phone, X } from 'lucide-react'
 import apiClient from '../../api/client'
 
 interface HotlineEntry {
@@ -13,11 +14,26 @@ interface SosPanelProps {
   onClose: () => void
 }
 
+// PRESERVED: fallback hotlines when /sos endpoint fails or returns empty.
 const FALLBACK_NUMBERS: HotlineEntry[] = [
   { name: 'Linea 106 ICBF', number: '018000112440' },
   { name: 'Linea 141 Linea de la Vida', number: '018000113113' },
 ]
 
+/**
+ * CrisisOverlay (a.k.a. SosPanel) — reskin per `crisis.jsx` prototype.
+ *
+ * Functional contract is preserved verbatim:
+ * - Triggers: SosFab (manual), sidebar SOS button (manual), Chat.tsx
+ *   riskDetected (auto). All three set `open=true` from the parent.
+ * - On open: GET /system-config/sos to fetch hotlines (falls back to
+ *   hardcoded list on failure/empty).
+ * - On open: POST /safety-events with event_type=redirect_shown,
+ *   payload.trigger, payload.lines_shown, and session_id — same payload
+ *   shape as before.
+ * - Backdrop click, X button and "Continuar con Mabel" all call onClose
+ *   without ending the session.
+ */
 export default function SosPanel({ open, trigger, sessionId, onClose }: SosPanelProps) {
   const [numbers, setNumbers] = useState<HotlineEntry[]>(FALLBACK_NUMBERS)
   const [registered, setRegistered] = useState(false)
@@ -33,7 +49,7 @@ export default function SosPanel({ open, trigger, sessionId, onClose }: SosPanel
       })
       .catch(() => {})
 
-    // Register redirect_shown event
+    // PRESERVED: Register redirect_shown safety event.
     if (!registered) {
       apiClient
         .post('/safety-events', {
@@ -52,58 +68,250 @@ export default function SosPanel({ open, trigger, sessionId, onClose }: SosPanel
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" />
-      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-text-primary/40 hover:text-text-primary text-xl"
+    <div
+      className="fade-in"
+      onClick={onClose}
+      role="presentation"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'rgba(26,17,16,0.32)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="scale-in"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="crisis-overlay-title"
+        style={{
+          background: '#fff',
+          width: 'min(100%, 720px)',
+          maxHeight: '92%',
+          borderRadius: 18,
+          overflow: 'auto',
+          boxShadow: 'var(--shadow-xl)',
+          border: '1px solid var(--ink-200)',
+          fontFamily: 'var(--font-sans)',
+        }}
+      >
+        {/* Hero band */}
+        <div
+          style={{
+            background: 'var(--mabel-50)',
+            padding: '32px 32px 28px',
+            textAlign: 'center',
+            borderBottom: '1px solid var(--mabel-100)',
+            position: 'relative',
+          }}
         >
-          &times;
-        </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            style={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.8)',
+              border: '1px solid var(--ink-200)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--ink-600)',
+              transition: 'background var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#fff'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.8)'
+            }}
+          >
+            <X size={16} />
+          </button>
 
-        {/* Header */}
-        <div className="text-center mb-5">
-          <span className="text-4xl block mb-3">{'\u2764\uFE0F'}</span>
-          <h2 className="text-xl font-bold text-text-primary">Estamos aqui para ayudarte</h2>
-          <p className="text-sm text-text-primary/60 mt-2">
-            Si estas pasando por un momento dificil, no estas solo. Hay personas capacitadas
-            que pueden escucharte y orientarte ahora mismo.
+          <div
+            aria-hidden="true"
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 999,
+              background: '#fff',
+              color: 'var(--mabel-600)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
+            <Heart size={24} />
+          </div>
+
+          <h2
+            id="crisis-overlay-title"
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              margin: '0 0 8px',
+              color: 'var(--ink-900)',
+              letterSpacing: '-0.015em',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Estamos aqui contigo
+          </h2>
+
+          <p
+            style={{
+              fontSize: 14,
+              color: 'var(--ink-600)',
+              margin: '0 auto',
+              maxWidth: 420,
+              lineHeight: 1.55,
+            }}
+          >
+            Si estas pasando por un momento dificil, no estas solo/a. Hay personas
+            capacitadas listas para ayudarte ahora mismo.
           </p>
         </div>
 
-        {/* Hotline numbers */}
-        <div className="flex flex-col gap-2 mb-5">
-          {numbers.map((line) => (
-            <a
-              key={line.number}
-              href={`tel:${line.number}`}
-              className="flex items-center gap-3 px-4 py-3 bg-danger/5 border border-danger/20 rounded-xl hover:bg-danger/10 transition-colors"
+        {/* Body */}
+        <div style={{ padding: '24px 28px 28px' }}>
+          {/* Hotline cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {numbers.map((line) => {
+              const telHref = `tel:${line.number.replace(/\D/g, '')}`
+              return (
+                <div
+                  key={`${line.name}-${line.number}`}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid var(--ink-200)',
+                    borderRadius: 12,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 14,
+                  }}
+                >
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 999,
+                      background: 'var(--mabel-50)',
+                      color: 'var(--mabel-600)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Phone size={18} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: 'var(--ink-900)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {line.name}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--ink-500)',
+                        marginTop: 2,
+                      }}
+                    >
+                      {line.number}
+                    </div>
+                  </div>
+                  <a
+                    href={telHref}
+                    aria-label={`Llamar a ${line.name}`}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'var(--mabel-600)',
+                      color: '#fff',
+                      borderRadius: 999,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      textDecoration: 'none',
+                      transition: 'background var(--dur-fast) var(--ease-out)',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--mabel-700)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--mabel-600)'
+                    }}
+                  >
+                    Llamar
+                  </a>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Continuar con Mabel — outline secondary action */}
+          <div
+            style={{
+              marginTop: 24,
+              paddingTop: 20,
+              borderTop: '1px solid var(--ink-100)',
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '10px 22px',
+                background: 'transparent',
+                color: 'var(--mabel-600)',
+                border: '1px solid var(--mabel-600)',
+                borderRadius: 11,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                transition: 'background var(--dur-fast) var(--ease-out)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mabel-50)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
             >
-              <svg className="w-5 h-5 text-danger shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-text-primary">{line.name}</p>
-                <p className="text-xs text-text-primary/50">{line.number}</p>
-              </div>
-            </a>
-          ))}
+              Continuar con Mabel
+            </button>
+          </div>
         </div>
-
-        {/* External resources */}
-        <p className="text-xs text-text-primary/40 text-center mb-4">
-          Tambien puedes acudir al servicio de Bienestar Universitario de la UMB.
-        </p>
-
-        {/* Back button */}
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          Volver al chat
-        </button>
       </div>
     </div>
   )
