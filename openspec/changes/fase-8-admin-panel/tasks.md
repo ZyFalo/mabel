@@ -55,17 +55,17 @@
 
 #### Backend
 
-- [ ] 28. Create `app/services/admin/metrics_service.py` with aggregation methods: `dashboard_kpis()`, `metrics_usage(from,to)`, `metrics_wellbeing(from,to)`, `metrics_technical(from,to)`, `metrics_safety(from,to)`, `metrics_study(from,to)`. Use SQLAlchemy `func.count/avg/percentile_cont` + `date_trunc`.
-- [ ] 29. Create `app/routers/admin/metrics_router.py` with GET `/admin/dashboard`, GET `/admin/metrics/{usage|wellbeing|technical|safety|study}`, GET `/admin/metrics/export.csv?tab=...`
-- [ ] 30. Implement Gemini cost estimation in `metrics_service.metrics_technical` (use cached rate per million tokens)
-- [ ] 31. Implement Cohen's d and t-test in `metrics_service.metrics_study` using `survey_responses` pre/post pairs
+- [x] 28. Create `app/services/admin/metrics_service.py` with aggregation methods: `dashboard_kpis()`, `metrics_usage(from,to)`, `metrics_wellbeing(from,to)`, `metrics_technical(from,to)`, `metrics_safety(from,to)`, `metrics_study(from,to)`. Use SQLAlchemy `func.count/avg/percentile_cont` + `date_trunc`.
+- [x] 29. Create `app/routers/admin/metrics_router.py` with GET `/admin/dashboard`, GET `/admin/metrics/{usage|wellbeing|technical|safety|study}`, GET `/admin/metrics/export.csv?tab=...`
+- [x] 30. Implement Gemini cost estimation in `metrics_service.metrics_technical` (use cached rate per million tokens)
+- [x] 31. Implement Cohen's d and t-test in `metrics_service.metrics_study` using `survey_responses` pre/post pairs
 
 #### Frontend
 
-- [ ] 32. Install `recharts` (`npm i recharts`) and add types
-- [ ] 33. Create `frontend/src/components/admin/charts/LineChartWrapper.tsx`, `BarChartWrapper.tsx`, `DonutChartWrapper.tsx`, `MetricLineWithReference.tsx`
-- [ ] 34. Create `frontend/src/pages/admin/Dashboard.tsx` (#24) — 7 KPI cards (con thresholds) + 4 line/bar charts + 1 donut + last-5 safety events mini-tabla + polling 30s
-- [ ] 35. Create `frontend/src/pages/admin/Metrics.tsx` (#27) — 5 tabs internos sincronizados con `?tab=`, controles globales (date range, refresh, export), un componente por tab
+- [x] 32. Install `recharts` (`npm i recharts`) and add types
+- [x] 33. Create `frontend/src/components/admin/charts/LineChartWrapper.tsx`, `BarChartWrapper.tsx`, `DonutChartWrapper.tsx`, `MetricLineWithReference.tsx`
+- [x] 34. Create `frontend/src/pages/admin/Dashboard.tsx` (#24) — 7 KPI cards (con thresholds) + 4 line/bar charts + 1 donut + last-5 safety events mini-tabla + polling 30s
+- [x] 35. Create `frontend/src/pages/admin/Metrics.tsx` (#27) — 5 tabs internos sincronizados con `?tab=`, controles globales (date range, refresh, export), un componente por tab
 
 ### Capability 5 — admin-config-audit
 

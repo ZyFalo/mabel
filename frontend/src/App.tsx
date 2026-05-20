@@ -6,6 +6,8 @@ import ProtectedRoute from './guards/ProtectedRoute'
 import PublicRoute from './guards/PublicRoute'
 import RoleGuard from './guards/RoleGuard'
 import AdminLayout from './components/admin/AdminLayout'
+import AdminDashboard from './pages/admin/Dashboard'
+import AdminMetrics from './pages/admin/Metrics'
 import AdminUsers from './pages/admin/Users'
 import AdminUserDetail from './pages/admin/UserDetail'
 import AdminReports from './pages/admin/Reports'
@@ -119,12 +121,12 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<RoleGuard role="admin" />}>
             <Route element={<AdminLayout />}>
-              <Route path="/admin" element={<AdminPageStub title="Dashboard" />} />
+              <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/users/:id" element={<AdminUserDetail />} />
               <Route path="/admin/reports" element={<AdminReports />} />
               <Route path="/admin/safety-events" element={<AdminSafetyEvents />} />
-              <Route path="/admin/metrics" element={<AdminPageStub title="Metricas" />} />
+              <Route path="/admin/metrics" element={<AdminMetrics />} />
               <Route path="/admin/config" element={<AdminPageStub title="Configuracion" />} />
               <Route path="/admin/logs" element={<AdminPageStub title="Logs de auditoria" />} />
             </Route>
