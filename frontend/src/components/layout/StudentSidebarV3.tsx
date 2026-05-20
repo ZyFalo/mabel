@@ -369,7 +369,11 @@ export default function StudentSidebarV3({
         zIndex: 30,
         transition: mobileDrawer ? undefined : `width ${COLLAPSE_DURATION}ms var(--ease-out)`,
         fontFamily: 'var(--font-sans)',
-        overflow: 'hidden',
+        // NOTE: NO overflow:hidden here. The floating collapse toggle
+        // overflows 12px to the right (right: -12px) and must remain
+        // visible. Internal overflow is handled per-section (sessions
+        // list has overflow-y auto + overflow-x hidden; labels clip via
+        // their own grid-template-columns trick).
       }}
     >
       {/* Brand header — Avatar M anchored left, label fades */}
