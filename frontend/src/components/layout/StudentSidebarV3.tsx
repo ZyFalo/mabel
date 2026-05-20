@@ -148,9 +148,12 @@ function Label({ open, children, delay = 0 }: LabelProps) {
         display: 'grid',
         gridTemplateColumns: open ? '1fr' : '0fr',
         opacity: open ? 1 : 0,
-        transition: `grid-template-columns ${COLLAPSE_DURATION}ms var(--ease-out) ${delay}ms, opacity ${COLLAPSE_DURATION * 0.7}ms var(--ease-out) ${delay}ms`,
+        // When closed: flex 0 0 0 so the label takes no horizontal space,
+        // letting `justify-content: center` on the parent actually center
+        // the icon. When open: flex 1 1 auto so the label fills the row.
+        flex: open ? '1 1 auto' : '0 0 0',
+        transition: `grid-template-columns ${COLLAPSE_DURATION}ms var(--ease-out) ${delay}ms, opacity ${COLLAPSE_DURATION * 0.7}ms var(--ease-out) ${delay}ms, flex-basis ${COLLAPSE_DURATION}ms var(--ease-out) ${delay}ms`,
         overflow: 'hidden',
-        flex: '1 1 auto',
         minWidth: 0,
       }}
     >
