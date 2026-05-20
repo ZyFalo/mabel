@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useNavigate, useParams } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import StudentSidebarV3 from './StudentSidebarV3'
 import SosFab from '../ui/SosFab'
+import SosPanel from '../sos/SosPanel'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useChatStore } from '../../stores/chatStore'
 import { useToastStore } from '../../stores/toastStore'
@@ -29,12 +30,20 @@ function getIsMobile(): boolean {
 
 export default function StudentLayout() {
   const navigate = useNavigate()
+  const params = useParams()
   const { createSession } = useChatStore()
   const addToast = useToastStore((s) => s.addToast)
 
   // Sidebar open state (desktop/tablet) AND drawer visibility (mobile).
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(getDefaultSidebarOpen)
   const [isMobile, setIsMobile] = useState<boolean>(getIsMobile)
+
+  // Crisis overlay state — shared between the SosFab (bottom-right) and the
+  // sidebar "Linea de crisis SOS" button. Both routes register a manual
+  // safety_event on open (handled inside `SosPanel`).
+  const [crisisOpen, setCrisisOpen] = useState(false)
+  const openCrisis = useCallback(() => setCrisisOpen(true), [])
+  const closeCrisis = useCallback(() => setCrisisOpen(false), [])
 
   // Sync `isMobile` with viewport changes.
   useEffect(() => {
@@ -141,6 +150,7 @@ export default function StudentLayout() {
                 onToggle={closeSidebar}
                 onNewChat={handleNewChat}
                 onOpenSettings={handleOpenSettings}
+                onOpenCrisis={openCrisis}
               />
             </div>
           </>
@@ -150,13 +160,20 @@ export default function StudentLayout() {
             onToggle={toggleSidebar}
             onNewChat={handleNewChat}
             onOpenSettings={handleOpenSettings}
+            onOpenCrisis={openCrisis}
           />
         )}
         <main className="flex-1 overflow-y-auto bg-bg-main relative">
           <Outlet />
-          <SosFab />
+          <SosFab onOpen={openCrisis} />
         </main>
       </div>
+      <SosPanel
+        open={crisisOpen}
+        trigger="manual"
+        sessionId={params.id}
+        onClose={closeCrisis}
+      />
     </div>
   )
 }

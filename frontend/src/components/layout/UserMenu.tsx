@@ -1,13 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Lock,
-  Eye,
-  Volume2,
-  User,
-  Database,
+  HelpCircle,
   LogOut,
   Settings as SettingsIcon,
+  Shield,
+  User,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -18,27 +16,55 @@ interface UserMenuProps {
   anchorRef: React.RefObject<HTMLElement | null>
 }
 
-interface MenuItem {
-  id: string
-  label: string
-  icon: typeof Lock
-  to: string
-  shortcut?: string
-  destructive?: boolean
-}
+type MenuEntry =
+  | {
+      kind: 'item'
+      id: string
+      label: string
+      icon: typeof SettingsIcon
+      to?: string
+      shortcut?: string
+      disabled?: boolean
+    }
+  | { kind: 'divider'; id: string }
 
-const SETTINGS_ITEMS: MenuItem[] = [
-  { id: 'settings', label: 'Configuracion', icon: SettingsIcon, to: '/settings', shortcut: '⌘,' },
-  { id: 'privacy', label: 'Privacidad', icon: Lock, to: '/settings?tab=privacy' },
-  { id: 'accessibility', label: 'Accesibilidad', icon: Eye, to: '/settings?tab=accessibility' },
-  { id: 'voice', label: 'Voz', icon: Volume2, to: '/settings?tab=voice' },
-  { id: 'account', label: 'Cuenta', icon: User, to: '/settings?tab=account' },
-  { id: 'arco', label: 'Mis datos (ARCO)', icon: Database, to: '/settings?tab=arco' },
+const ENTRIES: MenuEntry[] = [
+  {
+    kind: 'item',
+    id: 'settings',
+    label: 'Configuracion',
+    icon: SettingsIcon,
+    to: '/settings',
+    shortcut: '⌘,',
+  },
+  {
+    kind: 'item',
+    id: 'profile',
+    label: 'Perfil',
+    icon: User,
+    to: '/settings?tab=account',
+  },
+  {
+    kind: 'item',
+    id: 'privacy',
+    label: 'Privacidad',
+    icon: Shield,
+    to: '/settings?tab=privacy',
+  },
+  {
+    kind: 'item',
+    id: 'help',
+    label: 'Ayuda y soporte',
+    icon: HelpCircle,
+    disabled: true,
+  },
+  { kind: 'divider', id: 'sep' },
 ]
 
 /**
- * Popover menu anchored above the sidebar profile button. Lists shortcuts
- * to each Settings tab (via ?tab= query param) and Cerrar sesion.
+ * Popover menu anchored above the sidebar profile button. Shows the 4 main
+ * Mabel settings shortcuts (Configuracion, Perfil, Privacidad, Ayuda) plus
+ * "Cerrar sesion" (mabel-700, red-tinted).
  *
  * Closes on: outside click, Escape, or item selection.
  */
@@ -77,7 +103,11 @@ export default function UserMenu({ open, onClose, anchorRef }: UserMenuProps) {
 
   if (!open) return null
 
-  function handleSelect(to: string) {
+  function handleSelect(to?: string) {
+    if (!to) {
+      onClose()
+      return
+    }
     onClose()
     navigate(to)
   }
@@ -93,77 +123,142 @@ export default function UserMenu({ open, onClose, anchorRef }: UserMenuProps) {
       ref={menuRef}
       role="menu"
       aria-label="Menu de usuario"
-      className="absolute bottom-full left-3 right-3 mb-2 rounded-xl shadow-lg overflow-hidden scale-in z-40"
+      className="absolute left-3 right-3 scale-in z-40"
       style={{
-        backgroundColor: '#fff',
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderColor: 'var(--ink-200)',
+        bottom: 'calc(100% - 4px)',
+        background: '#fff',
+        borderRadius: 12,
+        border: '1px solid var(--ink-200)',
+        boxShadow: 'var(--shadow-lg)',
+        padding: 6,
+        fontFamily: 'var(--font-sans)',
+        overflow: 'hidden',
       }}
     >
-      {/* Header: name + email */}
+      {/* Header card */}
       <div
-        className="px-4 py-3 border-b"
-        style={{ borderColor: 'var(--ink-100)' }}
+        style={{
+          padding: '8px 12px 10px',
+          borderBottom: '1px solid var(--ink-100)',
+          marginBottom: 4,
+        }}
       >
         <div
-          className="text-[13px] font-medium truncate"
-          style={{ color: 'var(--ink-900)' }}
+          style={{
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: 'var(--ink-900)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
         >
           {user?.display_name || 'Usuario'}
         </div>
         <div
-          className="text-[11.5px] truncate mt-0.5"
-          style={{ color: 'var(--ink-400)' }}
+          style={{
+            fontSize: 11,
+            color: 'var(--ink-500)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
         >
           {user?.email}
         </div>
       </div>
 
-      {/* Settings shortcuts */}
-      <div className="py-1">
-        {SETTINGS_ITEMS.map((item) => {
-          const Icon = item.icon
+      {ENTRIES.map((entry) => {
+        if (entry.kind === 'divider') {
           return (
-            <button
-              key={item.id}
-              type="button"
-              role="menuitem"
-              onClick={() => handleSelect(item.to)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors hover:bg-[var(--ink-100)]"
-              style={{ color: 'var(--ink-700)' }}
-            >
-              <Icon size={14} style={{ color: 'var(--ink-500)' }} />
-              <span className="flex-1">{item.label}</span>
-              {item.shortcut && (
-                <span
-                  className="text-[11px] tabular-nums"
-                  style={{ color: 'var(--ink-400)' }}
-                >
-                  {item.shortcut}
-                </span>
-              )}
-            </button>
+            <div
+              key={entry.id}
+              style={{
+                height: 1,
+                background: 'var(--ink-100)',
+                margin: '4px 8px',
+              }}
+            />
           )
-        })}
-      </div>
+        }
+        const Icon = entry.icon
+        return (
+          <button
+            key={entry.id}
+            type="button"
+            role="menuitem"
+            onClick={() => !entry.disabled && handleSelect(entry.to)}
+            disabled={entry.disabled}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 12px',
+              borderRadius: 8,
+              background: 'transparent',
+              border: 'none',
+              cursor: entry.disabled ? 'not-allowed' : 'pointer',
+              fontSize: 13,
+              color: entry.disabled ? 'var(--ink-400)' : 'var(--ink-800)',
+              fontFamily: 'var(--font-sans)',
+              textAlign: 'left',
+              fontWeight: 500,
+              transition: 'background var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => {
+              if (!entry.disabled)
+                e.currentTarget.style.background = 'var(--ink-100)'
+            }}
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = 'transparent')
+            }
+          >
+            <Icon size={16} style={{ color: 'var(--ink-500)' }} />
+            <span style={{ flex: 1 }}>{entry.label}</span>
+            {entry.shortcut && (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: 'var(--ink-400)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {entry.shortcut}
+              </span>
+            )}
+          </button>
+        )
+      })}
 
-      {/* Logout */}
-      <div
-        className="border-t py-1"
-        style={{ borderColor: 'var(--ink-100)' }}
+      {/* Logout — red */}
+      <button
+        type="button"
+        role="menuitem"
+        onClick={handleLogout}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '8px 12px',
+          borderRadius: 8,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 13,
+          color: 'var(--mabel-700)',
+          fontFamily: 'var(--font-sans)',
+          textAlign: 'left',
+          fontWeight: 500,
+          transition: 'background var(--dur-fast) var(--ease-out)',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--mabel-50)')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
       >
-        <button
-          type="button"
-          role="menuitem"
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors hover:bg-[var(--ink-100)]"
-          style={{ color: 'var(--danger-600)' }}
-        >
-          <LogOut size={14} />
-          <span>Cerrar sesion</span>
-        </button>
-      </div>
+        <LogOut size={16} />
+        <span>Cerrar sesion</span>
+      </button>
     </div>
   )
 }

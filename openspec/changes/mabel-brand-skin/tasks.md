@@ -28,8 +28,8 @@
 
 ### Capability 6.2 — sidebar-skin
 
-- [ ] 6. Create `frontend/src/components/ui/MabelLogo.tsx` — SVG component rendering the prototype's logo path (`M16 3C8.8 3 3 8.8...`) in a circle with `currentColor`. Accepts `size` prop default 28.
-- [ ] 7. Refactor `frontend/src/components/layout/StudentSidebarV3.tsx`:
+- [x] 6. Create `frontend/src/components/ui/MabelLogo.tsx` — SVG component rendering the prototype's logo path (`M16 3C8.8 3 3 8.8...`) in a circle with `currentColor`. Accepts `size` prop default 28.
+- [x] 7. Refactor `frontend/src/components/layout/StudentSidebarV3.tsx`:
   - Width 268 expanded / 60 collapsed
   - Brand header: MabelLogo size 28 + "Mabel" 15px bold + "UMB · Bienestar" 11px ink-400
   - "Nueva sesion" button mabel-600 bg + white + shadow-sm + Plus icon (full-width, primary CTA)
@@ -39,9 +39,9 @@
   - Sticky SOS button (mabel-50 bg + mabel-100 border + AlertTriangle icon + "Linea de crisis SOS") positioned just above profile footer
   - Profile pill (existing UserMenu wiring preserved)
   - Floating collapse toggle (24×24 circle, position absolute top:18px right:-12px, ChevronLeft/Right)
-- [ ] 8. Refactor `CollapsedSidebar.tsx` to width 60px, MabelLogo at top, then Plus (Nueva sesion), Search, MessageSquare, AlertTriangle (SOS), and avatar at bottom.
-- [ ] 9. Refactor `UserMenu.tsx` items per the prototype list: Configuracion (Cmd+,), Perfil (→ /settings?tab=account), Privacidad (→ /settings?tab=privacy), Ayuda y soporte (placeholder), separator, Cerrar sesion (mabel-700 text).
-- [ ] 10. Wire SOS button (sidebar new sticky) to open `CrisisOverlay` — same handler as `SosFab`. NO existing safety_event logic changes.
+- [x] 8. Refactor `CollapsedSidebar.tsx` to width 60px, MabelLogo at top, then Plus (Nueva sesion), Search, MessageSquare, AlertTriangle (SOS), and avatar at bottom.
+- [x] 9. Refactor `UserMenu.tsx` items per the prototype list: Configuracion (Cmd+,), Perfil (→ /settings?tab=account), Privacidad (→ /settings?tab=privacy), Ayuda y soporte (placeholder), separator, Cerrar sesion (mabel-700 text).
+- [x] 10. Wire SOS button (sidebar new sticky) to open `CrisisOverlay` — same handler as `SosFab`. NO existing safety_event logic changes.
 
 ### Capability 6.3 — chat-skin
 
