@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import { Lock, X } from 'lucide-react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
+import Input from './primitives/Input'
+import PrimaryButton from './primitives/PrimaryButton'
 
 interface ChangePasswordModalProps {
   open: boolean
@@ -68,102 +71,195 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
     }
   }
 
-  const inputClass =
-    'w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors'
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] mb-1">
+    <div
+      className="fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'rgba(26,17,16,0.32)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        style={{ position: 'absolute', inset: 0 }}
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className="scale-in"
+        style={{
+          position: 'relative',
+          background: '#fff',
+          border: '1px solid var(--ink-200)',
+          borderRadius: 18,
+          boxShadow: 'var(--shadow-xl)',
+          width: 'min(100%, 480px)',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          padding: '24px 26px',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--ink-500)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <X size={16} />
+        </button>
+
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--ink-900)',
+            margin: '0 0 4px',
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.015em',
+          }}
+        >
           Cambiar contrasena
         </h2>
-        <p className="text-[13px] text-[var(--ink-500)] mb-5">
+        <p style={{ fontSize: 13, color: 'var(--ink-500)', margin: '0 0 18px', lineHeight: 1.55 }}>
           Asegurate de elegir una contrasena fuerte.
         </p>
 
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-700)',
+                marginBottom: 6,
+              }}
+            >
               Contrasena actual
             </label>
-            <input
-              type="password"
+            <Input
               value={currentPassword}
-              onChange={(e) => {
-                setCurrentPassword(e.target.value)
+              onChange={(v) => {
+                setCurrentPassword(v)
                 setError('')
               }}
-              className={inputClass}
+              type="password"
+              prefix={<Lock size={16} />}
+              ariaLabel="Contrasena actual"
             />
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-700)',
+                marginBottom: 6,
+              }}
+            >
               Nueva contrasena
             </label>
-            <input
-              type="password"
+            <Input
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className={inputClass}
+              onChange={setNewPassword}
+              type="password"
+              prefix={<Lock size={16} />}
+              ariaLabel="Nueva contrasena"
             />
             {newPassword.length > 0 && (
-              <div className="mt-2">
-                <div className="flex gap-1">
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 4 }}>
                   {[1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
-                      className="h-1.5 flex-1 rounded-full"
                       style={{
-                        backgroundColor: i <= strength.score ? strength.varName : 'var(--ink-100)',
+                        height: 6,
+                        flex: 1,
+                        borderRadius: 999,
+                        background: i <= strength.score ? strength.varName : 'var(--ink-100)',
+                        transition: 'background var(--dur-fast) var(--ease-out)',
                       }}
                     />
                   ))}
                 </div>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--ink-400)' }}>
+                <p style={{ fontSize: 11, marginTop: 4, color: 'var(--ink-500)' }}>
                   {strength.label}
                 </p>
               </div>
             )}
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-700)',
+                marginBottom: 6,
+              }}
+            >
               Confirmar nueva contrasena
             </label>
-            <input
-              type="password"
+            <Input
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className={inputClass}
+              onChange={setConfirmPassword}
+              type="password"
+              prefix={<Lock size={16} />}
+              error={confirmPassword.length > 0 && !passwordsMatch ? 'Las contrasenas no coinciden' : undefined}
+              ariaLabel="Confirmar nueva contrasena"
             />
-            {confirmPassword.length > 0 && !passwordsMatch && (
-              <p className="text-[12px] mt-1" style={{ color: 'var(--danger-600)' }}>
-                Las contrasenas no coinciden
-              </p>
-            )}
           </div>
         </div>
 
         {error && (
-          <p className="text-[13px] mt-3" style={{ color: 'var(--danger-600)' }}>
-            {error}
-          </p>
+          <p style={{ fontSize: 13, marginTop: 12, color: 'var(--danger-600)' }}>{error}</p>
         )}
 
-        <div className="flex gap-3 mt-5">
+        <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
           <button
             onClick={onClose}
-            className="flex-1 px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
+            style={{
+              padding: '10px 18px',
+              background: 'transparent',
+              color: 'var(--ink-700)',
+              border: '1px solid var(--ink-300)',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             Cancelar
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!isValid || saving}
-            className="flex-1 px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-          >
-            {saving ? 'Cambiando...' : 'Cambiar'}
-          </button>
+          <PrimaryButton onClick={handleSubmit} disabled={!isValid || saving}>
+            {saving ? 'Cambiando...' : 'Cambiar contrasena'}
+          </PrimaryButton>
         </div>
       </div>
     </div>

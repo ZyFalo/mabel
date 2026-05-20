@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { X } from 'lucide-react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
 
@@ -47,27 +48,117 @@ export default function RevokeConsentModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] mb-1">
+    <div
+      className="fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'rgba(26,17,16,0.32)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div style={{ position: 'absolute', inset: 0 }} onClick={onClose} aria-hidden />
+      <div
+        className="scale-in"
+        style={{
+          position: 'relative',
+          background: '#fff',
+          border: '1px solid var(--ink-200)',
+          borderRadius: 18,
+          boxShadow: 'var(--shadow-xl)',
+          width: 'min(100%, 480px)',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          padding: '24px 26px',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--ink-500)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <X size={16} />
+        </button>
+
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--ink-900)',
+            margin: '0 0 4px',
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.015em',
+          }}
+        >
           Revocar consentimiento
         </h2>
-        <p className="text-[13px] text-[var(--ink-500)] mb-5 leading-relaxed">
+        <p style={{ fontSize: 13, color: 'var(--ink-500)', margin: '0 0 18px', lineHeight: 1.55 }}>
           La revocacion no implica eliminacion de cuenta ni de datos.
         </p>
 
-        <div className="space-y-3 mb-5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
           {currentScope === 'uso_mejora_anon' && (
             <button
               onClick={handleReduceScope}
               disabled={loading}
-              className="w-full p-4 border border-[var(--ink-200)] rounded-xl text-left hover:bg-[var(--ink-100)] hover:border-[var(--mabel-600)] transition-colors disabled:opacity-50"
+              style={{
+                width: '100%',
+                padding: 16,
+                textAlign: 'left',
+                background: '#fff',
+                border: '1px solid var(--ink-200)',
+                borderRadius: 12,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.5 : 1,
+                transition: 'all var(--dur-fast) var(--ease-out)',
+                fontFamily: 'var(--font-sans)',
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.background = 'var(--mabel-50)'
+                  e.currentTarget.style.borderColor = 'var(--mabel-300)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.background = '#fff'
+                  e.currentTarget.style.borderColor = 'var(--ink-200)'
+                }
+              }}
             >
-              <p className="text-[14px] font-medium text-[var(--ink-900)]">
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
                 Reducir a uso basico
               </p>
-              <p className="text-[12px] text-[var(--ink-500)] mt-1 leading-relaxed">
+              <p
+                style={{
+                  fontSize: 12.5,
+                  color: 'var(--ink-500)',
+                  margin: '4px 0 0',
+                  lineHeight: 1.5,
+                }}
+              >
                 Tus datos solo se usaran para el funcionamiento del sistema. Se excluyen de mejoras
                 anonimas.
               </p>
@@ -77,16 +168,29 @@ export default function RevokeConsentModal({
           <button
             onClick={handleRevoke}
             disabled={loading}
-            className="w-full p-4 rounded-xl text-left transition-colors disabled:opacity-50 border"
             style={{
-              borderColor: 'var(--danger-600)',
-              backgroundColor: 'var(--ink-100)',
+              width: '100%',
+              padding: 16,
+              textAlign: 'left',
+              background: 'var(--danger-50)',
+              border: '1px solid var(--danger-200)',
+              borderRadius: 12,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.5 : 1,
+              transition: 'all var(--dur-fast) var(--ease-out)',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) e.currentTarget.style.borderColor = 'var(--danger-600)'
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) e.currentTarget.style.borderColor = 'var(--danger-200)'
             }}
           >
-            <p className="text-[14px] font-medium" style={{ color: 'var(--danger-600)' }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--danger-700)', margin: 0 }}>
               Revocar totalmente
             </p>
-            <p className="text-[12px] text-[var(--ink-500)] mt-1 leading-relaxed">
+            <p style={{ fontSize: 12.5, color: 'var(--ink-600)', margin: '4px 0 0', lineHeight: 1.5 }}>
               Perderas acceso temporal hasta re-aceptar el consentimiento. Tus datos no se eliminan.
             </p>
           </button>
@@ -94,7 +198,20 @@ export default function RevokeConsentModal({
 
         <button
           onClick={onClose}
-          className="w-full px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
+          style={{
+            width: '100%',
+            padding: '11px',
+            background: 'transparent',
+            color: 'var(--ink-700)',
+            border: '1px solid var(--ink-300)',
+            borderRadius: 10,
+            fontSize: 13.5,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         >
           Cancelar
         </button>

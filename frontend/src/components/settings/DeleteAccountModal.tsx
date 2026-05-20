@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, X } from 'lucide-react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
 
@@ -34,37 +34,119 @@ export default function DeleteAccountModal({ open, onClose }: DeleteAccountModal
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
-        <div className="flex justify-center mb-3">
+    <div
+      className="fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'rgba(26,17,16,0.32)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div style={{ position: 'absolute', inset: 0 }} onClick={onClose} aria-hidden />
+      <div
+        className="scale-in"
+        style={{
+          position: 'relative',
+          background: '#fff',
+          border: '1px solid var(--ink-200)',
+          borderRadius: 18,
+          boxShadow: 'var(--shadow-xl)',
+          width: 'min(100%, 480px)',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          padding: '24px 26px',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--ink-500)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <X size={16} />
+        </button>
+
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: 'var(--ink-100)' }}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: 'var(--danger-50)',
+              color: 'var(--danger-600)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <AlertTriangle size={24} style={{ color: 'var(--danger-600)' }} />
+            <AlertTriangle size={26} />
           </div>
         </div>
 
-        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] text-center mb-1">
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--ink-900)',
+            margin: '0 0 4px',
+            textAlign: 'center',
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.015em',
+          }}
+        >
           Eliminar cuenta
         </h2>
         <p
-          className="text-[13px] font-medium text-center mb-3"
-          style={{ color: 'var(--danger-600)' }}
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            textAlign: 'center',
+            color: 'var(--danger-600)',
+            margin: '0 0 16px',
+          }}
         >
           Esta accion es irreversible
         </p>
-        <p className="text-[13px] text-[var(--ink-500)] mb-3 leading-relaxed">
+        <p style={{ fontSize: 13, color: 'var(--ink-600)', margin: '0 0 8px', lineHeight: 1.55 }}>
           Se eliminaran permanentemente:
         </p>
-        <ul className="text-[12px] text-[var(--ink-500)] mb-4 space-y-1 list-disc list-inside">
+        <ul
+          style={{
+            fontSize: 12.5,
+            color: 'var(--ink-600)',
+            margin: '0 0 14px',
+            paddingLeft: 18,
+            lineHeight: 1.7,
+          }}
+        >
           <li>Todas tus conversaciones y mensajes</li>
           <li>Tus preferencias y configuracion</li>
           <li>Tu consentimiento y datos de cuenta</li>
           <li>Tus reportes de mensajes</li>
         </ul>
-        <p className="text-[11px] text-[var(--ink-400)] mb-4">
+        <p style={{ fontSize: 11.5, color: 'var(--ink-400)', margin: '0 0 16px' }}>
           Los registros de seguridad se conservan de forma anonima.
         </p>
 
@@ -73,24 +155,58 @@ export default function DeleteAccountModal({ open, onClose }: DeleteAccountModal
           value={confirmation}
           onChange={(e) => setConfirmation(e.target.value)}
           placeholder="Escribe ELIMINAR para confirmar"
-          className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:outline-none transition-colors mb-4"
           style={{
-            borderColor: confirmation ? 'var(--danger-600)' : 'var(--ink-200)',
+            width: '100%',
+            padding: '11px 14px',
+            background: '#fff',
+            border: `1px solid ${confirmation ? 'var(--danger-600)' : 'var(--ink-200)'}`,
+            borderRadius: 10,
+            fontSize: 14,
+            color: 'var(--ink-900)',
+            outline: 'none',
+            fontFamily: 'var(--font-sans)',
+            marginBottom: 16,
+            boxSizing: 'border-box',
           }}
         />
 
-        <div className="flex gap-3">
+        <div style={{ display: 'flex', gap: 10 }}>
           <button
             onClick={onClose}
-            className="flex-1 px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
+            style={{
+              flex: 1,
+              padding: '11px 18px',
+              background: 'transparent',
+              color: 'var(--ink-700)',
+              border: '1px solid var(--ink-300)',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             Cancelar
           </button>
           <button
             onClick={handleDelete}
             disabled={!isValid || deleting}
-            className="flex-1 px-5 py-2.5 text-white text-[13px] font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
-            style={{ backgroundColor: 'var(--danger-600)' }}
+            style={{
+              flex: 1,
+              padding: '11px 18px',
+              background: 'var(--danger-600)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: !isValid || deleting ? 'not-allowed' : 'pointer',
+              opacity: !isValid || deleting ? 0.45 : 1,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: '0 4px 12px -3px rgba(220,38,38,0.35)',
+            }}
           >
             {deleting ? 'Eliminando...' : 'Eliminar mi cuenta'}
           </button>

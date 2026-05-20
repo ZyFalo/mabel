@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
 
@@ -48,70 +49,183 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] mb-1">
+    <div
+      className="fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'rgba(26,17,16,0.32)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div style={{ position: 'absolute', inset: 0 }} onClick={onClose} aria-hidden />
+      <div
+        className="scale-in"
+        style={{
+          position: 'relative',
+          background: '#fff',
+          border: '1px solid var(--ink-200)',
+          borderRadius: 18,
+          boxShadow: 'var(--shadow-xl)',
+          width: 'min(100%, 500px)',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          padding: '24px 26px',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--ink-500)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <X size={16} />
+        </button>
+
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--ink-900)',
+            margin: '0 0 4px',
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.015em',
+          }}
+        >
           Reportar mensaje
         </h2>
-        <p className="text-[13px] text-[var(--ink-500)] mb-5">
+        <p style={{ fontSize: 13, color: 'var(--ink-500)', margin: '0 0 18px', lineHeight: 1.55 }}>
           Ayudanos a mejorar Mabel IA.
         </p>
 
         {/* Reason */}
-        <div className="mb-4">
-          <label className="block text-[13px] font-medium text-[var(--ink-900)] mb-2">
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--ink-900)',
+              marginBottom: 10,
+            }}
+          >
             Motivo <span style={{ color: 'var(--danger-600)' }}>*</span>
           </label>
-          <div className="flex flex-col gap-2">
-            {REASONS.map((r) => (
-              <label
-                key={r.value}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:bg-[var(--ink-100)]"
-                style={{
-                  borderColor: reason === r.value ? 'var(--mabel-600)' : 'var(--ink-200)',
-                  backgroundColor: reason === r.value ? 'var(--ink-100)' : 'transparent',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="reason"
-                  value={r.value}
-                  checked={reason === r.value}
-                  onChange={() => setReason(r.value)}
-                  style={{ accentColor: 'var(--mabel-600)' }}
-                />
-                <span className="text-[13px] text-[var(--ink-700)]">{r.label}</span>
-              </label>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {REASONS.map((r) => {
+              const on = reason === r.value
+              return (
+                <label
+                  key={r.value}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    background: on ? 'var(--mabel-50)' : '#fff',
+                    border: `1px solid ${on ? 'var(--mabel-500)' : 'var(--ink-200)'}`,
+                    transition: 'all var(--dur-fast) var(--ease-out)',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="reason"
+                    value={r.value}
+                    checked={on}
+                    onChange={() => setReason(r.value)}
+                    style={{ accentColor: 'var(--mabel-600)' }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: on ? 'var(--mabel-700)' : 'var(--ink-700)',
+                      fontWeight: on ? 600 : 500,
+                    }}
+                  >
+                    {r.label}
+                  </span>
+                </label>
+              )
+            })}
           </div>
         </div>
 
         {/* Severity */}
-        <div className="mb-4">
-          <label className="block text-[13px] font-medium text-[var(--ink-900)] mb-2">
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--ink-900)',
+              marginBottom: 10,
+            }}
+          >
             Severidad (opcional)
           </label>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                onClick={() => setSeverity(severity === n ? null : n)}
-                className="w-9 h-9 rounded-lg text-[13px] font-medium transition-colors"
-                style={{
-                  backgroundColor: severity === n ? 'var(--mabel-600)' : 'var(--ink-100)',
-                  color: severity === n ? 'white' : 'var(--ink-500)',
-                }}
-              >
-                {n}
-              </button>
-            ))}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[1, 2, 3, 4, 5].map((n) => {
+              const on = severity === n
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setSeverity(on ? null : n)}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    background: on ? 'var(--mabel-600)' : 'var(--ink-100)',
+                    color: on ? '#fff' : 'var(--ink-600)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)',
+                    transition: 'all var(--dur-fast) var(--ease-out)',
+                  }}
+                >
+                  {n}
+                </button>
+              )
+            })}
           </div>
         </div>
 
         {/* Details */}
-        <div className="mb-5">
-          <label className="block text-[13px] font-medium text-[var(--ink-900)] mb-2">
+        <div style={{ marginBottom: 18 }}>
+          <label
+            style={{
+              display: 'block',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--ink-900)',
+              marginBottom: 10,
+            }}
+          >
             Detalles (opcional)
           </label>
           <textarea
@@ -120,25 +234,71 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
             maxLength={1000}
             rows={3}
             placeholder="Describe el problema..."
-            className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] resize-none focus:outline-none focus:border-[var(--mabel-600)] transition-colors"
+            style={{
+              width: '100%',
+              padding: '11px 14px',
+              background: '#fff',
+              border: '1px solid var(--ink-200)',
+              borderRadius: 10,
+              fontSize: 13,
+              color: 'var(--ink-900)',
+              resize: 'none',
+              outline: 'none',
+              fontFamily: 'var(--font-sans)',
+              boxSizing: 'border-box',
+              transition: 'border-color var(--dur-fast) var(--ease-out)',
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--mabel-500)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--ink-200)')}
           />
-          <p className="text-[11px] text-right mt-1" style={{ color: 'var(--ink-400)' }}>
+          <p
+            style={{
+              fontSize: 11,
+              textAlign: 'right',
+              marginTop: 4,
+              color: 'var(--ink-400)',
+            }}
+          >
             {details.length}/1000
           </p>
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3">
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button
             onClick={onClose}
-            className="px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
+            style={{
+              padding: '11px 18px',
+              background: 'transparent',
+              color: 'var(--ink-700)',
+              border: '1px solid var(--ink-300)',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={!reason || submitting}
-            className="px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              padding: '11px 18px',
+              background: !reason || submitting ? 'var(--ink-200)' : 'var(--mabel-600)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: !reason || submitting ? 'not-allowed' : 'pointer',
+              opacity: !reason || submitting ? 0.6 : 1,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: !reason || submitting ? 'none' : 'var(--shadow-sm)',
+            }}
           >
             {submitting ? 'Enviando...' : 'Enviar reporte'}
           </button>

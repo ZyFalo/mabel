@@ -39,42 +39,130 @@ export default function ConfirmModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={handleCancel} />
-      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] mb-2">
+    <div
+      className="fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'rgba(26,17,16,0.32)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div style={{ position: 'absolute', inset: 0 }} onClick={handleCancel} aria-hidden />
+      <div
+        className="scale-in"
+        style={{
+          position: 'relative',
+          background: '#fff',
+          border: '1px solid var(--ink-200)',
+          borderRadius: 18,
+          boxShadow: 'var(--shadow-xl)',
+          width: 'min(100%, 460px)',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          padding: '24px 26px',
+        }}
+      >
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--ink-900)',
+            margin: '0 0 8px',
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.015em',
+          }}
+        >
           {title}
         </h2>
-        <p className="text-[13px] text-[var(--ink-500)] mb-4 leading-relaxed">{message}</p>
+        <p
+          style={{
+            fontSize: 13.5,
+            color: 'var(--ink-600)',
+            margin: '0 0 18px',
+            lineHeight: 1.6,
+          }}
+        >
+          {message}
+        </p>
 
         {variant === 'verification' && (
-          <div className="mb-4">
-            <label className="text-[13px] text-[var(--ink-500)] block mb-1.5">
+          <div style={{ marginBottom: 18 }}>
+            <label
+              style={{
+                fontSize: 13,
+                color: 'var(--ink-600)',
+                display: 'block',
+                marginBottom: 6,
+              }}
+            >
               Escribe{' '}
-              <strong className="text-[var(--ink-900)]">{verificationText}</strong> para confirmar
+              <strong style={{ color: 'var(--ink-900)' }}>{verificationText}</strong> para confirmar
             </label>
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:outline-none focus:border-[var(--mabel-600)] transition-colors"
               placeholder={verificationText}
+              style={{
+                width: '100%',
+                padding: '11px 14px',
+                background: '#fff',
+                border: '1px solid var(--ink-200)',
+                borderRadius: 10,
+                fontSize: 14,
+                color: 'var(--ink-900)',
+                outline: 'none',
+                fontFamily: 'var(--font-sans)',
+                boxSizing: 'border-box',
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--mabel-600)')}
+              onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--ink-200)')}
             />
           </div>
         )}
 
-        <div className="flex justify-end gap-3">
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button
             onClick={handleCancel}
-            className="px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
+            style={{
+              padding: '11px 18px',
+              background: 'transparent',
+              color: 'var(--ink-700)',
+              border: '1px solid var(--ink-300)',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             Cancelar
           </button>
           <button
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="px-5 py-2.5 text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: 'var(--danger-600)' }}
+            style={{
+              padding: '11px 18px',
+              background: 'var(--danger-600)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: !canConfirm ? 'not-allowed' : 'pointer',
+              opacity: !canConfirm ? 0.5 : 1,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: !canConfirm ? 'none' : '0 4px 12px -3px rgba(220,38,38,0.35)',
+            }}
           >
             {confirmLabel}
           </button>

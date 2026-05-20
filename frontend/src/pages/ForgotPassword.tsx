@@ -1,6 +1,9 @@
 import { FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Mail, ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import apiClient from '../api/client'
+import AuthShell from '../components/auth/AuthShell'
+import Input from '../components/settings/primitives/Input'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
@@ -23,39 +26,82 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
+    <AuthShell
+      side={
+        <div>
+          <h1
+            style={{
+              fontSize: 40,
+              fontWeight: 700,
+              margin: '0 0 14px',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Recupera tu<br />acceso.
+          </h1>
+          <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
+            Te enviaremos un enlace seguro a tu correo institucional para restablecer tu contrasena.
+          </p>
+        </div>
+      }
+    >
+      <div>
+        <h2
+          style={{
+            fontSize: 26,
+            fontWeight: 700,
+            margin: '0 0 6px',
+            letterSpacing: '-0.015em',
+            color: 'var(--ink-900)',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
           Recuperar contrasena
-        </h1>
-        <p className="text-[14px] text-[var(--ink-500)] text-center mb-8">
-          Ingresa tu email y te enviaremos instrucciones.
+        </h2>
+        <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 24px' }}>
+          Ingresa tu email institucional y te enviaremos instrucciones.
         </p>
 
         {sent ? (
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div
-              className="p-4 text-[13px] rounded-lg border"
               style={{
-                backgroundColor: 'var(--ink-100)',
-                color: 'var(--success-600)',
-                borderColor: 'var(--ink-100)',
+                display: 'flex',
+                gap: 10,
+                padding: '14px 16px',
+                fontSize: 13,
+                borderRadius: 12,
+                background: 'var(--success-50)',
+                color: 'var(--success-700)',
+                border: '1px solid var(--success-200)',
+                alignItems: 'flex-start',
               }}
             >
-              Si el email esta registrado, recibiras instrucciones.
+              <Check size={16} style={{ marginTop: 2, flexShrink: 0 }} />
+              <span>Si el email esta registrado, recibiras instrucciones en breve.</span>
             </div>
             {resetLink && (
               <div
-                className="p-4 rounded-lg border"
                 style={{
-                  backgroundColor: 'var(--ink-100)',
-                  borderColor: 'var(--ink-100)',
+                  padding: 14,
+                  borderRadius: 12,
+                  background: 'var(--ink-50)',
+                  border: '1px dashed var(--ink-200)',
                 }}
               >
-                <p className="text-[13px] font-medium text-[var(--ink-900)] mb-2">Enlace simulado (MVP):</p>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-700)', marginBottom: 6 }}>
+                  Enlace simulado (MVP)
+                </p>
                 <Link
                   to={resetLink}
-                  className="text-[12px] text-[var(--mabel-600)] break-all hover:underline"
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--mabel-600)',
+                    wordBreak: 'break-all',
+                    textDecoration: 'underline',
+                  }}
                 >
                   {window.location.origin}
                   {resetLink}
@@ -64,40 +110,98 @@ export default function ForgotPassword() {
             )}
             <Link
               to="/login"
-              className="block text-center text-[13px] text-[var(--mabel-600)] hover:underline"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                marginTop: 6,
+                fontSize: 13,
+                color: 'var(--mabel-600)',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
             >
-              Volver al login
+              <ArrowLeft size={14} />
+              Volver al inicio de sesion
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Email</label>
-              <input
-                type="email"
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--ink-700)',
+                  marginBottom: 6,
+                }}
+              >
+                Correo institucional
+              </label>
+              <Input
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors"
-                placeholder="tu@est.umb.edu.co"
-                required
+                onChange={setEmail}
+                type="email"
+                placeholder="tu.nombre@est.umb.edu.co"
+                prefix={<Mail size={16} />}
+                ariaLabel="Correo electronico"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '13px',
+                background: 'var(--mabel-600)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 11,
+                fontSize: 14.5,
+                fontWeight: 600,
+                fontFamily: 'var(--font-sans)',
+                boxShadow: 'var(--shadow-brand)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+                transition: 'background var(--dur-fast) var(--ease-out)',
+                marginTop: 6,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) e.currentTarget.style.background = 'var(--mabel-700)'
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) e.currentTarget.style.background = 'var(--mabel-600)'
+              }}
             >
               {loading ? 'Enviando...' : 'Enviar enlace'}
+              {!loading && <ArrowRight size={15} strokeWidth={2.25} />}
             </button>
             <Link
               to="/login"
-              className="block text-center text-[13px] text-[var(--mabel-600)] hover:underline pt-2"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                marginTop: 4,
+                fontSize: 13,
+                color: 'var(--mabel-600)',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
             >
-              Volver al login
+              <ArrowLeft size={14} />
+              Volver al inicio de sesion
             </Link>
           </form>
         )}
       </div>
-    </div>
+    </AuthShell>
   )
 }

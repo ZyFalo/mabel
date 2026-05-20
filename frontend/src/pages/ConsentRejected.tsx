@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { Frown } from 'lucide-react'
+import { Frown, ArrowRight } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import AuthShell from '../components/auth/AuthShell'
 
 export default function ConsentRejected() {
   const navigate = useNavigate()
@@ -12,62 +13,197 @@ export default function ConsentRejected() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-2xl bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <div className="flex justify-center mb-5">
-          <div
-            className="w-14 h-14 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: 'var(--ink-100)' }}
+    <AuthShell
+      side={
+        <div>
+          <h1
+            style={{
+              fontSize: 40,
+              fontWeight: 700,
+              margin: '0 0 14px',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              fontFamily: 'var(--font-sans)',
+            }}
           >
-            <Frown size={28} style={{ color: 'var(--ink-500)' }} />
+            Respetamos tu<br />decision.
+          </h1>
+          <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
+            El consentimiento informado es necesario para utilizar Mabel IA bajo la Ley 1581/2012.
+            Puedes revisarlo de nuevo cuando lo desees.
+          </p>
+        </div>
+      }
+      wide
+    >
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: 'var(--ink-100)',
+              color: 'var(--ink-500)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Frown size={28} />
           </div>
         </div>
 
-        <h1 className="text-[24px] font-display italic text-[var(--ink-900)] text-center mb-3">
+        <h2
+          style={{
+            fontSize: 24,
+            fontWeight: 700,
+            margin: '0 0 10px',
+            color: 'var(--ink-900)',
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.015em',
+            textAlign: 'center',
+          }}
+        >
           Consentimiento no aceptado
-        </h1>
-        <p className="text-[14px] text-[var(--ink-500)] text-center mb-6 leading-relaxed">
+        </h2>
+        <p
+          style={{
+            fontSize: 14,
+            color: 'var(--ink-500)',
+            margin: '0 0 22px',
+            lineHeight: 1.55,
+            textAlign: 'center',
+          }}
+        >
           De acuerdo con la Ley 1581 de 2012, el consentimiento informado es necesario para utilizar
           Mabel IA, ya que el sistema procesa datos personales como parte de un proyecto de
           investigacion academica.
         </p>
 
         <div
-          className="rounded-lg p-4 mb-8 border"
           style={{
-            backgroundColor: 'var(--ink-100)',
-            borderColor: 'var(--ink-100)',
+            padding: 18,
+            borderRadius: 14,
+            background: 'var(--mabel-50)',
+            border: '1px solid var(--mabel-100)',
+            marginBottom: 22,
           }}
         >
-          <p className="text-[13px] font-medium text-[var(--ink-900)] mb-2">Al aceptar, puedes:</p>
-          <ul className="text-[13px] text-[var(--ink-500)] space-y-1.5">
-            <li>&#8226; Acceder al asistente de apoyo psicoeducativo</li>
-            <li>&#8226; Recibir orientacion sobre bienestar emocional</li>
-            <li>&#8226; Utilizar herramientas de check-in y seguimiento</li>
-            <li>&#8226; Revocar el consentimiento en cualquier momento</li>
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--mabel-800)',
+              margin: '0 0 10px',
+            }}
+          >
+            Al aceptar, puedes:
+          </p>
+          <ul
+            style={{
+              listStyle: 'none',
+              padding: 0,
+              margin: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            {[
+              'Acceder al asistente de apoyo psicoeducativo',
+              'Recibir orientacion sobre bienestar emocional',
+              'Utilizar herramientas de check-in y seguimiento',
+              'Revocar el consentimiento en cualquier momento',
+            ].map((item, i) => (
+              <li
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  fontSize: 13,
+                  color: 'var(--ink-700)',
+                  lineHeight: 1.5,
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: 'var(--mabel-600)',
+                    marginTop: 7,
+                    flexShrink: 0,
+                  }}
+                />
+                {item}
+              </li>
+            ))}
           </ul>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Link
             to="/consent"
-            className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '13px',
+              background: 'var(--mabel-600)',
+              color: '#fff',
+              borderRadius: 11,
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: 'none',
+              fontFamily: 'var(--font-sans)',
+              boxShadow: 'var(--shadow-brand)',
+              transition: 'background var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--mabel-700)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--mabel-600)')}
           >
             Volver a revisar el consentimiento
+            <ArrowRight size={15} strokeWidth={2.25} />
           </Link>
           <button
             onClick={handleLogout}
-            className="w-full px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] rounded-lg font-medium hover:bg-[var(--ink-100)] transition-colors"
+            style={{
+              width: '100%',
+              padding: '13px',
+              background: 'transparent',
+              color: 'var(--ink-600)',
+              border: '1px solid var(--ink-300)',
+              borderRadius: 11,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              transition: 'background var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             Cerrar sesion
           </button>
         </div>
 
-        <p className="mt-6 text-[11px] text-[var(--ink-400)] text-center">
+        <p
+          style={{
+            marginTop: 18,
+            fontSize: 11.5,
+            color: 'var(--ink-400)',
+            textAlign: 'center',
+            lineHeight: 1.5,
+          }}
+        >
           Si tienes preguntas, contacta al equipo de investigacion a traves de los canales
           institucionales de la UMB.
         </p>
       </div>
-    </div>
+    </AuthShell>
   )
 }

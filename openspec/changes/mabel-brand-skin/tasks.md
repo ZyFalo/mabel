@@ -103,24 +103,24 @@
 
 ### Capability 6.6 — auth-onboarding-skin
 
-- [ ] 28. Create `frontend/src/components/auth/AuthShell.tsx` with:
+- [x] 28. Create `frontend/src/components/auth/AuthShell.tsx` with:
   - LEFT panel: flex-1 padding 48 56, gradient mabel-700→600→800 160deg, 2 decorative circles absolute, brand row top with Avatar M white + Mabel IA / UMB, hero `{side}` prop centered, footer with lock + disclaimer 12px opacity 0.7
   - RIGHT panel: flex-1 bg white padding 48 56, formulario max-w 420 centered
   - Mobile (<md): left panel becomes ~120px top header bar with brand + reduced gradient
-- [ ] 29. Refactor each auth page to use AuthShell:
+- [x] 29. Refactor each auth page to use AuthShell:
   - `Landing.tsx`: hero "Bienestar emocional · UMB" + CTA group (Iniciar sesion + Registrarme)
   - `Login.tsx`: hero "Bienvenido de vuelta" + existing login form on right (preserve all logic including role-based redirect and remember_me)
   - `Register.tsx`: hero "Empieza tu camino con Mabel" + register form
   - `ForgotPassword.tsx` + `ResetPassword.tsx`: hero with relevant copy + form
-- [ ] 30. `Consent.tsx`, `ConsentRejected.tsx`, `ConsentRequired.tsx`: wider variant (max-w-2xl form area in right panel) to fit legal body. 3 existing variants (sin consent, revocado, nueva version) preserved.
-- [ ] 31. `Onboarding.tsx`: 3 steps with progress bar (h-1 ink-200 + mabel-600 fill), card with primitives, PrimaryButton/SecondaryButton, fade-in on step transitions. Preserve existing 3-step flow (Privacidad → Accesibilidad → Voz) + finalize → /home.
-- [ ] 32. Restyle 7 modals: ChangePassword, Revoke, Delete, ArcoExport, Confirm, SessionExpired, Report — backdrop rgba(26,17,16,0.32) backdrop-blur 4, card bg white radius 18 shadow-xl scale-in, Nunito titles, mabel-600 primary button. Props/APIs UNTOUCHED.
+- [x] 30. `Consent.tsx`, `ConsentRejected.tsx`, `ConsentRequired.tsx`: wider variant (max-w-2xl form area in right panel) to fit legal body. 3 existing variants (sin consent, revocado, nueva version) preserved.
+- [x] 31. `Onboarding.tsx`: 3 steps with progress bar (h-1 ink-200 + mabel-600 fill), card with primitives, PrimaryButton/SecondaryButton, fade-in on step transitions. Preserve existing 3-step flow (Privacidad → Accesibilidad → Voz) + finalize → /home.
+- [x] 32. Restyle 7 modals: ChangePassword, Revoke, Delete, ArcoExport, Confirm, SessionExpired, Report — backdrop rgba(26,17,16,0.32) backdrop-blur 4, card bg white radius 18 shadow-xl scale-in, Nunito titles, mabel-600 primary button. Props/APIs UNTOUCHED.
 
 ### Verification
 
-- [ ] 33. Frontend: `cd frontend && npx tsc --noEmit` clean.
-- [ ] 34. Frontend: `cd frontend && npm run build` success.
-- [ ] 35. Backend: `cd backend && source .venv/bin/activate && python -c "from app.main import app; print('OK')"` — no changes expected.
-- [ ] 36. Admin panel untouched: `git diff main..feat/student-redesign --name-only | grep admin | wc -l` → 0 (admin files unchanged from main).
-- [ ] 37. Visual smoke (manual): with admin credentials, walk through every screen — login → consent → onboarding → home → chat (text + mic) → sidebar SOS → settings overlay 5 tabs → logout via UserMenu. Verify SOS FAB visible + functional.
-- [ ] 38. Functional smoke (manual): trigger crisis automatica (send a guardrail keyword) → CrisisOverlay opens automatically, TTS stops; reportar mensaje → modal opens + saves; check-in → form submits; finalizar sesion → end session route works.
+- [x] 33. Frontend: `cd frontend && npx tsc --noEmit` clean.
+- [x] 34. Frontend: `cd frontend && npm run build` success.
+- [x] 35. Backend: `cd backend && source .venv/bin/activate && python -c "from app.main import app; print('OK')"` — no changes expected.
+- [x] 36. Admin panel untouched: `git diff main..feat/student-redesign --name-only | grep admin | wc -l` → 0 (admin files unchanged from main).
+- [x] 37. Visual smoke (manual): with admin credentials, walk through every screen — login → consent → onboarding → home → chat (text + mic) → sidebar SOS → settings overlay 5 tabs → logout via UserMenu. Verify SOS FAB visible + functional.
+- [x] 38. Functional smoke (manual): trigger crisis automatica (send a guardrail keyword) → CrisisOverlay opens automatically, TTS stops; reportar mensaje → modal opens + saves; check-in → form submits; finalizar sesion → end session route works.

@@ -1,79 +1,195 @@
 import { Link } from 'react-router-dom'
-
-const steps = [
-  { title: 'Registrate', desc: 'Crea tu cuenta con tu email institucional UMB.' },
-  { title: 'Acepta el consentimiento', desc: 'Revisa y acepta el consentimiento informado.' },
-  { title: 'Conversa con Mabel', desc: 'Inicia una conversacion de apoyo psicoeducativo.' },
-]
+import { Heart, ArrowRight } from 'lucide-react'
+import AuthShell from '../components/auth/AuthShell'
 
 export default function Landing() {
   return (
-    <div className="min-h-screen w-full bg-[var(--ink-50)] flex flex-col items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        {/* Logo */}
-        <div className="flex justify-center mb-6">
+    <AuthShell
+      side={
+        <div>
           <div
-            className="w-14 h-14 rounded-full flex items-center justify-center shadow-sm"
-            style={{ backgroundColor: 'var(--mabel-600)' }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 12px',
+              background: 'rgba(255,255,255,0.12)',
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 600,
+              marginBottom: 24,
+              backdropFilter: 'blur(6px)',
+            }}
           >
-            <span className="text-white text-xl font-display italic">M</span>
+            <Heart size={13} />
+            Bienestar emocional UMB
           </div>
+          <h1
+            style={{
+              fontSize: 36,
+              fontWeight: 700,
+              lineHeight: 1.15,
+              margin: '0 0 14px',
+              letterSpacing: '-0.02em',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Un espacio seguro para hablar de ti.
+          </h1>
+          <p
+            style={{
+              fontSize: 15,
+              lineHeight: 1.6,
+              opacity: 0.85,
+              margin: 0,
+              maxWidth: 380,
+            }}
+          >
+            Mabel es tu asistente de bienestar en la Universidad Manuela Beltran. Confidencial,
+            empatica, disponible siempre que la necesites.
+          </p>
         </div>
-
-        {/* Title */}
-        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
-          Mabel IA
-        </h1>
-        <p className="text-[14px] text-[var(--ink-500)] text-center mb-8 leading-relaxed">
-          Asistente virtual de apoyo psicoeducativo para estudiantes de la Universidad Manuela Beltran.
+      }
+    >
+      <div>
+        <h2
+          style={{
+            fontSize: 28,
+            fontWeight: 700,
+            margin: '0 0 6px',
+            letterSpacing: '-0.015em',
+            color: 'var(--ink-900)',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
+          Hola, bienvenido/a
+        </h2>
+        <p
+          style={{
+            fontSize: 14,
+            color: 'var(--ink-500)',
+            margin: '0 0 28px',
+            lineHeight: 1.55,
+          }}
+        >
+          Tu acompanamiento psicoeducativo empieza aqui. Elige como continuar.
         </p>
 
-        {/* CTAs */}
-        <div className="flex flex-col gap-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Link
             to="/login"
-            className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '13px',
+              background: 'var(--mabel-600)',
+              color: '#fff',
+              borderRadius: 11,
+              fontSize: 14.5,
+              fontWeight: 600,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: 'var(--shadow-brand)',
+              textDecoration: 'none',
+              transition: 'background var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--mabel-700)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--mabel-600)')}
           >
             Iniciar sesion
+            <ArrowRight size={15} strokeWidth={2.25} />
           </Link>
           <Link
             to="/register"
-            className="w-full px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] rounded-lg font-medium text-center hover:bg-[var(--ink-100)] transition-colors"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '13px',
+              background: 'transparent',
+              color: 'var(--mabel-600)',
+              border: '1px solid var(--mabel-600)',
+              borderRadius: 11,
+              fontSize: 14.5,
+              fontWeight: 600,
+              fontFamily: 'var(--font-sans)',
+              textDecoration: 'none',
+              transition: 'background var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--mabel-50)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
-            Crear cuenta
+            Registrarme
           </Link>
         </div>
 
-        {/* Divider + steps */}
-        <div className="mt-10 pt-6 border-t border-[var(--ink-100)]">
-          <p className="text-[12px] uppercase tracking-wider text-[var(--ink-400)] text-center mb-4">
+        <div
+          style={{
+            marginTop: 28,
+            paddingTop: 22,
+            borderTop: '1px solid var(--ink-100)',
+          }}
+        >
+          <p
+            style={{
+              fontSize: 11,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: 'var(--ink-400)',
+              marginBottom: 12,
+              fontWeight: 600,
+            }}
+          >
             Como funciona
           </p>
-          <ol className="space-y-3">
-            {steps.map((step, i) => (
-              <li key={i} className="flex items-start gap-3">
+          <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[
+              { title: 'Registrate', desc: 'Crea tu cuenta con tu email institucional UMB.' },
+              { title: 'Acepta el consentimiento', desc: 'Revisa y acepta el consentimiento informado.' },
+              { title: 'Conversa con Mabel', desc: 'Inicia una conversacion de apoyo psicoeducativo.' },
+            ].map((step, i) => (
+              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <span
-                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-medium"
                   style={{
-                    backgroundColor: 'var(--ink-100)',
-                    color: 'var(--mabel-600)',
+                    flexShrink: 0,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 999,
+                    background: 'var(--mabel-50)',
+                    color: 'var(--mabel-700)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 700,
                   }}
                 >
                   {i + 1}
                 </span>
                 <div>
-                  <p className="text-[14px] font-medium text-[var(--ink-900)]">{step.title}</p>
-                  <p className="text-[12px] text-[var(--ink-500)] leading-relaxed">{step.desc}</p>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-900)' }}>{step.title}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--ink-500)', lineHeight: 1.55 }}>{step.desc}</div>
                 </div>
               </li>
             ))}
           </ol>
         </div>
-      </div>
 
-      <p className="mt-6 text-[11px] text-[var(--ink-400)] text-center max-w-md">
-        Proyecto de tesis — Ingenieria de Software, Universidad Manuela Beltran (UMB), Bogota, Colombia, 2025.
-      </p>
-    </div>
+        <p
+          style={{
+            marginTop: 24,
+            fontSize: 11,
+            color: 'var(--ink-400)',
+            textAlign: 'center',
+          }}
+        >
+          Proyecto de tesis - Ingenieria de Software, UMB, Bogota, 2025.
+        </p>
+      </div>
+    </AuthShell>
   )
 }

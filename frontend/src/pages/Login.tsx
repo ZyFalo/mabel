@@ -1,7 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Mail, Lock, ArrowRight } from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuthStore } from '../stores/authStore'
+import AuthShell from '../components/auth/AuthShell'
+import Input from '../components/settings/primitives/Input'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -41,22 +44,54 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
+    <AuthShell
+      side={
+        <div>
+          <h1
+            style={{
+              fontSize: 40,
+              fontWeight: 700,
+              margin: '0 0 14px',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Bienvenido<br />de vuelta.
+          </h1>
+          <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
+            Inicia sesion para continuar tu camino de bienestar con Mabel IA.
+          </p>
+        </div>
+      }
+    >
+      <div>
+        <h2
+          style={{
+            fontSize: 26,
+            fontWeight: 700,
+            margin: '0 0 6px',
+            letterSpacing: '-0.015em',
+            color: 'var(--ink-900)',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
           Iniciar sesion
-        </h1>
-        <p className="text-[14px] text-[var(--ink-500)] text-center mb-8">
-          Continua tu camino con Mabel IA.
+        </h2>
+        <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 24px' }}>
+          Ingresa tus credenciales para continuar.
         </p>
 
         {successToast && (
           <div
-            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
             style={{
-              backgroundColor: 'var(--ink-100)',
-              color: 'var(--success-600)',
-              borderColor: 'var(--ink-100)',
+              marginBottom: 16,
+              padding: '10px 12px',
+              fontSize: 13,
+              borderRadius: 10,
+              background: 'var(--success-50)',
+              color: 'var(--success-700)',
+              border: '1px solid var(--success-200)',
             }}
           >
             {successToast}
@@ -64,74 +99,146 @@ export default function Login() {
         )}
         {error && (
           <div
-            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
             style={{
-              backgroundColor: 'var(--ink-100)',
-              color: 'var(--danger-600)',
-              borderColor: 'var(--ink-100)',
+              marginBottom: 16,
+              padding: '10px 12px',
+              fontSize: 13,
+              borderRadius: 10,
+              background: 'var(--danger-50)',
+              color: 'var(--danger-700)',
+              border: '1px solid var(--danger-200)',
             }}
           >
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Email</label>
-            <input
-              type="email"
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-700)',
+                marginBottom: 6,
+              }}
+            >
+              Correo institucional
+            </label>
+            <Input
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors"
-              placeholder="tu@est.umb.edu.co"
-              required
+              onChange={(v) => setForm({ ...form, email: v })}
+              type="email"
+              placeholder="tu.nombre@est.umb.edu.co"
+              prefix={<Mail size={16} />}
+              ariaLabel="Correo electronico"
             />
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Contrasena</label>
-            <input
-              type="password"
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 6,
+              }}
+            >
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-700)' }}>Contrasena</label>
+              <Link
+                to="/forgot-password"
+                style={{
+                  fontSize: 12,
+                  color: 'var(--mabel-600)',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                Olvidaste tu contrasena?
+              </Link>
+            </div>
+            <Input
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors"
-              required
+              onChange={(v) => setForm({ ...form, password: v })}
+              type="password"
+              placeholder="Tu contrasena"
+              prefix={<Lock size={16} />}
+              ariaLabel="Contrasena"
             />
           </div>
-          <div className="flex items-center gap-2 pt-1">
+
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 13,
+              color: 'var(--ink-700)',
+              cursor: 'pointer',
+              marginTop: 2,
+            }}
+          >
             <input
               type="checkbox"
-              id="remember"
               checked={form.remember_me}
               onChange={(e) => setForm({ ...form, remember_me: e.target.checked })}
-              className="w-4 h-4 rounded border-[var(--ink-300)]"
-              style={{ accentColor: 'var(--mabel-600)' }}
+              style={{ accentColor: 'var(--mabel-600)', width: 16, height: 16 }}
             />
-            <label htmlFor="remember" className="text-[13px] text-[var(--ink-500)] cursor-pointer">
-              Recordar sesion
-            </label>
-          </div>
+            Recordarme
+          </label>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '13px',
+              background: loading ? 'var(--mabel-700)' : 'var(--mabel-600)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 11,
+              fontSize: 14.5,
+              fontWeight: 600,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: 'var(--shadow-brand)',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              transition: 'background var(--dur-fast) var(--ease-out)',
+              marginTop: 8,
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) e.currentTarget.style.background = 'var(--mabel-700)'
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) e.currentTarget.style.background = 'var(--mabel-600)'
+            }}
           >
             {loading ? 'Ingresando...' : 'Iniciar sesion'}
+            {!loading && <ArrowRight size={15} strokeWidth={2.25} />}
           </button>
         </form>
 
-        <div className="mt-6 text-center space-y-2">
-          <Link to="/forgot-password" className="block text-[13px] text-[var(--mabel-600)] hover:underline">
-            Olvidaste tu contrasena?
+        <div
+          style={{
+            textAlign: 'center',
+            marginTop: 22,
+            fontSize: 13,
+            color: 'var(--ink-600)',
+          }}
+        >
+          No tienes cuenta?{' '}
+          <Link
+            to="/register"
+            style={{ color: 'var(--mabel-600)', fontWeight: 600, textDecoration: 'none' }}
+          >
+            Crear cuenta nueva
           </Link>
-          <p className="text-[13px] text-[var(--ink-500)]">
-            No tienes cuenta?{' '}
-            <Link to="/register" className="text-[var(--mabel-600)] font-medium hover:underline">
-              Registrate
-            </Link>
-          </p>
         </div>
       </div>
-    </div>
+    </AuthShell>
   )
 }

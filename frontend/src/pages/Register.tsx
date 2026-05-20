@@ -1,6 +1,9 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { User, Mail, Lock, ArrowRight } from 'lucide-react'
 import apiClient from '../api/client'
+import AuthShell from '../components/auth/AuthShell'
+import Input from '../components/settings/primitives/Input'
 
 function getPasswordStrength(pw: string): { label: string; varName: string; pct: number } {
   let score = 0
@@ -59,133 +62,235 @@ export default function Register() {
     }
   }
 
-  const inputClass =
-    'w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors'
-
   return (
-    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
+    <AuthShell
+      side={
+        <div>
+          <h1
+            style={{
+              fontSize: 40,
+              fontWeight: 700,
+              margin: '0 0 14px',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Empieza tu<br />camino con Mabel.
+          </h1>
+          <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
+            Registrate y comienza tu experiencia con tu companera de apoyo psicoeducativo disponible
+            24/7.
+          </p>
+        </div>
+      }
+    >
+      <div>
+        <h2
+          style={{
+            fontSize: 26,
+            fontWeight: 700,
+            margin: '0 0 6px',
+            letterSpacing: '-0.015em',
+            color: 'var(--ink-900)',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
           Crear cuenta
-        </h1>
-        <p className="text-[14px] text-[var(--ink-500)] text-center mb-8">
-          Comienza tu acompanamiento con Mabel IA.
+        </h2>
+        <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 24px' }}>
+          Unete a Mabel y empieza tu camino de bienestar.
         </p>
 
         {toast && (
           <div
-            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
             style={{
-              backgroundColor: 'var(--ink-100)',
-              color: 'var(--danger-600)',
-              borderColor: 'var(--ink-100)',
+              marginBottom: 16,
+              padding: '10px 12px',
+              fontSize: 13,
+              borderRadius: 10,
+              background: 'var(--danger-50)',
+              color: 'var(--danger-700)',
+              border: '1px solid var(--danger-200)',
             }}
           >
             {toast}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Display name */}
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Nombre</label>
-            <input
-              type="text"
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-700)',
+                marginBottom: 6,
+              }}
+            >
+              Nombre completo
+            </label>
+            <Input
               value={form.display_name}
-              onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-              className={inputClass}
-              placeholder="Tu nombre"
+              onChange={(v) => setForm({ ...form, display_name: v })}
+              type="text"
+              placeholder="Ej: Maria Gonzalez"
+              prefix={<User size={16} />}
+              error={errors.display_name}
+              ariaLabel="Nombre completo"
             />
-            {errors.display_name && (
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger-600)' }}>
-                {errors.display_name}
-              </p>
-            )}
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Email institucional</label>
-            <input
-              type="email"
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-700)',
+                marginBottom: 6,
+              }}
+            >
+              Correo institucional
+            </label>
+            <Input
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className={inputClass}
-              placeholder="usuario@est.umb.edu.co"
+              onChange={(v) => setForm({ ...form, email: v })}
+              type="email"
+              placeholder="tu.nombre@est.umb.edu.co"
+              prefix={<Mail size={16} />}
+              error={errors.email}
+              ariaLabel="Correo electronico"
             />
-            {errors.email && (
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger-600)' }}>
-                {errors.email}
-              </p>
-            )}
           </div>
 
           {/* Password */}
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Contrasena</label>
-            <input
-              type="password"
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-700)',
+                marginBottom: 6,
+              }}
+            >
+              Contrasena
+            </label>
+            <Input
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className={inputClass}
+              onChange={(v) => setForm({ ...form, password: v })}
+              type="password"
               placeholder="Minimo 8 caracteres"
+              prefix={<Lock size={16} />}
+              error={errors.password}
+              ariaLabel="Contrasena"
             />
             {form.password && (
-              <div className="mt-2">
+              <div style={{ marginTop: 8 }}>
                 <div
-                  className="h-1.5 rounded-full overflow-hidden"
-                  style={{ backgroundColor: 'var(--ink-100)' }}
+                  style={{
+                    height: 6,
+                    borderRadius: 999,
+                    overflow: 'hidden',
+                    background: 'var(--ink-100)',
+                  }}
                 >
                   <div
-                    className="h-full transition-all"
-                    style={{ width: `${strength.pct}%`, backgroundColor: strength.varName }}
+                    style={{
+                      width: `${strength.pct}%`,
+                      height: '100%',
+                      background: strength.varName,
+                      transition: 'width var(--dur-base) var(--ease-out)',
+                    }}
                   />
                 </div>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--ink-400)' }}>
+                <p style={{ fontSize: 11, marginTop: 4, color: 'var(--ink-500)' }}>
                   {strength.label}
                 </p>
               </div>
-            )}
-            {errors.password && (
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger-600)' }}>
-                {errors.password}
-              </p>
             )}
           </div>
 
           {/* Confirm */}
           <div>
-            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Confirmar contrasena</label>
-            <input
-              type="password"
+            <label
+              style={{
+                display: 'block',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-700)',
+                marginBottom: 6,
+              }}
+            >
+              Confirmar contrasena
+            </label>
+            <Input
               value={form.confirm}
-              onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-              className={inputClass}
-              placeholder="Repite la contrasena"
+              onChange={(v) => setForm({ ...form, confirm: v })}
+              type="password"
+              placeholder="Repite tu contrasena"
+              prefix={<Lock size={16} />}
+              error={errors.confirm}
+              ariaLabel="Confirmar contrasena"
             />
-            {errors.confirm && (
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger-600)' }}>
-                {errors.confirm}
-              </p>
-            )}
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '13px',
+              background: 'var(--mabel-600)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 11,
+              fontSize: 14.5,
+              fontWeight: 600,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: 'var(--shadow-brand)',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              transition: 'background var(--dur-fast) var(--ease-out)',
+              marginTop: 6,
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) e.currentTarget.style.background = 'var(--mabel-700)'
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) e.currentTarget.style.background = 'var(--mabel-600)'
+            }}
           >
-            {loading ? 'Registrando...' : 'Registrarse'}
+            {loading ? 'Registrando...' : 'Crear mi cuenta'}
+            {!loading && <ArrowRight size={15} strokeWidth={2.25} />}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-[13px] text-[var(--ink-500)]">
+        <div
+          style={{
+            textAlign: 'center',
+            marginTop: 22,
+            fontSize: 13,
+            color: 'var(--ink-600)',
+          }}
+        >
           Ya tienes cuenta?{' '}
-          <Link to="/login" className="text-[var(--mabel-600)] font-medium hover:underline">
-            Inicia sesion
+          <Link
+            to="/login"
+            style={{ color: 'var(--mabel-600)', fontWeight: 600, textDecoration: 'none' }}
+          >
+            Iniciar sesion
           </Link>
-        </p>
+        </div>
       </div>
-    </div>
+    </AuthShell>
   )
 }

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Type, MonitorSmartphone, Bot } from 'lucide-react'
+import { Type, MonitorSmartphone, Bot, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react'
 import Toggle from '../components/ui/Toggle'
 import Segmented from '../components/ui/Segmented'
 import NativeSelect from '../components/ui/NativeSelect'
 import { usePreferencesStore } from '../stores/preferencesStore'
 import { useToastStore } from '../stores/toastStore'
+import AuthShell from '../components/auth/AuthShell'
 
 const STEPS = ['Privacidad', 'Accesibilidad', 'Voz']
 
@@ -79,54 +80,136 @@ export default function Onboarding() {
   const progressPct = ((step + 1) / STEPS.length) * 100
 
   return (
-    <div className="min-h-screen w-full bg-[var(--ink-50)] flex flex-col items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-xl">
+    <AuthShell
+      wide
+      side={
+        <div>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 12px',
+              background: 'rgba(255,255,255,0.12)',
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 600,
+              marginBottom: 24,
+              backdropFilter: 'blur(6px)',
+            }}
+          >
+            <Sparkles size={13} />
+            Configuracion inicial
+          </div>
+          <h1
+            style={{
+              fontSize: 36,
+              fontWeight: 700,
+              margin: '0 0 14px',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Personaliza tu<br />experiencia.
+          </h1>
+          <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.6 }}>
+            Ajusta privacidad, accesibilidad y voz a la medida. Podras cambiar todo despues desde
+            Ajustes.
+          </p>
+        </div>
+      }
+    >
+      <div>
         {/* Progress bar */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[12px] uppercase tracking-wider text-[var(--ink-400)]">
-              Paso {step + 1} / {STEPS.length}
-            </p>
-            <p className="text-[12px] font-medium text-[var(--ink-500)]">{STEPS[step]}</p>
+        <div style={{ marginBottom: 24 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 8,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                color: 'var(--ink-500)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}
+            >
+              Paso {step + 1} de {STEPS.length}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--mabel-600)', fontWeight: 600 }}>
+              {STEPS[step]}
+            </span>
           </div>
           <div
-            className="h-1 rounded-full overflow-hidden"
-            style={{ backgroundColor: 'var(--ink-200)' }}
+            style={{
+              height: 4,
+              borderRadius: 999,
+              overflow: 'hidden',
+              background: 'var(--ink-200)',
+            }}
           >
             <div
-              className="h-full transition-all duration-500 ease-out"
               style={{
                 width: `${progressPct}%`,
-                backgroundColor: 'var(--mabel-600)',
+                height: '100%',
+                background: 'var(--mabel-600)',
+                transition: 'width var(--dur-base) var(--ease-out)',
               }}
             />
           </div>
         </div>
 
-        {/* Card */}
+        {/* Step card */}
         <div
           key={step}
-          className="bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 fade-in"
+          className="fade-in"
+          style={{
+            background: '#fff',
+            border: '1px solid var(--ink-200)',
+            borderRadius: 18,
+            padding: '28px 28px 22px',
+            boxShadow: 'var(--shadow-sm)',
+          }}
         >
           {/* Step 1: Privacidad */}
           {step === 0 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-[24px] font-display italic text-[var(--ink-900)] mb-2">
-                  Privacidad
-                </h2>
-                <p className="text-[14px] text-[var(--ink-500)]">
-                  Configura como Mabel IA maneja tu informacion.
-                </p>
-              </div>
+            <div>
+              <h2
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  margin: '0 0 6px',
+                  color: 'var(--ink-900)',
+                  fontFamily: 'var(--font-sans)',
+                  letterSpacing: '-0.015em',
+                }}
+              >
+                Privacidad
+              </h2>
+              <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 22px', lineHeight: 1.55 }}>
+                Configura como Mabel IA maneja tu informacion.
+              </p>
 
-              <div className="space-y-5">
-                <div className="flex items-start justify-between gap-4 py-2">
-                  <div className="flex-1">
-                    <p className="text-[14px] font-medium text-[var(--ink-900)]">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
                       Guardar historial de conversaciones
                     </p>
-                    <p className="text-[12px] text-[var(--ink-500)] mt-0.5 leading-relaxed">
+                    <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Si esta desactivado, los mensajes no se guardan despues de cerrar la sesion.
                     </p>
                   </div>
@@ -137,18 +220,21 @@ export default function Onboarding() {
                   />
                 </div>
 
-                <div
-                  className="h-px"
-                  style={{ backgroundColor: 'var(--ink-100)' }}
-                  aria-hidden="true"
-                />
+                <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
 
-                <div className="flex items-start justify-between gap-4 py-2">
-                  <div className="flex-1">
-                    <p className="text-[14px] font-medium text-[var(--ink-900)]">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
                       Check-in emocional al inicio
                     </p>
-                    <p className="text-[12px] text-[var(--ink-500)] mt-0.5 leading-relaxed">
+                    <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Te preguntaremos como te sientes antes de iniciar la conversacion.
                     </p>
                   </div>
@@ -164,21 +250,37 @@ export default function Onboarding() {
 
           {/* Step 2: Accesibilidad */}
           {step === 1 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-[24px] font-display italic text-[var(--ink-900)] mb-2">
-                  Accesibilidad
-                </h2>
-                <p className="text-[14px] text-[var(--ink-500)]">
-                  Ajusta la interfaz a tus necesidades.
-                </p>
-              </div>
+            <div>
+              <h2
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  margin: '0 0 6px',
+                  color: 'var(--ink-900)',
+                  fontFamily: 'var(--font-sans)',
+                  letterSpacing: '-0.015em',
+                }}
+              >
+                Accesibilidad
+              </h2>
+              <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 22px', lineHeight: 1.55 }}>
+                Ajusta la interfaz a tus necesidades.
+              </p>
 
-              <div className="space-y-5">
-                <div className="flex items-start justify-between gap-4 py-2">
-                  <div className="flex-1">
-                    <p className="text-[14px] font-medium text-[var(--ink-900)]">Alto contraste</p>
-                    <p className="text-[12px] text-[var(--ink-500)] mt-0.5">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
+                      Alto contraste
+                    </p>
+                    <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Aumenta el contraste de colores para mejor legibilidad.
                     </p>
                   </div>
@@ -189,14 +291,17 @@ export default function Onboarding() {
                   />
                 </div>
 
-                <div
-                  className="h-px"
-                  style={{ backgroundColor: 'var(--ink-100)' }}
-                  aria-hidden="true"
-                />
+                <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
 
-                <div className="py-2">
-                  <p className="text-[14px] font-medium text-[var(--ink-900)] mb-3">
+                <div>
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--ink-900)',
+                      margin: '0 0 10px',
+                    }}
+                  >
                     Tamano de fuente
                   </p>
                   <Segmented
@@ -211,16 +316,21 @@ export default function Onboarding() {
                   />
                 </div>
 
-                <div
-                  className="h-px"
-                  style={{ backgroundColor: 'var(--ink-100)' }}
-                  aria-hidden="true"
-                />
+                <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
 
-                <div className="flex items-start justify-between gap-4 py-2">
-                  <div className="flex-1">
-                    <p className="text-[14px] font-medium text-[var(--ink-900)]">Subtitulos TTS</p>
-                    <p className="text-[12px] text-[var(--ink-500)] mt-0.5">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
+                      Subtitulos TTS
+                    </p>
+                    <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Resalta el texto mientras Mabel habla.
                     </p>
                   </div>
@@ -236,19 +346,33 @@ export default function Onboarding() {
 
           {/* Step 3: Voz */}
           {step === 2 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-[24px] font-display italic text-[var(--ink-900)] mb-2">
-                  Voz
-                </h2>
-                <p className="text-[14px] text-[var(--ink-500)]">
-                  Configura como suena Mabel IA.
-                </p>
-              </div>
+            <div>
+              <h2
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  margin: '0 0 6px',
+                  color: 'var(--ink-900)',
+                  fontFamily: 'var(--font-sans)',
+                  letterSpacing: '-0.015em',
+                }}
+              >
+                Voz
+              </h2>
+              <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 22px', lineHeight: 1.55 }}>
+                Configura como suena Mabel IA.
+              </p>
 
-              <div className="space-y-5">
-                <div className="py-2">
-                  <p className="text-[14px] font-medium text-[var(--ink-900)] mb-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--ink-900)',
+                      margin: '0 0 10px',
+                    }}
+                  >
                     Voz del asistente
                   </p>
                   <NativeSelect
@@ -263,14 +387,17 @@ export default function Onboarding() {
                   </NativeSelect>
                 </div>
 
-                <div
-                  className="h-px"
-                  style={{ backgroundColor: 'var(--ink-100)' }}
-                  aria-hidden="true"
-                />
+                <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
 
-                <div className="py-2">
-                  <p className="text-[14px] font-medium text-[var(--ink-900)] mb-3">
+                <div>
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--ink-900)',
+                      margin: '0 0 10px',
+                    }}
+                  >
                     Modo de interaccion
                   </p>
                   <Segmented
@@ -286,46 +413,119 @@ export default function Onboarding() {
               </div>
             </div>
           )}
+        </div>
 
-          {/* Navigation */}
-          <div className="flex items-center gap-3 mt-8 pt-6 border-t border-[var(--ink-100)]">
-            {step > 0 ? (
-              <button
-                onClick={() => setStep(step - 1)}
-                className="px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
-              >
-                Anterior
-              </button>
-            ) : (
-              <div className="w-[88px]" />
-            )}
-            <div className="flex-1" />
+        {/* Navigation */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            marginTop: 20,
+          }}
+        >
+          {step > 0 ? (
             <button
-              onClick={handleSkip}
-              disabled={saving}
-              className="px-3 py-2.5 text-[13px] text-[var(--ink-500)] hover:text-[var(--ink-900)] transition-colors"
+              onClick={() => setStep(step - 1)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '11px 18px',
+                background: 'transparent',
+                color: 'var(--ink-600)',
+                border: 'none',
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
-              Omitir
+              <ArrowLeft size={14} />
+              Anterior
             </button>
-            {step < STEPS.length - 1 ? (
-              <button
-                onClick={() => setStep(step + 1)}
-                className="px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity"
-              >
-                Siguiente
-              </button>
-            ) : (
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
-              >
-                {saving ? 'Guardando...' : 'Finalizar'}
-              </button>
-            )}
-          </div>
+          ) : (
+            <div style={{ width: 92 }} />
+          )}
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={handleSkip}
+            disabled={saving}
+            style={{
+              padding: '11px 14px',
+              background: 'transparent',
+              color: 'var(--ink-500)',
+              border: 'none',
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Omitir
+          </button>
+          {step < STEPS.length - 1 ? (
+            <button
+              onClick={() => setStep(step + 1)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '11px 22px',
+                background: 'var(--mabel-600)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 11,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                boxShadow: 'var(--shadow-brand)',
+                transition: 'background var(--dur-fast) var(--ease-out)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--mabel-700)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--mabel-600)')}
+            >
+              Continuar
+              <ArrowRight size={15} strokeWidth={2.25} />
+            </button>
+          ) : (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '11px 22px',
+                background: 'var(--mabel-600)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 11,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: saving ? 'not-allowed' : 'pointer',
+                fontFamily: 'var(--font-sans)',
+                boxShadow: 'var(--shadow-brand)',
+                opacity: saving ? 0.7 : 1,
+                transition: 'background var(--dur-fast) var(--ease-out)',
+              }}
+              onMouseEnter={(e) => {
+                if (!saving) e.currentTarget.style.background = 'var(--mabel-700)'
+              }}
+              onMouseLeave={(e) => {
+                if (!saving) e.currentTarget.style.background = 'var(--mabel-600)'
+              }}
+            >
+              {saving ? 'Guardando...' : 'Comenzar'}
+              {!saving && <ArrowRight size={15} strokeWidth={2.25} />}
+            </button>
+          )}
         </div>
       </div>
-    </div>
+    </AuthShell>
   )
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FileText, Hand, Lock } from 'lucide-react'
+import { FileText, Hand, Lock, ArrowRight } from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuthStore } from '../stores/authStore'
+import AuthShell from '../components/auth/AuthShell'
 
 interface StatusData {
   status: string
@@ -34,10 +35,21 @@ export default function ConsentRequired() {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center">
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <div
-          className="w-8 h-8 rounded-full animate-spin"
+          className="animate-spin"
           style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
             border: '4px solid var(--ink-200)',
             borderTopColor: 'var(--mabel-600)',
           }}
@@ -46,31 +58,112 @@ export default function ConsentRequired() {
     )
   }
 
+  // Hero copy varies per status
+  const heroByStatus: Record<string, { title: string; subtitle: string }> = {
+    no_consent: {
+      title: 'Antes de empezar,\nun paso importante.',
+      subtitle:
+        'Para continuar necesitas revisar y aceptar el consentimiento informado segun la Ley 1581/2012.',
+    },
+    revoked: {
+      title: 'Consentimiento\nrevocado.',
+      subtitle:
+        'Tu acceso esta temporalmente bloqueado. Puedes re-aceptar el consentimiento cuando quieras.',
+    },
+    new_version_required: {
+      title: 'Hay una nueva\nversion.',
+      subtitle:
+        'Hemos actualizado el consentimiento informado. Revisalo para continuar usando Mabel.',
+    },
+  }
+  const hero =
+    heroByStatus[data?.status || 'no_consent'] || heroByStatus.no_consent
+
   return (
-    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-2xl bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in text-center">
+    <AuthShell
+      side={
+        <div>
+          <h1
+            style={{
+              fontSize: 40,
+              fontWeight: 700,
+              margin: '0 0 14px',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.1,
+              fontFamily: 'var(--font-sans)',
+              whiteSpace: 'pre-line',
+            }}
+          >
+            {hero.title}
+          </h1>
+          <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
+            {hero.subtitle}
+          </p>
+        </div>
+      }
+      wide
+    >
+      <div style={{ textAlign: 'center' }}>
         {/* Variant A — No consent */}
         {data?.status === 'no_consent' && (
           <>
-            <div className="flex justify-center mb-5">
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
               <div
-                className="w-14 h-14 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: 'var(--ink-100)' }}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  background: 'var(--mabel-50)',
+                  color: 'var(--mabel-600)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <Hand size={28} style={{ color: 'var(--mabel-600)' }} />
+                <Hand size={28} />
               </div>
             </div>
-            <h1 className="text-[24px] font-display italic text-[var(--ink-900)] mb-3">
+            <h2
+              style={{
+                fontSize: 24,
+                fontWeight: 700,
+                margin: '0 0 10px',
+                color: 'var(--ink-900)',
+                fontFamily: 'var(--font-sans)',
+                letterSpacing: '-0.015em',
+              }}
+            >
               Bienvenido a Mabel IA
-            </h1>
-            <p className="text-[14px] text-[var(--ink-500)] mb-8 leading-relaxed">
+            </h2>
+            <p
+              style={{
+                fontSize: 14,
+                color: 'var(--ink-500)',
+                margin: '0 0 22px',
+                lineHeight: 1.55,
+              }}
+            >
               Para continuar, necesitas revisar y aceptar el consentimiento informado.
             </p>
             <Link
               to="/consent"
-              className="inline-block px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '12px 22px',
+                background: 'var(--mabel-600)',
+                color: '#fff',
+                borderRadius: 11,
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: 'none',
+                boxShadow: 'var(--shadow-brand)',
+                fontFamily: 'var(--font-sans)',
+              }}
             >
               Ir al consentimiento
+              <ArrowRight size={15} strokeWidth={2.25} />
             </Link>
           </>
         )}
@@ -78,33 +171,99 @@ export default function ConsentRequired() {
         {/* Variant B — Revoked */}
         {data?.status === 'revoked' && (
           <>
-            <div className="flex justify-center mb-5">
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
               <div
-                className="w-14 h-14 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: 'var(--ink-100)' }}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  background: 'var(--warn-50)',
+                  color: 'var(--warn-600)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <Lock size={28} style={{ color: 'var(--warn-600)' }} />
+                <Lock size={28} />
               </div>
             </div>
-            <h1 className="text-[24px] font-display italic text-[var(--ink-900)] mb-3">
+            <h2
+              style={{
+                fontSize: 24,
+                fontWeight: 700,
+                margin: '0 0 10px',
+                color: 'var(--ink-900)',
+                fontFamily: 'var(--font-sans)',
+                letterSpacing: '-0.015em',
+              }}
+            >
               Consentimiento revocado
-            </h1>
-            <p className="text-[14px] text-[var(--ink-500)] mb-3 leading-relaxed">
+            </h2>
+            <p
+              style={{
+                fontSize: 14,
+                color: 'var(--ink-500)',
+                margin: '0 0 10px',
+                lineHeight: 1.55,
+              }}
+            >
               Tu consentimiento ha sido revocado y el acceso esta temporalmente bloqueado.
             </p>
-            <p className="text-[14px] text-[var(--ink-500)] mb-8 leading-relaxed">
+            <p
+              style={{
+                fontSize: 14,
+                color: 'var(--ink-500)',
+                margin: '0 0 22px',
+                lineHeight: 1.55,
+              }}
+            >
               Puedes re-aceptar el consentimiento en cualquier momento para recuperar el acceso.
             </p>
-            <div className="flex flex-col gap-3">
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                maxWidth: 360,
+                margin: '0 auto',
+              }}
+            >
               <Link
                 to="/consent"
-                className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '13px',
+                  background: 'var(--mabel-600)',
+                  color: '#fff',
+                  borderRadius: 11,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  boxShadow: 'var(--shadow-brand)',
+                  fontFamily: 'var(--font-sans)',
+                }}
               >
                 Re-aceptar consentimiento
+                <ArrowRight size={15} strokeWidth={2.25} />
               </Link>
               <button
                 onClick={handleLogout}
-                className="w-full px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] rounded-lg font-medium hover:bg-[var(--ink-100)] transition-colors"
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  background: 'transparent',
+                  color: 'var(--ink-600)',
+                  border: '1px solid var(--ink-300)',
+                  borderRadius: 11,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                }}
               >
                 Cerrar sesion
               </button>
@@ -115,38 +274,101 @@ export default function ConsentRequired() {
         {/* Variant C — New version required */}
         {data?.status === 'new_version_required' && (
           <>
-            <div className="flex justify-center mb-5">
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
               <div
-                className="w-14 h-14 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: 'var(--ink-100)' }}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: '50%',
+                  background: 'var(--info-50)',
+                  color: 'var(--info-600)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <FileText size={28} style={{ color: 'var(--mabel-600)' }} />
+                <FileText size={28} />
               </div>
             </div>
-            <h1 className="text-[24px] font-display italic text-[var(--ink-900)] mb-3">
+            <h2
+              style={{
+                fontSize: 24,
+                fontWeight: 700,
+                margin: '0 0 10px',
+                color: 'var(--ink-900)',
+                fontFamily: 'var(--font-sans)',
+                letterSpacing: '-0.015em',
+              }}
+            >
               Nueva version del consentimiento
-            </h1>
-            <p className="text-[14px] text-[var(--ink-500)] mb-3 leading-relaxed">
+            </h2>
+            <p
+              style={{
+                fontSize: 14,
+                color: 'var(--ink-500)',
+                margin: '0 0 10px',
+                lineHeight: 1.55,
+              }}
+            >
               Hay una nueva version del consentimiento informado que debes aceptar para continuar.
             </p>
             {data.new_version && (
-              <p className="text-[13px] text-[var(--ink-500)] mb-8">
+              <p
+                style={{
+                  fontSize: 13,
+                  color: 'var(--ink-500)',
+                  margin: '0 0 22px',
+                }}
+              >
                 Nueva version:{' '}
-                <span className="font-medium" style={{ color: 'var(--mabel-600)' }}>
-                  {data.new_version}
-                </span>
+                <span style={{ fontWeight: 600, color: 'var(--mabel-600)' }}>{data.new_version}</span>
               </p>
             )}
-            <div className="flex flex-col gap-3">
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                maxWidth: 360,
+                margin: '0 auto',
+              }}
+            >
               <Link
                 to="/consent"
-                className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '13px',
+                  background: 'var(--mabel-600)',
+                  color: '#fff',
+                  borderRadius: 11,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  boxShadow: 'var(--shadow-brand)',
+                  fontFamily: 'var(--font-sans)',
+                }}
               >
                 Revisar nueva version
+                <ArrowRight size={15} strokeWidth={2.25} />
               </Link>
               <button
                 onClick={handleLogout}
-                className="w-full px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] rounded-lg font-medium hover:bg-[var(--ink-100)] transition-colors"
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  background: 'transparent',
+                  color: 'var(--ink-600)',
+                  border: '1px solid var(--ink-300)',
+                  borderRadius: 11,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                }}
               >
                 Cerrar sesion
               </button>
@@ -154,6 +376,6 @@ export default function ConsentRequired() {
           </>
         )}
       </div>
-    </div>
+    </AuthShell>
   )
 }

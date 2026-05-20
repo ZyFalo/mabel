@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { X, Download } from 'lucide-react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
 
@@ -63,23 +64,45 @@ export default function ArcoExportModal({ open, onClose }: ArcoExportModalProps)
   function renderSection(title: string, obj: Record<string, unknown> | null) {
     if (!obj)
       return (
-        <p className="text-[12px]" style={{ color: 'var(--ink-400)' }}>
-          Sin datos
-        </p>
+        <p style={{ fontSize: 12, color: 'var(--ink-400)' }}>Sin datos</p>
       )
     return (
-      <div className="space-y-1">
-        <p className="text-[12px] font-medium uppercase tracking-wider text-[var(--ink-400)]">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <p
+          style={{
+            fontSize: 11.5,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: 'var(--ink-400)',
+            margin: 0,
+          }}
+        >
           {title}
         </p>
         <div
-          className="rounded-lg p-3 space-y-1.5"
-          style={{ backgroundColor: 'var(--ink-100)' }}
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            background: 'var(--ink-50)',
+            border: '1px solid var(--ink-100)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
         >
           {Object.entries(obj).map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-3 text-[12px]">
-              <span className="text-[var(--ink-500)]">{k}</span>
-              <span className="text-[var(--ink-900)] text-right break-all">
+            <div
+              key={k}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: 'var(--ink-500)' }}>{k}</span>
+              <span style={{ color: 'var(--ink-900)', textAlign: 'right', wordBreak: 'break-all' }}>
                 {typeof v === 'object' ? JSON.stringify(v) : String(v ?? '-')}
               </span>
             </div>
@@ -90,28 +113,99 @@ export default function ArcoExportModal({ open, onClose }: ArcoExportModalProps)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-lg w-full p-6 max-h-[85vh] overflow-y-auto scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] text-center mb-1">
+    <div
+      className="fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        background: 'rgba(26,17,16,0.32)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div style={{ position: 'absolute', inset: 0 }} onClick={onClose} aria-hidden />
+      <div
+        className="scale-in"
+        style={{
+          position: 'relative',
+          background: '#fff',
+          border: '1px solid var(--ink-200)',
+          borderRadius: 18,
+          boxShadow: 'var(--shadow-xl)',
+          width: 'min(100%, 560px)',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          padding: '24px 26px',
+        }}
+      >
+        <button
+          onClick={onClose}
+          aria-label="Cerrar"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--ink-500)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <X size={16} />
+        </button>
+
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--ink-900)',
+            margin: '0 0 4px',
+            textAlign: 'center',
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.015em',
+          }}
+        >
           Mis datos personales
         </h2>
-        <p className="text-[12px] text-[var(--ink-400)] text-center mb-5">
-          Ley 1581 de 2012 — Derecho de acceso a datos personales
+        <p
+          style={{
+            fontSize: 12,
+            color: 'var(--ink-400)',
+            textAlign: 'center',
+            margin: '0 0 20px',
+          }}
+        >
+          Ley 1581 de 2012 - Derecho de acceso a datos personales
         </p>
 
         {loading ? (
-          <div className="flex justify-center py-10">
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 36 }}>
             <div
-              className="w-6 h-6 rounded-full animate-spin"
+              className="animate-spin"
               style={{
-                border: '2px solid var(--ink-200)',
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                border: '3px solid var(--ink-200)',
                 borderTopColor: 'var(--mabel-600)',
               }}
             />
           </div>
         ) : data ? (
-          <div className="space-y-4 mb-5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
             {renderSection('Cuenta', data.account)}
             {renderSection('Consentimiento', data.consent)}
             {renderSection('Preferencias', data.preferences)}
@@ -119,25 +213,74 @@ export default function ArcoExportModal({ open, onClose }: ArcoExportModalProps)
           </div>
         ) : null}
 
-        <div className="flex gap-3 mb-3">
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
           <button
             onClick={downloadJson}
             disabled={!data}
-            className="flex-1 px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
+            style={{
+              flex: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '11px 18px',
+              background: !data ? 'var(--ink-200)' : 'var(--mabel-600)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: !data ? 'not-allowed' : 'pointer',
+              opacity: !data ? 0.6 : 1,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: !data ? 'none' : 'var(--shadow-sm)',
+            }}
           >
+            <Download size={14} />
             Descargar JSON
           </button>
           <button
             onClick={downloadCsv}
             disabled={!data}
-            className="flex-1 px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
+            style={{
+              flex: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '11px 18px',
+              background: !data ? 'var(--ink-200)' : 'var(--mabel-600)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: !data ? 'not-allowed' : 'pointer',
+              opacity: !data ? 0.6 : 1,
+              fontFamily: 'var(--font-sans)',
+              boxShadow: !data ? 'none' : 'var(--shadow-sm)',
+            }}
           >
+            <Download size={14} />
             Descargar CSV
           </button>
         </div>
         <button
           onClick={onClose}
-          className="w-full px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
+          style={{
+            width: '100%',
+            padding: '11px',
+            background: 'transparent',
+            color: 'var(--ink-700)',
+            border: '1px solid var(--ink-300)',
+            borderRadius: 10,
+            fontSize: 13.5,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         >
           Cerrar
         </button>

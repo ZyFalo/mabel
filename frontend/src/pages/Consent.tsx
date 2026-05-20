@@ -1,7 +1,9 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Lock, Shield, Check } from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuthStore } from '../stores/authStore'
+import AuthShell from '../components/auth/AuthShell'
 
 interface ConsentVersion {
   id: string
@@ -63,7 +65,6 @@ export default function Consent() {
         await apiClient.get('/preferences/me')
         navigate('/home', { replace: true })
       } catch {
-        // No preferences → onboarding (Fase 5 placeholder → /home)
         navigate('/home', { replace: true })
       }
     } catch (err: any) {
@@ -73,12 +74,61 @@ export default function Consent() {
     }
   }
 
+  const sideHero = (
+    <div>
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '6px 12px',
+          background: 'rgba(255,255,255,0.12)',
+          borderRadius: 999,
+          fontSize: 12,
+          fontWeight: 600,
+          marginBottom: 24,
+          backdropFilter: 'blur(6px)',
+        }}
+      >
+        <Shield size={13} />
+        Ley 1581 de 2012
+      </div>
+      <h1
+        style={{
+          fontSize: 36,
+          fontWeight: 700,
+          margin: '0 0 14px',
+          letterSpacing: '-0.02em',
+          lineHeight: 1.15,
+          fontFamily: 'var(--font-sans)',
+        }}
+      >
+        Consentimiento<br />informado.
+      </h1>
+      <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 400, lineHeight: 1.6 }}>
+        Antes de comenzar, es importante que conozcas como tratamos tu informacion. Lee con calma y
+        toma una decision informada.
+      </p>
+    </div>
+  )
+
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center">
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <div
-          className="w-8 h-8 rounded-full animate-spin"
+          className="animate-spin"
           style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
             border: '4px solid var(--ink-200)',
             borderTopColor: 'var(--mabel-600)',
           }}
@@ -89,12 +139,44 @@ export default function Consent() {
 
   if (noVersion) {
     return (
-      <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
-        <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in text-center">
-          <h1 className="text-[22px] font-display italic text-[var(--ink-900)] mb-3">
+      <AuthShell side={sideHero} wide>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: 'var(--warn-50)',
+                color: 'var(--warn-600)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Lock size={26} />
+            </div>
+          </div>
+          <h2
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              margin: '0 0 10px',
+              color: 'var(--ink-900)',
+              fontFamily: 'var(--font-sans)',
+              letterSpacing: '-0.015em',
+            }}
+          >
             Sin version disponible
-          </h1>
-          <p className="text-[14px] text-[var(--ink-500)] mb-6 leading-relaxed">
+          </h2>
+          <p
+            style={{
+              fontSize: 14,
+              color: 'var(--ink-500)',
+              margin: '0 0 22px',
+              lineHeight: 1.55,
+            }}
+          >
             No hay una version de consentimiento disponible. Contacta al equipo de investigacion.
           </p>
           <button
@@ -102,44 +184,75 @@ export default function Consent() {
               logout()
               navigate('/')
             }}
-            className="inline-block px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+            style={{
+              padding: '12px 22px',
+              background: 'var(--mabel-600)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 11,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: 'var(--shadow-brand)',
+              fontFamily: 'var(--font-sans)',
+            }}
           >
             Cerrar sesion
           </button>
         </div>
-      </div>
+      </AuthShell>
     )
   }
 
   const canSubmit = scrolledToEnd && accepted && scope !== ''
 
   return (
-    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-start justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-2xl bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
-          Consentimiento Informado
-        </h1>
-        {version && (
-          <div className="flex justify-center mb-8">
+    <AuthShell side={sideHero} wide>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h2
+            style={{
+              fontSize: 26,
+              fontWeight: 700,
+              margin: 0,
+              letterSpacing: '-0.015em',
+              color: 'var(--ink-900)',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            Consentimiento Informado
+          </h2>
+          {version && (
             <span
-              className="px-3 py-1 text-[12px] rounded-full font-medium"
               style={{
-                backgroundColor: 'var(--ink-100)',
-                color: 'var(--mabel-600)',
+                padding: '4px 12px',
+                fontSize: 12,
+                borderRadius: 999,
+                fontWeight: 600,
+                background: 'var(--mabel-50)',
+                color: 'var(--mabel-700)',
+                border: '1px solid var(--mabel-100)',
               }}
             >
-              Version {version.version}
+              v{version.version}
             </span>
-          </div>
-        )}
+          )}
+        </div>
+
+        <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 20px', lineHeight: 1.55 }}>
+          Lee con atencion el documento. Debes desplazarte hasta el final antes de aceptar.
+        </p>
 
         {error && (
           <div
-            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
             style={{
-              backgroundColor: 'var(--ink-100)',
-              color: 'var(--danger-600)',
-              borderColor: 'var(--ink-100)',
+              marginBottom: 16,
+              padding: '10px 12px',
+              fontSize: 13,
+              borderRadius: 10,
+              background: 'var(--danger-50)',
+              color: 'var(--danger-700)',
+              border: '1px solid var(--danger-200)',
             }}
           >
             {error}
@@ -148,28 +261,52 @@ export default function Consent() {
 
         <form onSubmit={handleSubmit}>
           {/* Legal text */}
-          <div className="relative mb-6">
+          <div style={{ position: 'relative', marginBottom: 22 }}>
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="h-80 overflow-y-auto rounded-lg p-4 text-[13px] leading-relaxed whitespace-pre-wrap border"
               style={{
-                backgroundColor: 'var(--ink-50)',
+                height: 320,
+                overflowY: 'auto',
+                padding: 16,
+                borderRadius: 12,
+                fontSize: 13,
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                background: 'var(--ink-50)',
+                border: '1px solid var(--ink-200)',
                 color: 'var(--ink-700)',
-                borderColor: 'var(--ink-200)',
+                fontFamily: 'var(--font-sans)',
               }}
             >
               {version?.body}
             </div>
             {!scrolledToEnd && (
               <div
-                className="absolute bottom-0 left-0 right-0 h-12 rounded-b-lg flex items-end justify-center pb-1.5 pointer-events-none"
                 style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 56,
+                  borderRadius: '0 0 12px 12px',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  justifyContent: 'center',
+                  paddingBottom: 8,
+                  pointerEvents: 'none',
                   background:
                     'linear-gradient(to top, var(--ink-50) 0%, var(--ink-50) 30%, transparent 100%)',
                 }}
               >
-                <span className="text-[11px] animate-bounce" style={{ color: 'var(--mabel-600)' }}>
+                <span
+                  className="animate-bounce"
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--mabel-600)',
+                    fontWeight: 600,
+                  }}
+                >
                   Desplaza para leer todo el texto
                 </span>
               </div>
@@ -177,98 +314,158 @@ export default function Consent() {
           </div>
 
           {/* Scope */}
-          <div className="mb-6">
-            <p className="text-[13px] font-medium text-[var(--ink-900)] mb-3">
-              Alcance del consentimiento:
+          <div style={{ marginBottom: 20 }}>
+            <p
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--ink-900)',
+                margin: '0 0 12px',
+              }}
+            >
+              Alcance del consentimiento
             </p>
-            <div className="space-y-3">
-              <label
-                className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors hover:bg-[var(--ink-100)]"
-                style={{ borderColor: scope === 'solo_uso' ? 'var(--mabel-600)' : 'var(--ink-200)' }}
-              >
-                <input
-                  type="radio"
-                  name="scope"
-                  value="solo_uso"
-                  checked={scope === 'solo_uso'}
-                  onChange={(e) => setScope(e.target.value)}
-                  className="mt-0.5"
-                  style={{ accentColor: 'var(--mabel-600)' }}
-                />
-                <div>
-                  <span className="font-medium text-[13px] text-[var(--ink-900)]">Solo uso</span>
-                  <p className="text-[12px] text-[var(--ink-500)] mt-0.5">
-                    Datos minimos para el funcionamiento del sistema.
-                  </p>
-                </div>
-              </label>
-              <label
-                className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors hover:bg-[var(--ink-100)]"
-                style={{
-                  borderColor: scope === 'uso_mejora_anon' ? 'var(--mabel-600)' : 'var(--ink-200)',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="scope"
-                  value="uso_mejora_anon"
-                  checked={scope === 'uso_mejora_anon'}
-                  onChange={(e) => setScope(e.target.value)}
-                  className="mt-0.5"
-                  style={{ accentColor: 'var(--mabel-600)' }}
-                />
-                <div>
-                  <span className="font-medium text-[13px] text-[var(--ink-900)]">
-                    Uso + mejora anonima
-                  </span>
-                  <p className="text-[12px] text-[var(--ink-500)] mt-0.5">
-                    Datos anonimizados para mejorar el servicio.
-                  </p>
-                </div>
-              </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                {
+                  value: 'solo_uso',
+                  title: 'Solo uso',
+                  desc: 'Datos minimos para el funcionamiento del sistema.',
+                },
+                {
+                  value: 'uso_mejora_anon',
+                  title: 'Uso + mejora anonima',
+                  desc: 'Datos anonimizados para mejorar el servicio.',
+                },
+              ].map((opt) => {
+                const on = scope === opt.value
+                return (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 12,
+                      padding: 14,
+                      borderRadius: 12,
+                      cursor: 'pointer',
+                      background: on ? 'var(--mabel-50)' : '#fff',
+                      border: `1px solid ${on ? 'var(--mabel-500)' : 'var(--ink-200)'}`,
+                      transition: 'all var(--dur-fast) var(--ease-out)',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="scope"
+                      value={opt.value}
+                      checked={on}
+                      onChange={(e) => setScope(e.target.value)}
+                      style={{ accentColor: 'var(--mabel-600)', marginTop: 2 }}
+                    />
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 13.5,
+                          fontWeight: 600,
+                          color: on ? 'var(--mabel-700)' : 'var(--ink-900)',
+                        }}
+                      >
+                        {opt.title}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: 'var(--ink-500)', marginTop: 3, lineHeight: 1.5 }}>
+                        {opt.desc}
+                      </div>
+                    </div>
+                  </label>
+                )
+              })}
             </div>
           </div>
 
           {/* Checkbox */}
-          <div className="mb-6">
-            <label
-              className={`flex items-center gap-3 ${
-                !scrolledToEnd ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={accepted}
-                onChange={(e) => setAccepted(e.target.checked)}
-                disabled={!scrolledToEnd}
-                className="w-4 h-4"
-                style={{ accentColor: 'var(--mabel-600)' }}
-              />
-              <span className="text-[13px] text-[var(--ink-700)]">
-                He leido y acepto el consentimiento informado
-              </span>
-            </label>
-          </div>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: 'var(--ink-50)',
+              border: '1px solid var(--ink-200)',
+              marginBottom: 20,
+              cursor: scrolledToEnd ? 'pointer' : 'not-allowed',
+              opacity: scrolledToEnd ? 1 : 0.55,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+              disabled={!scrolledToEnd}
+              style={{ accentColor: 'var(--mabel-600)', width: 16, height: 16 }}
+            />
+            <span style={{ fontSize: 13, color: 'var(--ink-700)' }}>
+              He leido y acepto el consentimiento informado
+            </span>
+          </label>
 
           {/* Buttons */}
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={!canSubmit || submitting}
-              className="flex-1 px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-              {submitting ? 'Aceptando...' : 'Acepto'}
-            </button>
+          <div
+            style={{
+              display: 'flex',
+              gap: 12,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ fontSize: 12.5, color: 'var(--ink-500)', marginRight: 'auto' }}>
+              {canSubmit ? 'Listo para continuar' : 'Completa todos los campos para continuar'}
+            </span>
             <button
               type="button"
               onClick={() => navigate('/consent/rejected')}
-              className="px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] rounded-lg font-medium hover:bg-[var(--ink-100)] transition-colors"
+              style={{
+                padding: '11px 18px',
+                background: 'transparent',
+                color: 'var(--ink-600)',
+                border: 'none',
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               Rechazo
+            </button>
+            <button
+              type="submit"
+              disabled={!canSubmit || submitting}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '11px 22px',
+                background: canSubmit && !submitting ? 'var(--mabel-600)' : 'var(--ink-200)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 11,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: canSubmit && !submitting ? 'pointer' : 'not-allowed',
+                fontFamily: 'var(--font-sans)',
+                boxShadow: canSubmit ? 'var(--shadow-brand)' : 'none',
+                transition: 'background var(--dur-fast) var(--ease-out)',
+              }}
+            >
+              <Check size={15} strokeWidth={2.5} />
+              {submitting ? 'Aceptando...' : 'Acepto y continuar'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </AuthShell>
   )
 }
