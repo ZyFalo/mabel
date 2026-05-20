@@ -41,12 +41,12 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
           Iniciar sesion
         </h1>
-        <p className="text-[14px] text-[var(--text-muted)] text-center mb-8">
+        <p className="text-[14px] text-[var(--ink-500)] text-center mb-8">
           Continua tu camino con Mabel IA.
         </p>
 
@@ -54,9 +54,9 @@ export default function Login() {
           <div
             className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
             style={{
-              backgroundColor: 'var(--bg-hover)',
-              color: 'var(--success)',
-              borderColor: 'var(--border-subtle)',
+              backgroundColor: 'var(--ink-100)',
+              color: 'var(--success-600)',
+              borderColor: 'var(--ink-100)',
             }}
           >
             {successToast}
@@ -66,9 +66,9 @@ export default function Login() {
           <div
             className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
             style={{
-              backgroundColor: 'var(--bg-hover)',
-              color: 'var(--danger)',
-              borderColor: 'var(--border-subtle)',
+              backgroundColor: 'var(--ink-100)',
+              color: 'var(--danger-600)',
+              borderColor: 'var(--ink-100)',
             }}
           >
             {error}
@@ -77,23 +77,23 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Email</label>
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Email</label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors"
+              className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors"
               placeholder="tu@est.umb.edu.co"
               required
             />
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Contrasena</label>
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Contrasena</label>
             <input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors"
+              className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors"
               required
             />
           </div>
@@ -103,10 +103,10 @@ export default function Login() {
               id="remember"
               checked={form.remember_me}
               onChange={(e) => setForm({ ...form, remember_me: e.target.checked })}
-              className="w-4 h-4 rounded border-[var(--border-strong)]"
-              style={{ accentColor: 'var(--accent)' }}
+              className="w-4 h-4 rounded border-[var(--ink-300)]"
+              style={{ accentColor: 'var(--mabel-600)' }}
             />
-            <label htmlFor="remember" className="text-[13px] text-[var(--text-muted)] cursor-pointer">
+            <label htmlFor="remember" className="text-[13px] text-[var(--ink-500)] cursor-pointer">
               Recordar sesion
             </label>
           </div>
@@ -114,19 +114,19 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
+            className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
           >
             {loading ? 'Ingresando...' : 'Iniciar sesion'}
           </button>
         </form>
 
         <div className="mt-6 text-center space-y-2">
-          <Link to="/forgot-password" className="block text-[13px] text-[var(--accent)] hover:underline">
+          <Link to="/forgot-password" className="block text-[13px] text-[var(--mabel-600)] hover:underline">
             Olvidaste tu contrasena?
           </Link>
-          <p className="text-[13px] text-[var(--text-muted)]">
+          <p className="text-[13px] text-[var(--ink-500)]">
             No tienes cuenta?{' '}
-            <Link to="/register" className="text-[var(--accent)] font-medium hover:underline">
+            <Link to="/register" className="text-[var(--mabel-600)] font-medium hover:underline">
               Registrate
             </Link>
           </p>

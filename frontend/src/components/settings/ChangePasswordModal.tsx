@@ -13,10 +13,10 @@ function getStrength(pw: string): { score: number; label: string; varName: strin
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^a-zA-Z0-9]/.test(pw)) score++
-  if (score <= 1) return { score, label: 'Debil', varName: 'var(--danger)' }
-  if (score <= 2) return { score, label: 'Media', varName: 'var(--warning)' }
-  if (score <= 3) return { score, label: 'Buena', varName: 'var(--accent)' }
-  return { score, label: 'Fuerte', varName: 'var(--success)' }
+  if (score <= 1) return { score, label: 'Debil', varName: 'var(--danger-600)' }
+  if (score <= 2) return { score, label: 'Media', varName: 'var(--warn-600)' }
+  if (score <= 3) return { score, label: 'Buena', varName: 'var(--mabel-600)' }
+  return { score, label: 'Fuerte', varName: 'var(--success-600)' }
 }
 
 export default function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps) {
@@ -69,22 +69,22 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
   }
 
   const inputClass =
-    'w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors'
+    'w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--text-strong)] mb-1">
+      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
+        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] mb-1">
           Cambiar contrasena
         </h2>
-        <p className="text-[13px] text-[var(--text-muted)] mb-5">
+        <p className="text-[13px] text-[var(--ink-500)] mb-5">
           Asegurate de elegir una contrasena fuerte.
         </p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">
               Contrasena actual
             </label>
             <input
@@ -98,7 +98,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
             />
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">
               Nueva contrasena
             </label>
             <input
@@ -115,19 +115,19 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
                       key={i}
                       className="h-1.5 flex-1 rounded-full"
                       style={{
-                        backgroundColor: i <= strength.score ? strength.varName : 'var(--bg-hover)',
+                        backgroundColor: i <= strength.score ? strength.varName : 'var(--ink-100)',
                       }}
                     />
                   ))}
                 </div>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--ink-400)' }}>
                   {strength.label}
                 </p>
               </div>
             )}
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">
               Confirmar nueva contrasena
             </label>
             <input
@@ -137,7 +137,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
               className={inputClass}
             />
             {confirmPassword.length > 0 && !passwordsMatch && (
-              <p className="text-[12px] mt-1" style={{ color: 'var(--danger)' }}>
+              <p className="text-[12px] mt-1" style={{ color: 'var(--danger-600)' }}>
                 Las contrasenas no coinciden
               </p>
             )}
@@ -145,7 +145,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
         </div>
 
         {error && (
-          <p className="text-[13px] mt-3" style={{ color: 'var(--danger)' }}>
+          <p className="text-[13px] mt-3" style={{ color: 'var(--danger-600)' }}>
             {error}
           </p>
         )}
@@ -153,14 +153,14 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
         <div className="flex gap-3 mt-5">
           <button
             onClick={onClose}
-            className="flex-1 px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+            className="flex-1 px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={!isValid || saving}
-            className="flex-1 px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+            className="flex-1 px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
           >
             {saving ? 'Cambiando...' : 'Cambiar'}
           </button>

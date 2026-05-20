@@ -75,13 +75,13 @@ export default function Composer({
       <div
         className="
           group/composer
-          bg-[var(--bg-elevated)]
-          border border-[var(--border)]
+          bg-[#fff]
+          border border-[var(--ink-200)]
           rounded-[22px]
           shadow-sm
           transition-all duration-200
-          focus-within:border-[var(--accent)]/60
-          focus-within:shadow-[0_2px_24px_-6px_var(--accent-glow)]
+          focus-within:border-[var(--mabel-600)]/60
+          focus-within:shadow-[0_2px_24px_-6px_var(--ring-mabel)]
         "
       >
         <textarea
@@ -97,8 +97,8 @@ export default function Composer({
           className="
             w-full resize-none
             bg-transparent
-            text-[var(--text-strong)]
-            placeholder:text-[var(--text-placeholder)]
+            text-[var(--ink-900)]
+            placeholder:text-[var(--ink-400)]
             px-5 pt-4 pb-2
             text-[15px] leading-relaxed
             outline-none
@@ -122,8 +122,8 @@ export default function Composer({
                   isRecording
                     ? 'flex items-center justify-center w-9 h-9 rounded-lg bg-white border-2 border-[#DC2626] text-[#DC2626] animate-pulse'
                     : isProcessingAudio
-                      ? 'flex items-center justify-center w-9 h-9 rounded-lg text-[var(--text-faint)]'
-                      : 'flex items-center justify-center w-9 h-9 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                      ? 'flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-400)]'
+                      : 'flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-400)] hover:text-[var(--ink-700)] hover:bg-[var(--ink-100)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
                 }
               >
                 {isProcessingAudio ? (
@@ -143,7 +143,7 @@ export default function Composer({
                 title={isMuted ? 'Activar TTS' : 'Silenciar TTS'}
                 aria-label={isMuted ? 'Activar TTS' : 'Silenciar TTS'}
                 aria-pressed={isMuted}
-                className="flex items-center justify-center w-9 h-9 rounded-lg text-[var(--text-faint)] hover:text-[var(--text)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-400)] hover:text-[var(--ink-700)] hover:bg-[var(--ink-100)] transition-colors"
               >
                 {isMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
               </button>
@@ -160,10 +160,10 @@ export default function Composer({
             className="
               flex items-center justify-center
               p-2 rounded-lg
-              bg-[var(--accent)] text-white
+              bg-[var(--mabel-600)] text-white
               hover:opacity-90 active:opacity-100
               transition-opacity
-              disabled:bg-[var(--border-strong)] disabled:text-[var(--text-placeholder)]
+              disabled:bg-[var(--ink-300)] disabled:text-[var(--ink-400)]
               disabled:cursor-not-allowed
             "
           >
@@ -173,11 +173,11 @@ export default function Composer({
       </div>
 
       {showHint && (
-        <p className="text-[11px] text-[var(--text-faint)] text-center mt-2 select-none">
+        <p className="text-[11px] text-[var(--ink-400)] text-center mt-2 select-none">
           <span className="font-medium">Enter</span> para enviar,{' '}
           <span className="font-medium">Shift+Enter</span> para nueva linea
           {charsNearMax && (
-            <span className="ml-2 text-[var(--text-muted)]">
+            <span className="ml-2 text-[var(--ink-500)]">
               · {value.length}/{maxLength}
             </span>
           )}

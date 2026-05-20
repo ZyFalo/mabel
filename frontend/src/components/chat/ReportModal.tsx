@@ -50,27 +50,27 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--text-strong)] mb-1">
+      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
+        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] mb-1">
           Reportar mensaje
         </h2>
-        <p className="text-[13px] text-[var(--text-muted)] mb-5">
+        <p className="text-[13px] text-[var(--ink-500)] mb-5">
           Ayudanos a mejorar Mabel IA.
         </p>
 
         {/* Reason */}
         <div className="mb-4">
-          <label className="block text-[13px] font-medium text-[var(--text-strong)] mb-2">
-            Motivo <span style={{ color: 'var(--danger)' }}>*</span>
+          <label className="block text-[13px] font-medium text-[var(--ink-900)] mb-2">
+            Motivo <span style={{ color: 'var(--danger-600)' }}>*</span>
           </label>
           <div className="flex flex-col gap-2">
             {REASONS.map((r) => (
               <label
                 key={r.value}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:bg-[var(--ink-100)]"
                 style={{
-                  borderColor: reason === r.value ? 'var(--accent)' : 'var(--border)',
-                  backgroundColor: reason === r.value ? 'var(--bg-hover)' : 'transparent',
+                  borderColor: reason === r.value ? 'var(--mabel-600)' : 'var(--ink-200)',
+                  backgroundColor: reason === r.value ? 'var(--ink-100)' : 'transparent',
                 }}
               >
                 <input
@@ -79,9 +79,9 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
                   value={r.value}
                   checked={reason === r.value}
                   onChange={() => setReason(r.value)}
-                  style={{ accentColor: 'var(--accent)' }}
+                  style={{ accentColor: 'var(--mabel-600)' }}
                 />
-                <span className="text-[13px] text-[var(--text)]">{r.label}</span>
+                <span className="text-[13px] text-[var(--ink-700)]">{r.label}</span>
               </label>
             ))}
           </div>
@@ -89,7 +89,7 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
 
         {/* Severity */}
         <div className="mb-4">
-          <label className="block text-[13px] font-medium text-[var(--text-strong)] mb-2">
+          <label className="block text-[13px] font-medium text-[var(--ink-900)] mb-2">
             Severidad (opcional)
           </label>
           <div className="flex gap-2">
@@ -99,8 +99,8 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
                 onClick={() => setSeverity(severity === n ? null : n)}
                 className="w-9 h-9 rounded-lg text-[13px] font-medium transition-colors"
                 style={{
-                  backgroundColor: severity === n ? 'var(--accent)' : 'var(--bg-hover)',
-                  color: severity === n ? 'white' : 'var(--text-muted)',
+                  backgroundColor: severity === n ? 'var(--mabel-600)' : 'var(--ink-100)',
+                  color: severity === n ? 'white' : 'var(--ink-500)',
                 }}
               >
                 {n}
@@ -111,7 +111,7 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
 
         {/* Details */}
         <div className="mb-5">
-          <label className="block text-[13px] font-medium text-[var(--text-strong)] mb-2">
+          <label className="block text-[13px] font-medium text-[var(--ink-900)] mb-2">
             Detalles (opcional)
           </label>
           <textarea
@@ -120,9 +120,9 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
             maxLength={1000}
             rows={3}
             placeholder="Describe el problema..."
-            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
+            className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] resize-none focus:outline-none focus:border-[var(--mabel-600)] transition-colors"
           />
-          <p className="text-[11px] text-right mt-1" style={{ color: 'var(--text-faint)' }}>
+          <p className="text-[11px] text-right mt-1" style={{ color: 'var(--ink-400)' }}>
             {details.length}/1000
           </p>
         </div>
@@ -131,14 +131,14 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+            className="px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={!reason || submitting}
-            className="px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Enviando...' : 'Enviar reporte'}
           </button>

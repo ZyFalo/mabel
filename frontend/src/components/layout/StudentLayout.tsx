@@ -95,7 +95,7 @@ export default function StudentLayout() {
   }, [navigate, isMobile])
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--bg)]">
+    <div className="h-screen flex flex-col bg-[var(--ink-50)]">
       {/* Mobile floating hamburger — solo cuando el sidebar esta cerrado en mobile.
           Desktop/tablet usan el toggle propio del sidebar; admin mantiene su header. */}
       {isMobile && !sidebarOpen && (
@@ -105,11 +105,11 @@ export default function StudentLayout() {
           title="Abrir menu"
           className="fixed top-3 left-3 z-30 p-2 rounded-lg shadow-sm transition-opacity hover:opacity-80"
           style={{
-            backgroundColor: 'var(--bg-elevated)',
-            color: 'var(--text-strong)',
+            backgroundColor: '#fff',
+            color: 'var(--ink-900)',
             borderWidth: '1px',
             borderStyle: 'solid',
-            borderColor: 'var(--border)',
+            borderColor: 'var(--ink-200)',
           }}
         >
           <Menu className="w-5 h-5" />

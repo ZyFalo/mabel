@@ -34,14 +34,14 @@ export default function NativeSelect({
         aria-label={ariaLabel}
         className={[
           'appearance-none rounded-lg border pl-3 pr-9 py-2 text-sm',
-          'focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]',
+          'focus:outline-none focus:ring-2 focus:ring-[var(--mabel-600)]/40 focus:border-[var(--mabel-600)]',
           'disabled:cursor-not-allowed disabled:opacity-50',
           'transition-colors duration-150',
         ].join(' ')}
         style={{
-          backgroundColor: 'var(--bg-elevated)',
-          borderColor: 'var(--border)',
-          color: 'var(--text-strong)',
+          backgroundColor: '#fff',
+          borderColor: 'var(--ink-200)',
+          color: 'var(--ink-900)',
         }}
       >
         {children}
@@ -51,7 +51,7 @@ export default function NativeSelect({
         viewBox="0 0 20 20"
         fill="none"
         className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4"
-        style={{ color: 'var(--text-muted)' }}
+        style={{ color: 'var(--ink-500)' }}
       >
         <path
           d="M5 7.5 10 12.5 15 7.5"

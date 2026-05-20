@@ -5,7 +5,7 @@ interface ChatTopBarProps {
 
 /**
  * ChatTopBar — Cap 3, minimal 48px top bar for the active chat view.
- * Left: brand label "Mabel IA" in Fraunces italic.
+ * Left: brand label "Mabel IA" via font-display (Nunito).
  * Right: "Finalizar sesion" link-style button (opens existing ConfirmModal upstream).
  */
 export default function ChatTopBar({ onEndSession, sessionInfo }: ChatTopBarProps) {
@@ -15,17 +15,17 @@ export default function ChatTopBar({ onEndSession, sessionInfo }: ChatTopBarProp
         h-12 shrink-0
         flex items-center justify-between
         px-4
-        border-b border-[var(--border-subtle)]
-        bg-[var(--bg)]/80 backdrop-blur-sm
+        border-b border-[var(--ink-100)]
+        bg-[var(--ink-50)]/80 backdrop-blur-sm
       "
       role="banner"
     >
       <div className="flex items-baseline gap-3 min-w-0">
-        <span className="font-display italic text-[14px] text-[var(--text-strong)] tracking-tight">
+        <span className="font-display italic text-[14px] text-[var(--ink-900)] tracking-tight">
           Mabel IA
         </span>
         {sessionInfo && (
-          <span className="hidden sm:inline text-[11px] text-[var(--text-faint)] truncate">
+          <span className="hidden sm:inline text-[11px] text-[var(--ink-400)] truncate">
             {sessionInfo}
           </span>
         )}
@@ -35,11 +35,11 @@ export default function ChatTopBar({ onEndSession, sessionInfo }: ChatTopBarProp
         type="button"
         onClick={onEndSession}
         className="
-          text-[12px] text-[var(--text-faint)]
-          hover:text-[var(--danger)]
+          text-[12px] text-[var(--ink-400)]
+          hover:text-[var(--danger-600)]
           transition-colors
           px-2 py-1 rounded-md
-          focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30
+          focus:outline-none focus:ring-2 focus:ring-[var(--mabel-600)]/30
         "
       >
         Finalizar sesion

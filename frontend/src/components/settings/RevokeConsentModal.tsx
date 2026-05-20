@@ -49,11 +49,11 @@ export default function RevokeConsentModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--text-strong)] mb-1">
+      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
+        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] mb-1">
           Revocar consentimiento
         </h2>
-        <p className="text-[13px] text-[var(--text-muted)] mb-5 leading-relaxed">
+        <p className="text-[13px] text-[var(--ink-500)] mb-5 leading-relaxed">
           La revocacion no implica eliminacion de cuenta ni de datos.
         </p>
 
@@ -62,12 +62,12 @@ export default function RevokeConsentModal({
             <button
               onClick={handleReduceScope}
               disabled={loading}
-              className="w-full p-4 border border-[var(--border)] rounded-xl text-left hover:bg-[var(--bg-hover)] hover:border-[var(--accent)] transition-colors disabled:opacity-50"
+              className="w-full p-4 border border-[var(--ink-200)] rounded-xl text-left hover:bg-[var(--ink-100)] hover:border-[var(--mabel-600)] transition-colors disabled:opacity-50"
             >
-              <p className="text-[14px] font-medium text-[var(--text-strong)]">
+              <p className="text-[14px] font-medium text-[var(--ink-900)]">
                 Reducir a uso basico
               </p>
-              <p className="text-[12px] text-[var(--text-muted)] mt-1 leading-relaxed">
+              <p className="text-[12px] text-[var(--ink-500)] mt-1 leading-relaxed">
                 Tus datos solo se usaran para el funcionamiento del sistema. Se excluyen de mejoras
                 anonimas.
               </p>
@@ -79,14 +79,14 @@ export default function RevokeConsentModal({
             disabled={loading}
             className="w-full p-4 rounded-xl text-left transition-colors disabled:opacity-50 border"
             style={{
-              borderColor: 'var(--danger)',
-              backgroundColor: 'var(--bg-hover)',
+              borderColor: 'var(--danger-600)',
+              backgroundColor: 'var(--ink-100)',
             }}
           >
-            <p className="text-[14px] font-medium" style={{ color: 'var(--danger)' }}>
+            <p className="text-[14px] font-medium" style={{ color: 'var(--danger-600)' }}>
               Revocar totalmente
             </p>
-            <p className="text-[12px] text-[var(--text-muted)] mt-1 leading-relaxed">
+            <p className="text-[12px] text-[var(--ink-500)] mt-1 leading-relaxed">
               Perderas acceso temporal hasta re-aceptar el consentimiento. Tus datos no se eliminan.
             </p>
           </button>
@@ -94,7 +94,7 @@ export default function RevokeConsentModal({
 
         <button
           onClick={onClose}
-          className="w-full px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+          className="w-full px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
         >
           Cancelar
         </button>

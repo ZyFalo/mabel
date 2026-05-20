@@ -63,23 +63,23 @@ export default function ArcoExportModal({ open, onClose }: ArcoExportModalProps)
   function renderSection(title: string, obj: Record<string, unknown> | null) {
     if (!obj)
       return (
-        <p className="text-[12px]" style={{ color: 'var(--text-faint)' }}>
+        <p className="text-[12px]" style={{ color: 'var(--ink-400)' }}>
           Sin datos
         </p>
       )
     return (
       <div className="space-y-1">
-        <p className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-faint)]">
+        <p className="text-[12px] font-medium uppercase tracking-wider text-[var(--ink-400)]">
           {title}
         </p>
         <div
           className="rounded-lg p-3 space-y-1.5"
-          style={{ backgroundColor: 'var(--bg-hover)' }}
+          style={{ backgroundColor: 'var(--ink-100)' }}
         >
           {Object.entries(obj).map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3 text-[12px]">
-              <span className="text-[var(--text-muted)]">{k}</span>
-              <span className="text-[var(--text-strong)] text-right break-all">
+              <span className="text-[var(--ink-500)]">{k}</span>
+              <span className="text-[var(--ink-900)] text-right break-all">
                 {typeof v === 'object' ? JSON.stringify(v) : String(v ?? '-')}
               </span>
             </div>
@@ -92,11 +92,11 @@ export default function ArcoExportModal({ open, onClose }: ArcoExportModalProps)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-lg max-w-lg w-full p-6 max-h-[85vh] overflow-y-auto scale-in">
-        <h2 className="text-[18px] font-display italic text-[var(--text-strong)] text-center mb-1">
+      <div className="relative bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-lg max-w-lg w-full p-6 max-h-[85vh] overflow-y-auto scale-in">
+        <h2 className="text-[18px] font-display italic text-[var(--ink-900)] text-center mb-1">
           Mis datos personales
         </h2>
-        <p className="text-[12px] text-[var(--text-faint)] text-center mb-5">
+        <p className="text-[12px] text-[var(--ink-400)] text-center mb-5">
           Ley 1581 de 2012 — Derecho de acceso a datos personales
         </p>
 
@@ -105,8 +105,8 @@ export default function ArcoExportModal({ open, onClose }: ArcoExportModalProps)
             <div
               className="w-6 h-6 rounded-full animate-spin"
               style={{
-                border: '2px solid var(--border)',
-                borderTopColor: 'var(--accent)',
+                border: '2px solid var(--ink-200)',
+                borderTopColor: 'var(--mabel-600)',
               }}
             />
           </div>
@@ -123,21 +123,21 @@ export default function ArcoExportModal({ open, onClose }: ArcoExportModalProps)
           <button
             onClick={downloadJson}
             disabled={!data}
-            className="flex-1 px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
+            className="flex-1 px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
           >
             Descargar JSON
           </button>
           <button
             onClick={downloadCsv}
             disabled={!data}
-            className="flex-1 px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
+            className="flex-1 px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
           >
             Descargar CSV
           </button>
         </div>
         <button
           onClick={onClose}
-          className="w-full px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+          className="w-full px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
         >
           Cerrar
         </button>

@@ -22,12 +22,12 @@ export default function Field({ label, description, vertical = false, htmlFor, c
           <label
             htmlFor={htmlFor}
             className="text-sm font-medium"
-            style={{ color: 'var(--text-strong)' }}
+            style={{ color: 'var(--ink-900)' }}
           >
             {label}
           </label>
           {description ? (
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--ink-500)' }}>
               {description}
             </p>
           ) : null}
@@ -43,12 +43,12 @@ export default function Field({ label, description, vertical = false, htmlFor, c
         <label
           htmlFor={htmlFor}
           className="text-sm font-medium"
-          style={{ color: 'var(--text-strong)' }}
+          style={{ color: 'var(--ink-900)' }}
         >
           {label}
         </label>
         {description ? (
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs" style={{ color: 'var(--ink-500)' }}>
             {description}
           </p>
         ) : null}

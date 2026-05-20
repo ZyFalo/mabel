@@ -24,11 +24,11 @@ export default function Toggle({ checked, onChange, disabled = false, label }: T
       className={[
         'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full',
         'transition-colors duration-200 ease-out',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mabel-600)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ink-50)]',
         disabled ? 'cursor-not-allowed opacity-50' : '',
       ].join(' ')}
       style={{
-        backgroundColor: checked ? 'var(--accent)' : 'var(--border-strong)',
+        backgroundColor: checked ? 'var(--mabel-600)' : 'var(--ink-300)',
       }}
     >
       <span

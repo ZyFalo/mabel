@@ -75,12 +75,12 @@ export default function Consent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center">
+      <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center">
         <div
           className="w-8 h-8 rounded-full animate-spin"
           style={{
-            border: '4px solid var(--border)',
-            borderTopColor: 'var(--accent)',
+            border: '4px solid var(--ink-200)',
+            borderTopColor: 'var(--mabel-600)',
           }}
         />
       </div>
@@ -89,12 +89,12 @@ export default function Consent() {
 
   if (noVersion) {
     return (
-      <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
-        <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in text-center">
-          <h1 className="text-[22px] font-display italic text-[var(--text-strong)] mb-3">
+      <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
+        <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in text-center">
+          <h1 className="text-[22px] font-display italic text-[var(--ink-900)] mb-3">
             Sin version disponible
           </h1>
-          <p className="text-[14px] text-[var(--text-muted)] mb-6 leading-relaxed">
+          <p className="text-[14px] text-[var(--ink-500)] mb-6 leading-relaxed">
             No hay una version de consentimiento disponible. Contacta al equipo de investigacion.
           </p>
           <button
@@ -102,7 +102,7 @@ export default function Consent() {
               logout()
               navigate('/')
             }}
-            className="inline-block px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+            className="inline-block px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
             Cerrar sesion
           </button>
@@ -114,9 +114,9 @@ export default function Consent() {
   const canSubmit = scrolledToEnd && accepted && scope !== ''
 
   return (
-    <div className="min-h-screen w-full bg-[var(--bg)] flex items-start justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-2xl bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-start justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-2xl bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
           Consentimiento Informado
         </h1>
         {version && (
@@ -124,8 +124,8 @@ export default function Consent() {
             <span
               className="px-3 py-1 text-[12px] rounded-full font-medium"
               style={{
-                backgroundColor: 'var(--bg-hover)',
-                color: 'var(--accent)',
+                backgroundColor: 'var(--ink-100)',
+                color: 'var(--mabel-600)',
               }}
             >
               Version {version.version}
@@ -137,9 +137,9 @@ export default function Consent() {
           <div
             className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
             style={{
-              backgroundColor: 'var(--bg-hover)',
-              color: 'var(--danger)',
-              borderColor: 'var(--border-subtle)',
+              backgroundColor: 'var(--ink-100)',
+              color: 'var(--danger-600)',
+              borderColor: 'var(--ink-100)',
             }}
           >
             {error}
@@ -154,9 +154,9 @@ export default function Consent() {
               onScroll={handleScroll}
               className="h-80 overflow-y-auto rounded-lg p-4 text-[13px] leading-relaxed whitespace-pre-wrap border"
               style={{
-                backgroundColor: 'var(--bg)',
-                color: 'var(--text)',
-                borderColor: 'var(--border)',
+                backgroundColor: 'var(--ink-50)',
+                color: 'var(--ink-700)',
+                borderColor: 'var(--ink-200)',
               }}
             >
               {version?.body}
@@ -166,10 +166,10 @@ export default function Consent() {
                 className="absolute bottom-0 left-0 right-0 h-12 rounded-b-lg flex items-end justify-center pb-1.5 pointer-events-none"
                 style={{
                   background:
-                    'linear-gradient(to top, var(--bg) 0%, var(--bg) 30%, transparent 100%)',
+                    'linear-gradient(to top, var(--ink-50) 0%, var(--ink-50) 30%, transparent 100%)',
                 }}
               >
-                <span className="text-[11px] animate-bounce" style={{ color: 'var(--accent)' }}>
+                <span className="text-[11px] animate-bounce" style={{ color: 'var(--mabel-600)' }}>
                   Desplaza para leer todo el texto
                 </span>
               </div>
@@ -178,13 +178,13 @@ export default function Consent() {
 
           {/* Scope */}
           <div className="mb-6">
-            <p className="text-[13px] font-medium text-[var(--text-strong)] mb-3">
+            <p className="text-[13px] font-medium text-[var(--ink-900)] mb-3">
               Alcance del consentimiento:
             </p>
             <div className="space-y-3">
               <label
-                className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors hover:bg-[var(--bg-hover)]"
-                style={{ borderColor: scope === 'solo_uso' ? 'var(--accent)' : 'var(--border)' }}
+                className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors hover:bg-[var(--ink-100)]"
+                style={{ borderColor: scope === 'solo_uso' ? 'var(--mabel-600)' : 'var(--ink-200)' }}
               >
                 <input
                   type="radio"
@@ -193,19 +193,19 @@ export default function Consent() {
                   checked={scope === 'solo_uso'}
                   onChange={(e) => setScope(e.target.value)}
                   className="mt-0.5"
-                  style={{ accentColor: 'var(--accent)' }}
+                  style={{ accentColor: 'var(--mabel-600)' }}
                 />
                 <div>
-                  <span className="font-medium text-[13px] text-[var(--text-strong)]">Solo uso</span>
-                  <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                  <span className="font-medium text-[13px] text-[var(--ink-900)]">Solo uso</span>
+                  <p className="text-[12px] text-[var(--ink-500)] mt-0.5">
                     Datos minimos para el funcionamiento del sistema.
                   </p>
                 </div>
               </label>
               <label
-                className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors hover:bg-[var(--bg-hover)]"
+                className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors hover:bg-[var(--ink-100)]"
                 style={{
-                  borderColor: scope === 'uso_mejora_anon' ? 'var(--accent)' : 'var(--border)',
+                  borderColor: scope === 'uso_mejora_anon' ? 'var(--mabel-600)' : 'var(--ink-200)',
                 }}
               >
                 <input
@@ -215,13 +215,13 @@ export default function Consent() {
                   checked={scope === 'uso_mejora_anon'}
                   onChange={(e) => setScope(e.target.value)}
                   className="mt-0.5"
-                  style={{ accentColor: 'var(--accent)' }}
+                  style={{ accentColor: 'var(--mabel-600)' }}
                 />
                 <div>
-                  <span className="font-medium text-[13px] text-[var(--text-strong)]">
+                  <span className="font-medium text-[13px] text-[var(--ink-900)]">
                     Uso + mejora anonima
                   </span>
-                  <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                  <p className="text-[12px] text-[var(--ink-500)] mt-0.5">
                     Datos anonimizados para mejorar el servicio.
                   </p>
                 </div>
@@ -242,9 +242,9 @@ export default function Consent() {
                 onChange={(e) => setAccepted(e.target.checked)}
                 disabled={!scrolledToEnd}
                 className="w-4 h-4"
-                style={{ accentColor: 'var(--accent)' }}
+                style={{ accentColor: 'var(--mabel-600)' }}
               />
-              <span className="text-[13px] text-[var(--text)]">
+              <span className="text-[13px] text-[var(--ink-700)]">
                 He leido y acepto el consentimiento informado
               </span>
             </label>
@@ -255,14 +255,14 @@ export default function Consent() {
             <button
               type="submit"
               disabled={!canSubmit || submitting}
-              className="flex-1 px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+              className="flex-1 px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {submitting ? 'Aceptando...' : 'Acepto'}
             </button>
             <button
               type="button"
               onClick={() => navigate('/consent/rejected')}
-              className="px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] rounded-lg font-medium hover:bg-[var(--bg-hover)] transition-colors"
+              className="px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] rounded-lg font-medium hover:bg-[var(--ink-100)] transition-colors"
             >
               Rechazo
             </button>

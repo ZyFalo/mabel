@@ -146,7 +146,7 @@ export default function StudentSidebarV3({
   if (!open && !mobileDrawer) {
     return (
       <aside
-        className="h-full shrink-0 overflow-hidden border-r border-[var(--border)] transition-[width] duration-300 ease-out"
+        className="h-full shrink-0 overflow-hidden border-r border-[var(--ink-200)] transition-[width] duration-300 ease-out"
         style={{ width: 56 }}
       >
         <CollapsedSidebar
@@ -164,8 +164,8 @@ export default function StudentSidebarV3({
   const roleLabel = user?.role === 'admin' ? 'Administrador' : 'Estudiante'
 
   const wrapperBase = mobileDrawer
-    ? 'h-full w-[272px] bg-[var(--bg-sidebar)] border-r border-[var(--border)] flex flex-col overflow-hidden'
-    : 'h-full shrink-0 bg-[var(--bg-sidebar)] border-r border-[var(--border)] flex flex-col overflow-hidden transition-[width] duration-300 ease-out'
+    ? 'h-full w-[272px] bg-[var(--ink-50)] border-r border-[var(--ink-200)] flex flex-col overflow-hidden'
+    : 'h-full shrink-0 bg-[var(--ink-50)] border-r border-[var(--ink-200)] flex flex-col overflow-hidden transition-[width] duration-300 ease-out'
 
   return (
     <aside
@@ -175,7 +175,7 @@ export default function StudentSidebarV3({
       {/* Header — logo + toggle */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <span
-          className="font-display text-[19px] font-medium tracking-tight text-[var(--text-strong)] select-none"
+          className="font-display text-[19px] font-medium tracking-tight text-[var(--ink-900)] select-none"
           style={{ fontVariationSettings: '"opsz" 36' }}
         >
           Mabel
@@ -185,7 +185,7 @@ export default function StudentSidebarV3({
           onClick={onToggle}
           aria-label="Colapsar sidebar"
           title="Colapsar sidebar (Cmd+B)"
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-strong)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--ink-500)] hover:text-[var(--ink-900)] hover:bg-[var(--ink-100)] transition-colors"
         >
           <PanelLeft size={15} />
         </button>
@@ -196,20 +196,20 @@ export default function StudentSidebarV3({
         <button
           type="button"
           onClick={handleNewSession}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-[var(--text-strong)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium text-[var(--ink-900)] hover:bg-[var(--ink-100)] transition-colors"
         >
           <span
-            className="w-5 h-5 flex items-center justify-center rounded-md bg-[var(--bg-elevated)] border border-[var(--border)]"
+            className="w-5 h-5 flex items-center justify-center rounded-md bg-[#fff] border border-[var(--ink-200)]"
             aria-hidden
           >
-            <Plus size={12} className="text-[var(--accent)]" />
+            <Plus size={12} className="text-[var(--mabel-600)]" />
           </span>
           Nueva conversacion
         </button>
         <button
           type="button"
           onClick={onToggle}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-[var(--text-muted)] hover:text-[var(--text-strong)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-[var(--ink-500)] hover:text-[var(--ink-900)] hover:bg-[var(--ink-100)] transition-colors"
         >
           <Search size={14} className="ml-0.5" />
           Buscar chats
@@ -221,21 +221,21 @@ export default function StudentSidebarV3({
         {!historyEnabled ? (
           <div className="px-2 py-6 flex flex-col items-start gap-2">
             <div
-              className="w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-muted)]"
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#fff] border border-[var(--ink-200)] text-[var(--ink-500)]"
               aria-hidden
             >
               <FolderClosed size={16} />
             </div>
-            <p className="text-[12.5px] font-medium text-[var(--text-strong)] leading-tight">
+            <p className="text-[12.5px] font-medium text-[var(--ink-900)] leading-tight">
               Historial desactivado
             </p>
-            <p className="text-[11.5px] text-[var(--text-faint)] leading-snug">
+            <p className="text-[11.5px] text-[var(--ink-400)] leading-snug">
               Tus conversaciones no se guardan.
             </p>
             <button
               type="button"
               onClick={() => navigate('/settings')}
-              className="text-[11.5px] font-medium text-[var(--accent)] hover:underline mt-0.5"
+              className="text-[11.5px] font-medium text-[var(--mabel-600)] hover:underline mt-0.5"
             >
               Activar en preferencias
             </button>
@@ -246,13 +246,13 @@ export default function StudentSidebarV3({
             <SkeletonText />
           </div>
         ) : groups.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-faint)] px-2 py-3">
+          <p className="text-[12px] text-[var(--ink-400)] px-2 py-3">
             Aun no tienes conversaciones.
           </p>
         ) : (
           groups.map((group) => (
             <div key={group.label} className="mb-4">
-              <p className="text-[10.5px] uppercase tracking-[0.08em] text-[var(--text-faint)] font-medium px-2 mb-1.5">
+              <p className="text-[10.5px] uppercase tracking-[0.08em] text-[var(--ink-400)] font-medium px-2 mb-1.5">
                 {group.label}
               </p>
               <div className="flex flex-col gap-0.5">
@@ -266,8 +266,8 @@ export default function StudentSidebarV3({
                       onClick={() => handleSessionClick(s)}
                       className={`group/row w-full text-left px-2.5 py-1.5 rounded-md text-[13px] transition-colors flex items-center gap-2 ${
                         isCurrent
-                          ? 'bg-[var(--bg-active)] text-[var(--text-strong)]'
-                          : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-strong)]'
+                          ? 'bg-[var(--mabel-50)] text-[var(--ink-900)]'
+                          : 'text-[var(--ink-500)] hover:bg-[var(--ink-100)] hover:text-[var(--ink-900)]'
                       }`}
                     >
                       <span className="truncate flex-1">
@@ -275,7 +275,7 @@ export default function StudentSidebarV3({
                       </span>
                       {isActive && (
                         <span
-                          className="shrink-0 w-1.5 h-1.5 rounded-full bg-[var(--accent)]"
+                          className="shrink-0 w-1.5 h-1.5 rounded-full bg-[var(--mabel-600)]"
                           aria-label="Sesion en curso"
                           title="Sesion en curso"
                         />
@@ -290,31 +290,31 @@ export default function StudentSidebarV3({
       </div>
 
       {/* Footer — user pill opens UserMenu popover with shortcuts to Settings tabs + Cerrar sesion */}
-      <div className="border-t border-[var(--border-subtle)] p-3 relative">
+      <div className="border-t border-[var(--ink-100)] p-3 relative">
         <button
           ref={profileButtonRef}
           type="button"
           onClick={() => setUserMenuOpen((v) => !v)}
           aria-haspopup="menu"
           aria-expanded={userMenuOpen}
-          className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors min-w-0 text-left"
+          className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-[var(--ink-100)] transition-colors min-w-0 text-left"
           aria-label="Abrir menu de cuenta"
         >
           <span
             className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[10.5px] font-semibold text-white"
             style={{
               backgroundImage:
-                'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 60%, black) 100%)',
+                'linear-gradient(135deg, var(--mabel-600) 0%, color-mix(in srgb, var(--mabel-600) 60%, black) 100%)',
             }}
             aria-hidden
           >
             {initials}
           </span>
           <span className="flex-1 min-w-0 flex flex-col leading-tight">
-            <span className="text-[12.5px] font-medium text-[var(--text-strong)] truncate">
+            <span className="text-[12.5px] font-medium text-[var(--ink-900)] truncate">
               {user?.display_name || user?.email || 'Usuario'}
             </span>
-            <span className="text-[10.5px] text-[var(--text-faint)] truncate">
+            <span className="text-[10.5px] text-[var(--ink-400)] truncate">
               {roleLabel}
             </span>
           </span>

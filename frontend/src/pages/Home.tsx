@@ -92,8 +92,8 @@ export default function Home() {
             className="
               w-12 h-12 rounded-full
               flex items-center justify-center
-              bg-[var(--bg-elevated)] border border-[var(--border)]
-              text-[var(--accent)]
+              bg-[#fff] border border-[var(--ink-200)]
+              text-[var(--mabel-600)]
               shadow-sm
             "
             aria-hidden="true"
@@ -107,12 +107,12 @@ export default function Home() {
           className="
             font-display italic font-light
             text-[34px] sm:text-[40px]
-            text-center text-[var(--text-strong)]
+            text-center text-[var(--ink-900)]
             mb-10 leading-tight tracking-tight
           "
         >
           {timeGreeting},{' '}
-          <span className="text-[var(--accent)]">{firstName}</span>
+          <span className="text-[var(--mabel-600)]">{firstName}</span>
         </h1>
 
         {/* Composer (no mic/mute on welcome — no session yet) */}
@@ -136,9 +136,9 @@ export default function Home() {
                 group/sg
                 flex items-start gap-3
                 p-3.5 rounded-xl
-                border border-[var(--border)]
-                bg-[var(--bg-elevated)]/60
-                hover:bg-[var(--bg-elevated)] hover:border-[var(--border-strong)]
+                border border-[var(--ink-200)]
+                bg-[#fff]/60
+                hover:bg-[#fff] hover:border-[var(--ink-300)]
                 transition-all duration-200
                 text-left
                 disabled:opacity-50 disabled:cursor-not-allowed
@@ -158,7 +158,7 @@ export default function Home() {
               >
                 {s.icon}
               </span>
-              <span className="text-[13.5px] text-[var(--text)] leading-snug pt-0.5">
+              <span className="text-[13.5px] text-[var(--ink-700)] leading-snug pt-0.5">
                 {s.text}
               </span>
             </button>
@@ -166,7 +166,7 @@ export default function Home() {
         </div>
 
         {/* Subtle footnote */}
-        <p className="text-center text-[11px] text-[var(--text-faint)] mt-8">
+        <p className="text-center text-[11px] text-[var(--ink-400)] mt-8">
           Mabel es una asistente de psicoeducacion. No reemplaza atencion profesional.
         </p>
       </div>

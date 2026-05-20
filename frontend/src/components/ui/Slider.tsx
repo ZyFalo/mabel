@@ -40,7 +40,7 @@ export default function Slider({
         <div
           aria-hidden="true"
           className="absolute inset-y-1/2 left-0 right-0 -translate-y-1/2 h-1.5 rounded-full"
-          style={{ backgroundColor: 'var(--border)' }}
+          style={{ backgroundColor: 'var(--ink-200)' }}
         />
         {/* Fill */}
         <div
@@ -48,8 +48,8 @@ export default function Slider({
           className="absolute inset-y-1/2 left-0 -translate-y-1/2 h-1.5 rounded-full"
           style={{
             width: `${pct}%`,
-            backgroundColor: 'var(--accent)',
-            boxShadow: `0 0 0 4px var(--accent-glow)`,
+            backgroundColor: 'var(--mabel-600)',
+            boxShadow: `0 0 0 4px var(--ring-mabel)`,
           }}
         />
         {/* Native range — fully transparent appearance, custom thumb via ::-webkit-slider-thumb */}
@@ -73,7 +73,7 @@ export default function Slider({
       </div>
       <span
         className="min-w-[2.5rem] text-right text-sm tabular-nums font-medium"
-        style={{ color: 'var(--text-strong)' }}
+        style={{ color: 'var(--ink-900)' }}
       >
         {display}
       </span>
@@ -95,8 +95,8 @@ export default function Slider({
           width: 18px;
           height: 18px;
           border-radius: 9999px;
-          background: var(--bg-elevated);
-          border: 2px solid var(--accent);
+          background: #fff;
+          border: 2px solid var(--mabel-600);
           box-shadow: 0 1px 3px rgba(0,0,0,0.10);
           cursor: pointer;
           transition: transform 150ms ease-out;
@@ -109,17 +109,17 @@ export default function Slider({
           width: 18px;
           height: 18px;
           border-radius: 9999px;
-          background: var(--bg-elevated);
-          border: 2px solid var(--accent);
+          background: #fff;
+          border: 2px solid var(--mabel-600);
           box-shadow: 0 1px 3px rgba(0,0,0,0.10);
           cursor: pointer;
           transition: transform 150ms ease-out;
         }
         .mabel-slider:focus-visible::-webkit-slider-thumb {
-          box-shadow: 0 0 0 4px var(--accent-glow);
+          box-shadow: 0 0 0 4px var(--ring-mabel);
         }
         .mabel-slider:focus-visible::-moz-range-thumb {
-          box-shadow: 0 0 0 4px var(--accent-glow);
+          box-shadow: 0 0 0 4px var(--ring-mabel);
         }
       `}</style>
     </div>

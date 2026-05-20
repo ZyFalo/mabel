@@ -79,25 +79,25 @@ export default function Onboarding() {
   const progressPct = ((step + 1) / STEPS.length) * 100
 
   return (
-    <div className="min-h-screen w-full bg-[var(--bg)] flex flex-col items-center justify-center px-4 py-12 fade-in">
+    <div className="min-h-screen w-full bg-[var(--ink-50)] flex flex-col items-center justify-center px-4 py-12 fade-in">
       <div className="w-full max-w-xl">
         {/* Progress bar */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[12px] uppercase tracking-wider text-[var(--text-faint)]">
+            <p className="text-[12px] uppercase tracking-wider text-[var(--ink-400)]">
               Paso {step + 1} / {STEPS.length}
             </p>
-            <p className="text-[12px] font-medium text-[var(--text-muted)]">{STEPS[step]}</p>
+            <p className="text-[12px] font-medium text-[var(--ink-500)]">{STEPS[step]}</p>
           </div>
           <div
             className="h-1 rounded-full overflow-hidden"
-            style={{ backgroundColor: 'var(--border)' }}
+            style={{ backgroundColor: 'var(--ink-200)' }}
           >
             <div
               className="h-full transition-all duration-500 ease-out"
               style={{
                 width: `${progressPct}%`,
-                backgroundColor: 'var(--accent)',
+                backgroundColor: 'var(--mabel-600)',
               }}
             />
           </div>
@@ -106,16 +106,16 @@ export default function Onboarding() {
         {/* Card */}
         <div
           key={step}
-          className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 fade-in"
+          className="bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 fade-in"
         >
           {/* Step 1: Privacidad */}
           {step === 0 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-[24px] font-display italic text-[var(--text-strong)] mb-2">
+                <h2 className="text-[24px] font-display italic text-[var(--ink-900)] mb-2">
                   Privacidad
                 </h2>
-                <p className="text-[14px] text-[var(--text-muted)]">
+                <p className="text-[14px] text-[var(--ink-500)]">
                   Configura como Mabel IA maneja tu informacion.
                 </p>
               </div>
@@ -123,10 +123,10 @@ export default function Onboarding() {
               <div className="space-y-5">
                 <div className="flex items-start justify-between gap-4 py-2">
                   <div className="flex-1">
-                    <p className="text-[14px] font-medium text-[var(--text-strong)]">
+                    <p className="text-[14px] font-medium text-[var(--ink-900)]">
                       Guardar historial de conversaciones
                     </p>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                    <p className="text-[12px] text-[var(--ink-500)] mt-0.5 leading-relaxed">
                       Si esta desactivado, los mensajes no se guardan despues de cerrar la sesion.
                     </p>
                   </div>
@@ -139,16 +139,16 @@ export default function Onboarding() {
 
                 <div
                   className="h-px"
-                  style={{ backgroundColor: 'var(--border-subtle)' }}
+                  style={{ backgroundColor: 'var(--ink-100)' }}
                   aria-hidden="true"
                 />
 
                 <div className="flex items-start justify-between gap-4 py-2">
                   <div className="flex-1">
-                    <p className="text-[14px] font-medium text-[var(--text-strong)]">
+                    <p className="text-[14px] font-medium text-[var(--ink-900)]">
                       Check-in emocional al inicio
                     </p>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                    <p className="text-[12px] text-[var(--ink-500)] mt-0.5 leading-relaxed">
                       Te preguntaremos como te sientes antes de iniciar la conversacion.
                     </p>
                   </div>
@@ -166,10 +166,10 @@ export default function Onboarding() {
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-[24px] font-display italic text-[var(--text-strong)] mb-2">
+                <h2 className="text-[24px] font-display italic text-[var(--ink-900)] mb-2">
                   Accesibilidad
                 </h2>
-                <p className="text-[14px] text-[var(--text-muted)]">
+                <p className="text-[14px] text-[var(--ink-500)]">
                   Ajusta la interfaz a tus necesidades.
                 </p>
               </div>
@@ -177,8 +177,8 @@ export default function Onboarding() {
               <div className="space-y-5">
                 <div className="flex items-start justify-between gap-4 py-2">
                   <div className="flex-1">
-                    <p className="text-[14px] font-medium text-[var(--text-strong)]">Alto contraste</p>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                    <p className="text-[14px] font-medium text-[var(--ink-900)]">Alto contraste</p>
+                    <p className="text-[12px] text-[var(--ink-500)] mt-0.5">
                       Aumenta el contraste de colores para mejor legibilidad.
                     </p>
                   </div>
@@ -191,12 +191,12 @@ export default function Onboarding() {
 
                 <div
                   className="h-px"
-                  style={{ backgroundColor: 'var(--border-subtle)' }}
+                  style={{ backgroundColor: 'var(--ink-100)' }}
                   aria-hidden="true"
                 />
 
                 <div className="py-2">
-                  <p className="text-[14px] font-medium text-[var(--text-strong)] mb-3">
+                  <p className="text-[14px] font-medium text-[var(--ink-900)] mb-3">
                     Tamano de fuente
                   </p>
                   <Segmented
@@ -213,14 +213,14 @@ export default function Onboarding() {
 
                 <div
                   className="h-px"
-                  style={{ backgroundColor: 'var(--border-subtle)' }}
+                  style={{ backgroundColor: 'var(--ink-100)' }}
                   aria-hidden="true"
                 />
 
                 <div className="flex items-start justify-between gap-4 py-2">
                   <div className="flex-1">
-                    <p className="text-[14px] font-medium text-[var(--text-strong)]">Subtitulos TTS</p>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                    <p className="text-[14px] font-medium text-[var(--ink-900)]">Subtitulos TTS</p>
+                    <p className="text-[12px] text-[var(--ink-500)] mt-0.5">
                       Resalta el texto mientras Mabel habla.
                     </p>
                   </div>
@@ -238,17 +238,17 @@ export default function Onboarding() {
           {step === 2 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-[24px] font-display italic text-[var(--text-strong)] mb-2">
+                <h2 className="text-[24px] font-display italic text-[var(--ink-900)] mb-2">
                   Voz
                 </h2>
-                <p className="text-[14px] text-[var(--text-muted)]">
+                <p className="text-[14px] text-[var(--ink-500)]">
                   Configura como suena Mabel IA.
                 </p>
               </div>
 
               <div className="space-y-5">
                 <div className="py-2">
-                  <p className="text-[14px] font-medium text-[var(--text-strong)] mb-3">
+                  <p className="text-[14px] font-medium text-[var(--ink-900)] mb-3">
                     Voz del asistente
                   </p>
                   <NativeSelect
@@ -265,12 +265,12 @@ export default function Onboarding() {
 
                 <div
                   className="h-px"
-                  style={{ backgroundColor: 'var(--border-subtle)' }}
+                  style={{ backgroundColor: 'var(--ink-100)' }}
                   aria-hidden="true"
                 />
 
                 <div className="py-2">
-                  <p className="text-[14px] font-medium text-[var(--text-strong)] mb-3">
+                  <p className="text-[14px] font-medium text-[var(--ink-900)] mb-3">
                     Modo de interaccion
                   </p>
                   <Segmented
@@ -288,11 +288,11 @@ export default function Onboarding() {
           )}
 
           {/* Navigation */}
-          <div className="flex items-center gap-3 mt-8 pt-6 border-t border-[var(--border-subtle)]">
+          <div className="flex items-center gap-3 mt-8 pt-6 border-t border-[var(--ink-100)]">
             {step > 0 ? (
               <button
                 onClick={() => setStep(step - 1)}
-                className="px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+                className="px-5 py-2.5 border border-[var(--ink-300)] text-[var(--ink-700)] text-[13px] font-medium rounded-lg hover:bg-[var(--ink-100)] transition-colors"
               >
                 Anterior
               </button>
@@ -303,14 +303,14 @@ export default function Onboarding() {
             <button
               onClick={handleSkip}
               disabled={saving}
-              className="px-3 py-2.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors"
+              className="px-3 py-2.5 text-[13px] text-[var(--ink-500)] hover:text-[var(--ink-900)] transition-colors"
             >
               Omitir
             </button>
             {step < STEPS.length - 1 ? (
               <button
                 onClick={() => setStep(step + 1)}
-                className="px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity"
+                className="px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity"
               >
                 Siguiente
               </button>
@@ -318,7 +318,7 @@ export default function Onboarding() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="px-5 py-2.5 bg-[var(--mabel-600)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {saving ? 'Guardando...' : 'Finalizar'}
               </button>

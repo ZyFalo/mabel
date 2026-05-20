@@ -222,15 +222,15 @@ export default function Chat() {
           ) : !hasMessages ? (
             <div className="flex flex-col items-center justify-center min-h-[40vh] text-center fade-in">
               <div
-                className="w-10 h-10 rounded-full bg-[var(--bg-elevated)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)] mb-4"
+                className="w-10 h-10 rounded-full bg-[#fff] border border-[var(--ink-200)] flex items-center justify-center text-[var(--mabel-600)] mb-4"
                 aria-hidden="true"
               >
                 <Sparkles size={16} />
               </div>
-              <p className="font-display italic text-[20px] text-[var(--text-strong)] mb-1">
+              <p className="font-display italic text-[20px] text-[var(--ink-900)] mb-1">
                 Estoy aqui, escuchandote
               </p>
-              <p className="text-[13px] text-[var(--text-faint)]">
+              <p className="text-[13px] text-[var(--ink-400)]">
                 Cuentame, como te sientes hoy?
               </p>
             </div>
@@ -259,8 +259,8 @@ export default function Chat() {
                         <div
                           className="
                             max-w-[90%] sm:max-w-[85%] md:max-w-[80%]
-                            bg-[var(--bg-user-msg)]
-                            text-[var(--text-strong)]
+                            bg-[var(--ink-100)]
+                            text-[var(--ink-900)]
                             px-4 py-2.5
                             rounded-2xl rounded-br-md
                             text-[14.5px] leading-relaxed
@@ -270,7 +270,7 @@ export default function Chat() {
                         >
                           {msg.content}
                         </div>
-                        <span className="text-[10px] text-[var(--text-faint)] mt-1 mr-1">
+                        <span className="text-[10px] text-[var(--ink-400)] mt-1 mr-1">
                           {formatTime(msg.created_at)}
                         </span>
                       </div>
@@ -281,10 +281,10 @@ export default function Chat() {
                           <div
                             className="
                               w-7 h-7 rounded-full
-                              bg-[var(--bg-elevated)]
-                              border border-[var(--border)]
+                              bg-[#fff]
+                              border border-[var(--ink-200)]
                               flex items-center justify-center
-                              text-[var(--accent)]
+                              text-[var(--mabel-600)]
                             "
                             aria-hidden="true"
                           >
@@ -292,7 +292,7 @@ export default function Chat() {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0 pt-0.5">
-                          <div className="text-[15px] text-[var(--text-strong)] leading-relaxed">
+                          <div className="text-[15px] text-[var(--ink-900)] leading-relaxed">
                             {subtitlesActive ? (
                               /* PRESERVED: word-by-word subtitle highlighting */
                               <p className="whitespace-pre-wrap">
@@ -301,7 +301,7 @@ export default function Chat() {
                                     key={i}
                                     className={
                                       i === currentWordIndex
-                                        ? 'bg-[var(--accent)]/20 rounded px-0.5'
+                                        ? 'bg-[var(--mabel-600)]/20 rounded px-0.5'
                                         : ''
                                     }
                                   >
@@ -315,7 +315,7 @@ export default function Chat() {
                             )}
                             {isLastStreaming && (
                               <span
-                                className="inline-block w-[7px] h-[15px] bg-[var(--accent)] ml-1 -mb-0.5 align-middle animate-pulse"
+                                className="inline-block w-[7px] h-[15px] bg-[var(--mabel-600)] ml-1 -mb-0.5 align-middle animate-pulse"
                                 aria-hidden="true"
                               />
                             )}
@@ -326,7 +326,7 @@ export default function Chat() {
                             <div className="flex items-center gap-2 mt-3 min-h-[24px]">
                               {/* Persistent badge */}
                               {isReported && (
-                                <span className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]">
+                                <span className="text-[10px] uppercase tracking-wider text-[var(--ink-400)] px-1.5 py-0.5 rounded border border-[var(--ink-100)]">
                                   Ya reportado
                                 </span>
                               )}
@@ -337,7 +337,7 @@ export default function Chat() {
                                   onClick={() => handleCopy(msg.content)}
                                   title="Copiar"
                                   aria-label="Copiar mensaje"
-                                  className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-faint)] hover:text-[var(--text)] transition-colors"
+                                  className="p-1.5 rounded-md hover:bg-[var(--ink-100)] text-[var(--ink-400)] hover:text-[var(--ink-700)] transition-colors"
                                 >
                                   <Copy size={13} />
                                 </button>
@@ -347,12 +347,12 @@ export default function Chat() {
                                     onClick={() => setReportMessageId(msg.id)}
                                     title="Reportar mensaje"
                                     aria-label="Reportar mensaje"
-                                    className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
+                                    className="p-1.5 rounded-md hover:bg-[var(--ink-100)] text-[var(--ink-400)] hover:text-[var(--danger-600)] transition-colors"
                                   >
                                     <Flag size={13} />
                                   </button>
                                 )}
-                                <span className="ml-1 text-[10px] text-[var(--text-faint)]">
+                                <span className="ml-1 text-[10px] text-[var(--ink-400)]">
                                   {formatTime(msg.created_at)}
                                 </span>
                               </div>
@@ -374,10 +374,10 @@ export default function Chat() {
                       <div
                         className="
                           w-7 h-7 rounded-full
-                          bg-[var(--bg-elevated)]
-                          border border-[var(--border)]
+                          bg-[#fff]
+                          border border-[var(--ink-200)]
                           flex items-center justify-center
-                          text-[var(--accent)]
+                          text-[var(--mabel-600)]
                         "
                         aria-hidden="true"
                       >
@@ -385,10 +385,10 @@ export default function Chat() {
                       </div>
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                      <div className="text-[15px] text-[var(--text-strong)] leading-relaxed whitespace-pre-wrap">
+                      <div className="text-[15px] text-[var(--ink-900)] leading-relaxed whitespace-pre-wrap">
                         {streamingText}
                         <span
-                          className="inline-block w-[7px] h-[15px] bg-[var(--accent)] ml-1 -mb-0.5 align-middle animate-pulse"
+                          className="inline-block w-[7px] h-[15px] bg-[var(--mabel-600)] ml-1 -mb-0.5 align-middle animate-pulse"
                           aria-hidden="true"
                         />
                       </div>
@@ -404,10 +404,10 @@ export default function Chat() {
                     <div
                       className="
                         w-7 h-7 rounded-full
-                        bg-[var(--bg-elevated)]
-                        border border-[var(--border)]
+                        bg-[#fff]
+                        border border-[var(--ink-200)]
                         flex items-center justify-center
-                        text-[var(--accent)]
+                        text-[var(--mabel-600)]
                       "
                       aria-hidden="true"
                     >
@@ -416,15 +416,15 @@ export default function Chat() {
                   </div>
                   <div className="flex items-center gap-1 pt-2">
                     <span
-                      className="w-1.5 h-1.5 bg-[var(--text-faint)] rounded-full animate-bounce"
+                      className="w-1.5 h-1.5 bg-[var(--ink-400)] rounded-full animate-bounce"
                       style={{ animationDelay: '0ms' }}
                     />
                     <span
-                      className="w-1.5 h-1.5 bg-[var(--text-faint)] rounded-full animate-bounce"
+                      className="w-1.5 h-1.5 bg-[var(--ink-400)] rounded-full animate-bounce"
                       style={{ animationDelay: '150ms' }}
                     />
                     <span
-                      className="w-1.5 h-1.5 bg-[var(--text-faint)] rounded-full animate-bounce"
+                      className="w-1.5 h-1.5 bg-[var(--ink-400)] rounded-full animate-bounce"
                       style={{ animationDelay: '300ms' }}
                     />
                   </div>
@@ -454,7 +454,7 @@ export default function Chat() {
             maxLength={2000}
             showHint={false}
           />
-          <p className="text-center text-[11px] text-[var(--text-faint)] mt-2.5 px-4 leading-relaxed">
+          <p className="text-center text-[11px] text-[var(--ink-400)] mt-2.5 px-4 leading-relaxed">
             Mabel es una asistente de psicoeducacion. No reemplaza atencion profesional.
             Lineas de ayuda disponibles via SOS.
           </p>

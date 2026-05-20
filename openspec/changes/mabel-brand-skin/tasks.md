@@ -2,8 +2,8 @@
 
 ### Capability 6.1 — tokens-and-typography
 
-- [ ] 1. Replace `frontend/src/index.css` content (keep the `@import "tailwindcss"` line) with the full prototype palette: `--mabel-50..900`, `--ink-50..900`, `--gray-50..700`, semantic colors (success/warn/danger/info), spacing 4px grid `--space-1..13`, radii `--r-xs..3xl + --r-full`, borders, shadows including `--shadow-brand`, `--ring-mabel`/`--ring-danger`, motion (`--ease-out`, `--ease-in-out`, `--dur-fast/base/slow`), layout vars
-- [ ] 2. Remove all references to legacy CSS vars (`--bg`, `--bg-elevated`, `--bg-sidebar`, `--bg-hover`, `--bg-active`, `--bg-user-msg`, `--bg-code`, `--border`, `--border-subtle`, `--border-strong`, `--text`, `--text-strong`, `--text-muted`, `--text-faint`, `--text-placeholder`, `--accent`, `--accent-glow`) from TSX/CSS. Migrate each usage to the appropriate prototype var. Common mappings:
+- [x] 1. Replace `frontend/src/index.css` content (keep the `@import "tailwindcss"` line) with the full prototype palette: `--mabel-50..900`, `--ink-50..900`, `--gray-50..700`, semantic colors (success/warn/danger/info), spacing 4px grid `--space-1..13`, radii `--r-xs..3xl + --r-full`, borders, shadows including `--shadow-brand`, `--ring-mabel`/`--ring-danger`, motion (`--ease-out`, `--ease-in-out`, `--dur-fast/base/slow`), layout vars
+- [x] 2. Remove all references to legacy CSS vars (`--bg`, `--bg-elevated`, `--bg-sidebar`, `--bg-hover`, `--bg-active`, `--bg-user-msg`, `--bg-code`, `--border`, `--border-subtle`, `--border-strong`, `--text`, `--text-strong`, `--text-muted`, `--text-faint`, `--text-placeholder`, `--accent`, `--accent-glow`) from TSX/CSS. Migrate each usage to the appropriate prototype var. Common mappings:
   - `--bg` → `var(--ink-50)`
   - `--bg-elevated` → `#fff`
   - `--bg-sidebar` → `var(--ink-50)`
@@ -22,9 +22,9 @@
   - `--accent-glow` → `var(--ring-mabel)`
   - `--danger` → `var(--danger-600)`
   - `--success` → `var(--success-600)`
-- [ ] 3. Update `index.css` @import: load `Nunito:wght@400;500;600;700;800` from Google Fonts; REMOVE Fraunces. Define `--font-sans: 'Nunito', ...`, `--font-ui: 'Inter', ...`. `.font-display` uses `var(--font-sans)` with Nunito.
-- [ ] 4. Preserve animations: keep `@keyframes fadeUp/fadeIn/scaleIn` and utility classes. Adjust fadeUp `translateY` from 8px to **6px** per prototype.
-- [ ] 5. Verify: `cd frontend && npx tsc --noEmit` clean + `npm run build` success. Visit / page on browser — verify Nunito is loaded (Network tab) and that no element looks broken (cream `ink-50` bg should be default).
+- [x] 3. Update `index.css` @import: load `Nunito:wght@400;500;600;700;800` from Google Fonts; REMOVE Fraunces. Define `--font-sans: 'Nunito', ...`, `--font-ui: 'Inter', ...`. `.font-display` uses `var(--font-sans)` with Nunito.
+- [x] 4. Preserve animations: keep `@keyframes fadeUp/fadeIn/scaleIn` and utility classes. Adjust fadeUp `translateY` from 8px to **6px** per prototype.
+- [x] 5. Verify: `cd frontend && npx tsc --noEmit` clean + `npm run build` success. Visit / page on browser — verify Nunito is loaded (Network tab) and that no element looks broken (cream `ink-50` bg should be default).
 
 ### Capability 6.2 — sidebar-skin
 

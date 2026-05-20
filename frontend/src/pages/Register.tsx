@@ -8,10 +8,10 @@ function getPasswordStrength(pw: string): { label: string; varName: string; pct:
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^a-zA-Z0-9]/.test(pw)) score++
-  if (score <= 1) return { label: 'Debil', varName: 'var(--danger)', pct: 25 }
-  if (score === 2) return { label: 'Regular', varName: 'var(--warning)', pct: 50 }
-  if (score === 3) return { label: 'Buena', varName: 'var(--warning)', pct: 75 }
-  return { label: 'Fuerte', varName: 'var(--success)', pct: 100 }
+  if (score <= 1) return { label: 'Debil', varName: 'var(--danger-600)', pct: 25 }
+  if (score === 2) return { label: 'Regular', varName: 'var(--warn-600)', pct: 50 }
+  if (score === 3) return { label: 'Buena', varName: 'var(--warn-600)', pct: 75 }
+  return { label: 'Fuerte', varName: 'var(--success-600)', pct: 100 }
 }
 
 export default function Register() {
@@ -60,15 +60,15 @@ export default function Register() {
   }
 
   const inputClass =
-    'w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors'
+    'w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors'
 
   return (
-    <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
           Crear cuenta
         </h1>
-        <p className="text-[14px] text-[var(--text-muted)] text-center mb-8">
+        <p className="text-[14px] text-[var(--ink-500)] text-center mb-8">
           Comienza tu acompanamiento con Mabel IA.
         </p>
 
@@ -76,9 +76,9 @@ export default function Register() {
           <div
             className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
             style={{
-              backgroundColor: 'var(--bg-hover)',
-              color: 'var(--danger)',
-              borderColor: 'var(--border-subtle)',
+              backgroundColor: 'var(--ink-100)',
+              color: 'var(--danger-600)',
+              borderColor: 'var(--ink-100)',
             }}
           >
             {toast}
@@ -88,7 +88,7 @@ export default function Register() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Display name */}
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Nombre</label>
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Nombre</label>
             <input
               type="text"
               value={form.display_name}
@@ -97,7 +97,7 @@ export default function Register() {
               placeholder="Tu nombre"
             />
             {errors.display_name && (
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger)' }}>
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger-600)' }}>
                 {errors.display_name}
               </p>
             )}
@@ -105,7 +105,7 @@ export default function Register() {
 
           {/* Email */}
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Email institucional</label>
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Email institucional</label>
             <input
               type="email"
               value={form.email}
@@ -114,7 +114,7 @@ export default function Register() {
               placeholder="usuario@est.umb.edu.co"
             />
             {errors.email && (
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger)' }}>
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger-600)' }}>
                 {errors.email}
               </p>
             )}
@@ -122,7 +122,7 @@ export default function Register() {
 
           {/* Password */}
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Contrasena</label>
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Contrasena</label>
             <input
               type="password"
               value={form.password}
@@ -134,20 +134,20 @@ export default function Register() {
               <div className="mt-2">
                 <div
                   className="h-1.5 rounded-full overflow-hidden"
-                  style={{ backgroundColor: 'var(--bg-hover)' }}
+                  style={{ backgroundColor: 'var(--ink-100)' }}
                 >
                   <div
                     className="h-full transition-all"
                     style={{ width: `${strength.pct}%`, backgroundColor: strength.varName }}
                   />
                 </div>
-                <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--ink-400)' }}>
                   {strength.label}
                 </p>
               </div>
             )}
             {errors.password && (
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger)' }}>
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger-600)' }}>
                 {errors.password}
               </p>
             )}
@@ -155,7 +155,7 @@ export default function Register() {
 
           {/* Confirm */}
           <div>
-            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Confirmar contrasena</label>
+            <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Confirmar contrasena</label>
             <input
               type="password"
               value={form.confirm}
@@ -164,7 +164,7 @@ export default function Register() {
               placeholder="Repite la contrasena"
             />
             {errors.confirm && (
-              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger)' }}>
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger-600)' }}>
                 {errors.confirm}
               </p>
             )}
@@ -173,15 +173,15 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
+            className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
           >
             {loading ? 'Registrando...' : 'Registrarse'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-[13px] text-[var(--text-muted)]">
+        <p className="mt-6 text-center text-[13px] text-[var(--ink-500)]">
           Ya tienes cuenta?{' '}
-          <Link to="/login" className="text-[var(--accent)] font-medium hover:underline">
+          <Link to="/login" className="text-[var(--mabel-600)] font-medium hover:underline">
             Inicia sesion
           </Link>
         </p>

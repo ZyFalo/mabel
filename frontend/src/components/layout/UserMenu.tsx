@@ -95,26 +95,26 @@ export default function UserMenu({ open, onClose, anchorRef }: UserMenuProps) {
       aria-label="Menu de usuario"
       className="absolute bottom-full left-3 right-3 mb-2 rounded-xl shadow-lg overflow-hidden scale-in z-40"
       style={{
-        backgroundColor: 'var(--bg-elevated)',
+        backgroundColor: '#fff',
         borderWidth: '1px',
         borderStyle: 'solid',
-        borderColor: 'var(--border)',
+        borderColor: 'var(--ink-200)',
       }}
     >
       {/* Header: name + email */}
       <div
         className="px-4 py-3 border-b"
-        style={{ borderColor: 'var(--border-subtle)' }}
+        style={{ borderColor: 'var(--ink-100)' }}
       >
         <div
           className="text-[13px] font-medium truncate"
-          style={{ color: 'var(--text-strong)' }}
+          style={{ color: 'var(--ink-900)' }}
         >
           {user?.display_name || 'Usuario'}
         </div>
         <div
           className="text-[11.5px] truncate mt-0.5"
-          style={{ color: 'var(--text-faint)' }}
+          style={{ color: 'var(--ink-400)' }}
         >
           {user?.email}
         </div>
@@ -130,15 +130,15 @@ export default function UserMenu({ open, onClose, anchorRef }: UserMenuProps) {
               type="button"
               role="menuitem"
               onClick={() => handleSelect(item.to)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors hover:bg-[var(--bg-hover)]"
-              style={{ color: 'var(--text)' }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors hover:bg-[var(--ink-100)]"
+              style={{ color: 'var(--ink-700)' }}
             >
-              <Icon size={14} style={{ color: 'var(--text-muted)' }} />
+              <Icon size={14} style={{ color: 'var(--ink-500)' }} />
               <span className="flex-1">{item.label}</span>
               {item.shortcut && (
                 <span
                   className="text-[11px] tabular-nums"
-                  style={{ color: 'var(--text-faint)' }}
+                  style={{ color: 'var(--ink-400)' }}
                 >
                   {item.shortcut}
                 </span>
@@ -151,14 +151,14 @@ export default function UserMenu({ open, onClose, anchorRef }: UserMenuProps) {
       {/* Logout */}
       <div
         className="border-t py-1"
-        style={{ borderColor: 'var(--border-subtle)' }}
+        style={{ borderColor: 'var(--ink-100)' }}
       >
         <button
           type="button"
           role="menuitem"
           onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors hover:bg-[var(--bg-hover)]"
-          style={{ color: 'var(--danger)' }}
+          className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors hover:bg-[var(--ink-100)]"
+          style={{ color: 'var(--danger-600)' }}
         >
           <LogOut size={14} />
           <span>Cerrar sesion</span>

@@ -23,12 +23,12 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
-      <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
-        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+    <div className="min-h-screen w-full bg-[var(--ink-50)] flex items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-md bg-[#fff] border border-[var(--ink-200)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--ink-900)] text-center mb-2">
           Recuperar contrasena
         </h1>
-        <p className="text-[14px] text-[var(--text-muted)] text-center mb-8">
+        <p className="text-[14px] text-[var(--ink-500)] text-center mb-8">
           Ingresa tu email y te enviaremos instrucciones.
         </p>
 
@@ -37,9 +37,9 @@ export default function ForgotPassword() {
             <div
               className="p-4 text-[13px] rounded-lg border"
               style={{
-                backgroundColor: 'var(--bg-hover)',
-                color: 'var(--success)',
-                borderColor: 'var(--border-subtle)',
+                backgroundColor: 'var(--ink-100)',
+                color: 'var(--success-600)',
+                borderColor: 'var(--ink-100)',
               }}
             >
               Si el email esta registrado, recibiras instrucciones.
@@ -48,14 +48,14 @@ export default function ForgotPassword() {
               <div
                 className="p-4 rounded-lg border"
                 style={{
-                  backgroundColor: 'var(--bg-hover)',
-                  borderColor: 'var(--border-subtle)',
+                  backgroundColor: 'var(--ink-100)',
+                  borderColor: 'var(--ink-100)',
                 }}
               >
-                <p className="text-[13px] font-medium text-[var(--text-strong)] mb-2">Enlace simulado (MVP):</p>
+                <p className="text-[13px] font-medium text-[var(--ink-900)] mb-2">Enlace simulado (MVP):</p>
                 <Link
                   to={resetLink}
-                  className="text-[12px] text-[var(--accent)] break-all hover:underline"
+                  className="text-[12px] text-[var(--mabel-600)] break-all hover:underline"
                 >
                   {window.location.origin}
                   {resetLink}
@@ -64,7 +64,7 @@ export default function ForgotPassword() {
             )}
             <Link
               to="/login"
-              className="block text-center text-[13px] text-[var(--accent)] hover:underline"
+              className="block text-center text-[13px] text-[var(--mabel-600)] hover:underline"
             >
               Volver al login
             </Link>
@@ -72,12 +72,12 @@ export default function ForgotPassword() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Email</label>
+              <label className="block text-[13px] font-medium text-[var(--ink-700)] mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors"
+                className="w-full bg-[#fff] border border-[var(--ink-200)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--ink-700)] placeholder:text-[var(--ink-400)] focus:border-[var(--mabel-600)] focus:outline-none transition-colors"
                 placeholder="tu@est.umb.edu.co"
                 required
               />
@@ -85,13 +85,13 @@ export default function ForgotPassword() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+              className="w-full px-5 py-2.5 bg-[var(--mabel-600)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {loading ? 'Enviando...' : 'Enviar enlace'}
             </button>
             <Link
               to="/login"
-              className="block text-center text-[13px] text-[var(--accent)] hover:underline pt-2"
+              className="block text-center text-[13px] text-[var(--mabel-600)] hover:underline pt-2"
             >
               Volver al login
             </Link>

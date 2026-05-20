@@ -38,7 +38,7 @@ const TABS: { id: TabId; icon: typeof Lock; label: string }[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Section header (Fraunces italic + supporting description + bottom border)
+// Section header (font-display Nunito + supporting description + bottom border)
 // ---------------------------------------------------------------------------
 
 interface SectionHeaderProps {
@@ -50,18 +50,18 @@ function SectionHeader({ title, description }: SectionHeaderProps) {
   return (
     <div
       className="mb-2 pb-4 border-b"
-      style={{ borderColor: 'var(--border-subtle)' }}
+      style={{ borderColor: 'var(--ink-100)' }}
     >
       <h2
         className="text-[20px] font-display italic"
-        style={{ color: 'var(--text-strong)' }}
+        style={{ color: 'var(--ink-900)' }}
       >
         {title}
       </h2>
       {description ? (
         <p
           className="text-[13px] mt-1"
-          style={{ color: 'var(--text-muted)' }}
+          style={{ color: 'var(--ink-500)' }}
         >
           {description}
         </p>
@@ -88,7 +88,7 @@ function SaveButton({ onClick, disabled, children }: SaveButtonProps) {
       disabled={disabled}
       className="mt-6 px-4 py-2 text-sm font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
       style={{
-        backgroundColor: 'var(--accent)',
+        backgroundColor: 'var(--mabel-600)',
         color: '#FFFFFF',
       }}
     >
@@ -105,11 +105,11 @@ function SettingsHeader({ onClose }: { onClose: () => void }) {
   return (
     <header
       className="h-12 flex items-center justify-between px-4 border-b shrink-0"
-      style={{ borderColor: 'var(--border-subtle)' }}
+      style={{ borderColor: 'var(--ink-100)' }}
     >
       <div
         className="text-[14.5px] font-display italic"
-        style={{ color: 'var(--text-strong)' }}
+        style={{ color: 'var(--ink-900)' }}
       >
         Configuracion
       </div>
@@ -119,10 +119,10 @@ function SettingsHeader({ onClose }: { onClose: () => void }) {
         title="Volver (Esc)"
         aria-label="Cerrar configuracion"
         className="p-1.5 rounded-md transition-colors"
-        style={{ color: 'var(--text-muted)' }}
+        style={{ color: 'var(--ink-500)' }}
         onMouseEnter={(e) => {
           ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-            'var(--bg-hover)'
+            'var(--ink-100)'
         }}
         onMouseLeave={(e) => {
           ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
@@ -149,7 +149,7 @@ function SettingsNav({ activeTab, onChange }: SettingsNavProps) {
     <nav
       aria-label="Secciones de configuracion"
       className="shrink-0 md:w-[220px] border-b md:border-b-0 md:border-r overflow-x-auto md:overflow-y-auto"
-      style={{ borderColor: 'var(--border-subtle)' }}
+      style={{ borderColor: 'var(--ink-100)' }}
     >
       <ul className="flex md:flex-col p-2 md:p-3 gap-0.5 whitespace-nowrap">
         {TABS.map((tab) => {
@@ -165,13 +165,13 @@ function SettingsNav({ activeTab, onChange }: SettingsNavProps) {
                   isActive ? 'font-medium' : ''
                 }`}
                 style={{
-                  backgroundColor: isActive ? 'var(--bg-active)' : 'transparent',
-                  color: isActive ? 'var(--text-strong)' : 'var(--text)',
+                  backgroundColor: isActive ? 'var(--mabel-50)' : 'transparent',
+                  color: isActive ? 'var(--ink-900)' : 'var(--ink-700)',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--bg-hover)'
+                      'var(--ink-100)'
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -184,7 +184,7 @@ function SettingsNav({ activeTab, onChange }: SettingsNavProps) {
                 <Icon
                   size={14}
                   style={{
-                    color: isActive ? 'var(--accent)' : 'currentColor',
+                    color: isActive ? 'var(--mabel-600)' : 'currentColor',
                   }}
                 />
                 <span>{tab.label}</span>
@@ -378,7 +378,7 @@ export default function Settings() {
   return (
     <div
       className="flex flex-col h-screen fade-in"
-      style={{ backgroundColor: 'var(--bg)' }}
+      style={{ backgroundColor: 'var(--ink-50)' }}
     >
       <SettingsHeader onClose={handleClose} />
 
@@ -622,9 +622,9 @@ function VoiceTab({
             disabled={previewPlaying}
             className="px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50"
             style={{
-              backgroundColor: 'var(--bg-hover)',
-              color: 'var(--text-strong)',
-              border: '1px solid var(--border-subtle)',
+              backgroundColor: 'var(--ink-100)',
+              color: 'var(--ink-900)',
+              border: '1px solid var(--ink-100)',
             }}
           >
             {previewPlaying ? 'Reproduciendo...' : 'Preview'}
@@ -674,7 +674,7 @@ function AccountTab({
         description="Tu identidad y opciones criticas."
       />
       <Field label="Email" description="No se puede cambiar el email.">
-        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-sm" style={{ color: 'var(--ink-500)' }}>
           {email || '-'}
         </span>
       </Field>
@@ -685,16 +685,16 @@ function AccountTab({
           onClick={onChangePassword}
           className="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors"
           style={{
-            backgroundColor: 'var(--bg-hover)',
-            color: 'var(--text-strong)',
+            backgroundColor: 'var(--ink-100)',
+            color: 'var(--ink-900)',
           }}
           onMouseEnter={(e) => {
             ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--bg-active)'
+              'var(--mabel-50)'
           }}
           onMouseLeave={(e) => {
             ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--bg-hover)'
+              'var(--ink-100)'
           }}
         >
           Cambiar contrasena
@@ -704,16 +704,16 @@ function AccountTab({
           onClick={onRevokeConsent}
           className="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors"
           style={{
-            backgroundColor: 'var(--bg-hover)',
-            color: 'var(--text-strong)',
+            backgroundColor: 'var(--ink-100)',
+            color: 'var(--ink-900)',
           }}
           onMouseEnter={(e) => {
             ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--bg-active)'
+              'var(--mabel-50)'
           }}
           onMouseLeave={(e) => {
             ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'var(--bg-hover)'
+              'var(--ink-100)'
           }}
         >
           Revocar consentimiento
@@ -723,17 +723,17 @@ function AccountTab({
           onClick={onDeleteAccount}
           className="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors"
           style={{
-            backgroundColor: 'color-mix(in srgb, var(--danger) 5%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)',
-            color: 'var(--danger)',
+            backgroundColor: 'color-mix(in srgb, var(--danger-600) 5%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--danger-600) 20%, transparent)',
+            color: 'var(--danger-600)',
           }}
           onMouseEnter={(e) => {
             ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'color-mix(in srgb, var(--danger) 10%, transparent)'
+              'color-mix(in srgb, var(--danger-600) 10%, transparent)'
           }}
           onMouseLeave={(e) => {
             ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              'color-mix(in srgb, var(--danger) 5%, transparent)'
+              'color-mix(in srgb, var(--danger-600) 5%, transparent)'
           }}
         >
           Eliminar cuenta
@@ -758,7 +758,7 @@ function ArcoTab({ onOpenExport }: ArcoTabProps) {
         title="Mis Datos (ARCO)"
         description="Ley 1581 de 2012 — derecho a Acceso, Rectificacion, Cancelacion y Oposicion."
       />
-      <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+      <p className="text-sm mb-6" style={{ color: 'var(--ink-500)' }}>
         Segun la Ley 1581 de 2012, tienes derecho a acceder, rectificar, cancelar
         y oponerte al tratamiento de tus datos personales. Descarga tu informacion
         en formato JSON o CSV para revisarla.
@@ -768,7 +768,7 @@ function ArcoTab({ onOpenExport }: ArcoTabProps) {
         onClick={onOpenExport}
         className="px-4 py-2 text-sm font-medium rounded-lg transition-opacity hover:opacity-90"
         style={{
-          backgroundColor: 'var(--accent)',
+          backgroundColor: 'var(--mabel-600)',
           color: '#FFFFFF',
         }}
       >

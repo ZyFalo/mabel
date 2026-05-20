@@ -21,7 +21,7 @@ function renderInline(input: string, keyBase: string): ReactNode[] {
     }
     if (m[1]) {
       out.push(
-        <strong key={`${keyBase}-b-${i}`} style={{ color: 'var(--text-strong)' }}>
+        <strong key={`${keyBase}-b-${i}`} style={{ color: 'var(--ink-900)' }}>
           {m[2]}
         </strong>,
       )
@@ -30,7 +30,7 @@ function renderInline(input: string, keyBase: string): ReactNode[] {
         <code
           key={`${keyBase}-c-${i}`}
           className="rounded px-1.5 py-0.5 text-[0.9em] font-mono"
-          style={{ backgroundColor: 'var(--bg-code)', color: 'var(--accent)' }}
+          style={{ backgroundColor: 'var(--ink-100)', color: 'var(--mabel-600)' }}
         >
           {m[4]}
         </code>,
@@ -46,7 +46,7 @@ function renderInline(input: string, keyBase: string): ReactNode[] {
             target="_blank"
             rel="noopener noreferrer"
             className="underline underline-offset-2"
-            style={{ color: 'var(--accent)' }}
+            style={{ color: 'var(--mabel-600)' }}
           >
             {label}
           </a>,
@@ -89,7 +89,7 @@ export default function Markdown({ text }: MarkdownProps) {
               <li key={`p-${pIdx}-li-${i}`} className="flex gap-3">
                 <span
                   className="shrink-0 tabular-nums font-medium"
-                  style={{ color: 'var(--accent)' }}
+                  style={{ color: 'var(--mabel-600)' }}
                 >
                   {num}.
                 </span>
@@ -106,7 +106,7 @@ export default function Markdown({ text }: MarkdownProps) {
             const body = l.trim().replace(/^-\s+/, '')
             return (
               <li key={`p-${pIdx}-li-${i}`} className="flex gap-3">
-                <span aria-hidden="true" className="shrink-0" style={{ color: 'var(--accent)' }}>
+                <span aria-hidden="true" className="shrink-0" style={{ color: 'var(--mabel-600)' }}>
                   •
                 </span>
                 <span>{renderInline(body, `p-${pIdx}-li-${i}`)}</span>

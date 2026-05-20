@@ -38,8 +38,8 @@ function RailButton({ icon, label, onClick, variant = 'default' }: RailButtonPro
     'relative group/btn w-9 h-9 flex items-center justify-center rounded-lg transition-colors'
   const styles =
     variant === 'prominent'
-      ? 'bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent)] hover:bg-[var(--bg-hover)] shadow-sm'
-      : 'text-[var(--text-muted)] hover:text-[var(--text-strong)] hover:bg-[var(--bg-hover)]'
+      ? 'bg-[#fff] border border-[var(--ink-200)] text-[var(--mabel-600)] hover:bg-[var(--ink-100)] shadow-sm'
+      : 'text-[var(--ink-500)] hover:text-[var(--ink-900)] hover:bg-[var(--ink-100)]'
   return (
     <button
       type="button"
@@ -50,7 +50,7 @@ function RailButton({ icon, label, onClick, variant = 'default' }: RailButtonPro
     >
       {icon}
       <span
-        className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md whitespace-nowrap text-[11px] font-medium opacity-0 group-hover/btn:opacity-100 transition-opacity duration-150 bg-[var(--text-strong)] text-[var(--bg)] shadow-md z-50"
+        className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md whitespace-nowrap text-[11px] font-medium opacity-0 group-hover/btn:opacity-100 transition-opacity duration-150 bg-[var(--ink-900)] text-[var(--ink-50)] shadow-md z-50"
         role="tooltip"
       >
         {label}
@@ -69,7 +69,7 @@ export default function CollapsedSidebar({
   const initials = getInitials(user?.display_name, user?.email)
 
   return (
-    <div className="h-full w-[56px] flex flex-col items-center py-3 bg-[var(--bg-sidebar)]">
+    <div className="h-full w-[56px] flex flex-col items-center py-3 bg-[var(--ink-50)]">
       {/* Top group */}
       <div className="flex flex-col items-center gap-1.5">
         <RailButton
@@ -119,12 +119,12 @@ export default function CollapsedSidebar({
           className="relative group/btn w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shadow-sm transition-transform hover:scale-[1.04]"
           style={{
             backgroundImage:
-              'linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 60%, black) 100%)',
+              'linear-gradient(135deg, var(--mabel-600) 0%, color-mix(in srgb, var(--mabel-600) 60%, black) 100%)',
           }}
         >
           {initials}
           <span
-            className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md whitespace-nowrap text-[11px] font-medium opacity-0 group-hover/btn:opacity-100 transition-opacity duration-150 bg-[var(--text-strong)] text-[var(--bg)] shadow-md z-50"
+            className="pointer-events-none absolute left-full ml-3 px-2 py-1 rounded-md whitespace-nowrap text-[11px] font-medium opacity-0 group-hover/btn:opacity-100 transition-opacity duration-150 bg-[var(--ink-900)] text-[var(--ink-50)] shadow-md z-50"
             role="tooltip"
           >
             {user?.display_name || user?.email || 'Cuenta'}
