@@ -5,6 +5,7 @@ import OnboardingGuard from './guards/OnboardingGuard'
 import ProtectedRoute from './guards/ProtectedRoute'
 import PublicRoute from './guards/PublicRoute'
 import RoleGuard from './guards/RoleGuard'
+import AdminLayout from './components/admin/AdminLayout'
 import StudentLayout from './components/layout/StudentLayout'
 import SessionExpiredModal from './components/ui/SessionExpiredModal'
 import ToastContainer from './components/ui/Toast'
@@ -27,12 +28,17 @@ import SessionEnd from './pages/SessionEnd'
 import Settings from './pages/Settings'
 import { useAuthStore } from './stores/authStore'
 
-function AdminPlaceholder() {
+function AdminPageStub({ title }: { title: string }) {
   return (
-    <div className="min-h-screen bg-bg-main flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-primary mb-4">Panel Admin</h1>
-        <p className="text-lg text-text-primary">En construccion (Fase 8)</p>
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-text-primary">{title}</h1>
+        <p className="text-sm text-text-primary/60 mt-1">En construccion (Fase 8)</p>
+      </div>
+      <div className="border border-dashed border-gray-300 rounded-lg p-10 text-center bg-white">
+        <p className="text-text-primary/50 text-sm">
+          Esta vista se implementara en una proxima capacidad de Fase 8.
+        </p>
       </div>
     </div>
   )
@@ -108,7 +114,16 @@ export default function App() {
         {/* Protected + RoleGuard: admin routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<RoleGuard role="admin" />}>
-            <Route path="/admin" element={<AdminPlaceholder />} />
+            <Route element={<AdminLayout />}>
+              <Route path="/admin" element={<AdminPageStub title="Dashboard" />} />
+              <Route path="/admin/users" element={<AdminPageStub title="Usuarios" />} />
+              <Route path="/admin/users/:id" element={<AdminPageStub title="Detalle de usuario" />} />
+              <Route path="/admin/reports" element={<AdminPageStub title="Reportes" />} />
+              <Route path="/admin/safety-events" element={<AdminPageStub title="Safety Events" />} />
+              <Route path="/admin/metrics" element={<AdminPageStub title="Metricas" />} />
+              <Route path="/admin/config" element={<AdminPageStub title="Configuracion" />} />
+              <Route path="/admin/logs" element={<AdminPageStub title="Logs de auditoria" />} />
+            </Route>
           </Route>
         </Route>
 

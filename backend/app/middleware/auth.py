@@ -54,6 +54,9 @@ def require_role(role: str) -> Callable:
     return role_dependency
 
 
+require_admin = require_role("admin")
+
+
 async def require_consent(
     current_user: User = Depends(get_current_user),
     db=Depends(get_db),
