@@ -83,7 +83,7 @@
 
 ### Verification & polish
 
-- [ ] 42. Backend: ensure `messages.content` is never serialized in any admin response (grep audit + add unit test if pytest is set up)
-- [ ] 43. Verify all admin pages render under `AdminLayout` and sidebar badges update via `adminStore` polling
-- [ ] 44. Run `npx tsc --noEmit` (frontend) and verify backend imports (`python -c "from app.main import app"`) without errors
+- [x] 42. Backend: ensure `messages.content` is never serialized in any admin response (grep audit + add unit test if pytest is set up)
+- [x] 43. Verify all admin pages render under `AdminLayout` and sidebar badges update via `adminStore` polling
+- [x] 44. Run `npx tsc --noEmit` (frontend) and verify backend imports (`python -c "from app.main import app"`) without errors
 - [ ] 45. Manual smoke test on `http://localhost:5173` with admin account: login redirect → dashboard KPIs → navigate each section → exercise filters → disable a test user → export CSV → verify audit_logs row
