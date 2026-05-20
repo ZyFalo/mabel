@@ -12,13 +12,12 @@
 }
 
 /* ============================================================
-   Design System v3 — CSS variables tokens (runtime-switchable)
-   Switched via <html data-theme="light"|"dark"|"auto">
+   Design System v3 — Light theme tokens (CSS variables)
+   Dark mode REMOVED para MVP (deferred — los hex permanecen en el
+   git history del commit dd9f411 si se decide reintroducir).
    ============================================================ */
 
-/* Light theme — default */
-:root,
-:root[data-theme="light"] {
+:root {
   --bg: #FAFAF7;
   --bg-elevated: #FFFFFF;
   --bg-sidebar: #F2F0EA;
@@ -39,56 +38,6 @@
   --danger: #DC2626;
   --success: #16A34A;
   --warning: #F59E0B;
-}
-
-/* Dark theme — explicit */
-:root[data-theme="dark"] {
-  --bg: #1F1D1A;
-  --bg-elevated: #2A2823;
-  --bg-sidebar: #161512;
-  --bg-hover: #34322C;
-  --bg-active: #423E35;
-  --bg-user-msg: #34322C;
-  --bg-code: #2D2B26;
-  --border: #34322C;
-  --border-subtle: #2A2823;
-  --border-strong: #52493D;
-  --text: #D4CFC1;
-  --text-strong: #F0EBD8;
-  --text-muted: #A09B8C;
-  --text-faint: #7A7567;
-  --text-placeholder: #6B6759;
-  --accent: #DC4844;
-  --accent-glow: rgba(220, 72, 68, 0.20);
-  --danger: #EF4444;
-  --success: #22C55E;
-  --warning: #FBBF24;
-}
-
-/* Auto theme — follows OS preference */
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="auto"] {
-    --bg: #1F1D1A;
-    --bg-elevated: #2A2823;
-    --bg-sidebar: #161512;
-    --bg-hover: #34322C;
-    --bg-active: #423E35;
-    --bg-user-msg: #34322C;
-    --bg-code: #2D2B26;
-    --border: #34322C;
-    --border-subtle: #2A2823;
-    --border-strong: #52493D;
-    --text: #D4CFC1;
-    --text-strong: #F0EBD8;
-    --text-muted: #A09B8C;
-    --text-faint: #7A7567;
-    --text-placeholder: #6B6759;
-    --accent: #DC4844;
-    --accent-glow: rgba(220, 72, 68, 0.20);
-    --danger: #EF4444;
-    --success: #22C55E;
-    --warning: #FBBF24;
-  }
 }
 
 /* ============================================================

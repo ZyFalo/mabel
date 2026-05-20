@@ -4,18 +4,13 @@ import {
   Lock,
   Eye,
   Volume2,
-  Palette,
   User,
   Database,
   X,
-  Sun,
-  Moon,
-  Monitor,
 } from 'lucide-react'
 import { usePreferencesStore } from '../stores/preferencesStore'
 import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
-import { useTheme, type ThemeMode } from '../hooks/useTheme'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import apiClient from '../api/client'
 import Toggle from '../components/ui/Toggle'
@@ -31,7 +26,6 @@ type TabId =
   | 'privacy'
   | 'accessibility'
   | 'voice'
-  | 'appearance'
   | 'account'
   | 'arco'
 
@@ -39,7 +33,6 @@ const TABS: { id: TabId; icon: typeof Lock; label: string }[] = [
   { id: 'privacy', icon: Lock, label: 'Privacidad' },
   { id: 'accessibility', icon: Eye, label: 'Accesibilidad' },
   { id: 'voice', icon: Volume2, label: 'Voz' },
-  { id: 'appearance', icon: Palette, label: 'Apariencia' },
   { id: 'account', icon: User, label: 'Cuenta' },
   { id: 'arco', icon: Database, label: 'Mis datos (ARCO)' },
 ]
@@ -212,7 +205,6 @@ const VALID_TABS: ReadonlySet<TabId> = new Set([
   'privacy',
   'accessibility',
   'voice',
-  'appearance',
   'account',
   'arco',
 ])
@@ -224,7 +216,6 @@ export default function Settings() {
   const updatePreferences = usePreferencesStore((s) => s.updatePreferences)
   const user = useAuthStore((s) => s.user)
   const addToast = useToastStore((s) => s.addToast)
-  const { theme, setTheme } = useTheme()
 
   // Local form state for each section
   const [saveHistory, setSaveHistory] = useState(false)
@@ -430,10 +421,6 @@ export default function Settings() {
                 previewVoice={previewVoice}
                 onSave={saveVoice}
               />
-            )}
-
-            {activeTab === 'appearance' && (
-              <ApariencaTab theme={theme} setTheme={setTheme} />
             )}
 
             {activeTab === 'account' && (
@@ -659,41 +646,6 @@ function VoiceTab({
         />
       </Field>
       <SaveButton onClick={onSave}>Guardar</SaveButton>
-    </section>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Apariencia Tab (NEW)
-// ---------------------------------------------------------------------------
-
-interface ApariencaTabProps {
-  theme: ThemeMode
-  setTheme: (v: ThemeMode) => void
-}
-
-function ApariencaTab({ theme, setTheme }: ApariencaTabProps) {
-  return (
-    <section>
-      <SectionHeader
-        title="Apariencia"
-        description="Tema visual y comportamiento de la interfaz."
-      />
-      <Field
-        label="Tema"
-        description="Claro, oscuro o automatico segun tu sistema. El cambio es inmediato y se persiste."
-      >
-        <Segmented<ThemeMode>
-          value={theme}
-          onChange={setTheme}
-          options={[
-            { value: 'light', label: 'Claro', icon: Sun },
-            { value: 'dark', label: 'Oscuro', icon: Moon },
-            { value: 'auto', label: 'Auto', icon: Monitor },
-          ]}
-          ariaLabel="Tema visual"
-        />
-      </Field>
     </section>
   )
 }

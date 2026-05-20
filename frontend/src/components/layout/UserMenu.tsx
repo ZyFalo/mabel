@@ -4,7 +4,6 @@ import {
   Lock,
   Eye,
   Volume2,
-  Palette,
   User,
   Database,
   LogOut,
@@ -33,7 +32,6 @@ const SETTINGS_ITEMS: MenuItem[] = [
   { id: 'privacy', label: 'Privacidad', icon: Lock, to: '/settings?tab=privacy' },
   { id: 'accessibility', label: 'Accesibilidad', icon: Eye, to: '/settings?tab=accessibility' },
   { id: 'voice', label: 'Voz', icon: Volume2, to: '/settings?tab=voice' },
-  { id: 'appearance', label: 'Apariencia', icon: Palette, to: '/settings?tab=appearance' },
   { id: 'account', label: 'Cuenta', icon: User, to: '/settings?tab=account' },
   { id: 'arco', label: 'Mis datos (ARCO)', icon: Database, to: '/settings?tab=arco' },
 ]
