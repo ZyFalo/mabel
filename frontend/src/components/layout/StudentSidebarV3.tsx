@@ -15,7 +15,6 @@ import { useAuthStore } from '../../stores/authStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
 import { useToastStore } from '../../stores/toastStore'
 import { SkeletonText } from '../ui/Skeleton'
-import CollapsedSidebar from './CollapsedSidebar'
 import UserMenu from './UserMenu'
 
 interface StudentSidebarV3Props {
@@ -36,9 +35,12 @@ interface SessionItem {
   topic_hint: string | null
 }
 
+const SIDEBAR_EXPANDED = 268
+const SIDEBAR_COLLAPSED = 60
+const COLLAPSE_DURATION = 280 // ms — keep in sync across container + labels
+
 /**
  * Group sessions into temporal buckets (most-recent first).
- * Buckets: Hoy, Ayer, Esta semana, Hace 30 dias, Anteriores.
  */
 function groupByDate(sessions: SessionItem[]) {
   const now = new Date()
@@ -95,7 +97,7 @@ function getInitials(name?: string | null, email?: string | null): string {
   return parts.map((p) => p.charAt(0).toUpperCase()).join('') || '?'
 }
 
-// ----- Inline primitives from prototype ----------------------------------
+// ----- Inline primitives --------------------------------------------------
 
 interface AvatarProps {
   initials: string
@@ -128,23 +130,64 @@ function Avatar({ initials, size = 28, bg = 'var(--mabel-600)', color = '#fff' }
   )
 }
 
+/**
+ * Inline-grid label wrapper that animates its width between 0 and auto via
+ * `grid-template-columns`. Keeps surrounding icons stable while collapsing.
+ */
+interface LabelProps {
+  open: boolean
+  children: React.ReactNode
+  /** Optional fixed delay for staggered fades. */
+  delay?: number
+}
+function Label({ open, children, delay = 0 }: LabelProps) {
+  return (
+    <span
+      aria-hidden={!open}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: open ? '1fr' : '0fr',
+        opacity: open ? 1 : 0,
+        transition: `grid-template-columns ${COLLAPSE_DURATION}ms var(--ease-out) ${delay}ms, opacity ${COLLAPSE_DURATION * 0.7}ms var(--ease-out) ${delay}ms`,
+        overflow: 'hidden',
+        flex: '1 1 auto',
+        minWidth: 0,
+      }}
+    >
+      <span
+        style={{
+          minWidth: 0,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {children}
+      </span>
+    </span>
+  )
+}
+
 interface SidebarItemProps {
   icon: typeof Search
   label: string
+  open: boolean
   active?: boolean
   onClick?: () => void
 }
-function SidebarItem({ icon: Icon, label, active, onClick }: SidebarItemProps) {
+function SidebarItem({ icon: Icon, label, open, active, onClick }: SidebarItemProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={open ? undefined : label}
       style={{
         width: '100%',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '9px 10px',
+        gap: open ? 10 : 0,
+        padding: open ? '9px 10px' : '9px 0',
+        justifyContent: open ? 'flex-start' : 'center',
         background: active ? 'var(--mabel-50)' : 'transparent',
         color: active ? 'var(--mabel-700)' : 'var(--ink-700)',
         border: 'none',
@@ -153,7 +196,7 @@ function SidebarItem({ icon: Icon, label, active, onClick }: SidebarItemProps) {
         fontSize: 13.5,
         fontWeight: active ? 600 : 500,
         fontFamily: 'var(--font-sans)',
-        transition: 'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
+        transition: `background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), padding ${COLLAPSE_DURATION}ms var(--ease-out), gap ${COLLAPSE_DURATION}ms var(--ease-out)`,
         textAlign: 'left',
       }}
       onMouseEnter={(e) => {
@@ -163,17 +206,8 @@ function SidebarItem({ icon: Icon, label, active, onClick }: SidebarItemProps) {
         if (!active) e.currentTarget.style.background = 'transparent'
       }}
     >
-      <Icon size={17} />
-      <span
-        style={{
-          flex: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {label}
-      </span>
+      <Icon size={17} style={{ flexShrink: 0 }} />
+      <Label open={open}>{label}</Label>
     </button>
   )
 }
@@ -242,7 +276,7 @@ function SessionRow({ session, active, onClick }: SessionRowProps) {
   )
 }
 
-// ----- Main component ---------------------------------------------------
+// ----- Main component ----------------------------------------------------
 
 export default function StudentSidebarV3({
   open,
@@ -266,7 +300,6 @@ export default function StudentSidebarV3({
     loadSessions()
   }, [loadSessions])
 
-  // `preferences.save_history` takes precedence when loaded; fallback to chatStore mirror.
   const historyEnabled =
     preferences && typeof preferences.save_history === 'boolean'
       ? preferences.save_history
@@ -315,58 +348,8 @@ export default function StudentSidebarV3({
     if (onOpenCrisis) onOpenCrisis()
   }
 
-  // Collapsed rail (only on non-mobile flow). Mobile drawer always renders the
-  // expanded variant — visibility is controlled by the parent via translate.
-  if (!open && !mobileDrawer) {
-    return (
-      <aside
-        className="h-full shrink-0 overflow-hidden border-r transition-[width] duration-300 ease-out relative"
-        style={{
-          width: 60,
-          background: 'var(--ink-50)',
-          borderColor: 'var(--ink-200)',
-        }}
-      >
-        <CollapsedSidebar
-          onExpand={onToggle}
-          onNewChat={handleNewSession}
-          onOpenSettings={handleSettings}
-          onOpenCrisis={handleOpenCrisis}
-          user={user}
-        />
-        {/* Floating toggle (also rendered on collapsed state) */}
-        <button
-          type="button"
-          onClick={onToggle}
-          title="Expandir"
-          aria-label="Expandir sidebar"
-          style={{
-            position: 'absolute',
-            top: 18,
-            right: -12,
-            zIndex: 6,
-            width: 24,
-            height: 24,
-            borderRadius: 999,
-            background: '#fff',
-            border: '1px solid var(--ink-200)',
-            boxShadow: 'var(--shadow-sm)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--ink-500)',
-            transition: 'color var(--dur-fast) var(--ease-out)',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--mabel-600)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-500)')}
-        >
-          <ChevronRight size={14} strokeWidth={2.25} />
-        </button>
-      </aside>
-    )
-  }
-
+  // Mobile drawer always renders the expanded variant.
+  const isOpen = open || mobileDrawer
   const groups = groupByDate(sessions as SessionItem[])
   const initials = getInitials(user?.display_name, user?.email)
   const displayName = user?.display_name || user?.email || 'Usuario'
@@ -375,7 +358,7 @@ export default function StudentSidebarV3({
   return (
     <aside
       style={{
-        width: 268,
+        width: isOpen ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
         height: '100%',
         flexShrink: 0,
         background: 'var(--ink-50)',
@@ -383,68 +366,75 @@ export default function StudentSidebarV3({
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        // Stacking: must beat the chat header's backdrop-filter stacking context
-        // so the floating collapse toggle (overflowing 12px to the right) stays
-        // visible above the main content.
         zIndex: 30,
-        transition: mobileDrawer ? undefined : 'width var(--dur-base) var(--ease-out)',
+        transition: mobileDrawer ? undefined : `width ${COLLAPSE_DURATION}ms var(--ease-out)`,
         fontFamily: 'var(--font-sans)',
+        overflow: 'hidden',
       }}
     >
-      {/* Brand header */}
+      {/* Brand header — Avatar M anchored left, label fades */}
       <div
         style={{
-          padding: '14px 16px',
+          padding: isOpen ? '14px 16px' : '14px 0',
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
+          gap: isOpen ? 10 : 0,
+          justifyContent: isOpen ? 'flex-start' : 'center',
+          transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out), gap ${COLLAPSE_DURATION}ms var(--ease-out)`,
         }}
       >
         <Avatar initials="M" size={28} />
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            lineHeight: 1.1,
-            minWidth: 0,
-          }}
-        >
+        <Label open={isOpen}>
           <span
             style={{
-              fontWeight: 700,
-              fontSize: 15,
-              color: 'var(--ink-900)',
-              letterSpacing: '-0.01em',
+              display: 'flex',
+              flexDirection: 'column',
+              lineHeight: 1.1,
+              minWidth: 0,
             }}
           >
-            Mabel
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: 15,
+                color: 'var(--ink-900)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Mabel
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--ink-400)',
+                fontWeight: 500,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              UMB · Bienestar
+            </span>
           </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: 'var(--ink-400)',
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            UMB · Bienestar
-          </span>
-        </div>
+        </Label>
       </div>
 
-      {/* Nueva sesion - primary CTA */}
-      <div style={{ padding: '0 12px' }}>
+      {/* Nueva sesion — primary CTA */}
+      <div
+        style={{
+          padding: isOpen ? '0 12px' : '0 10px',
+          transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
+        }}
+      >
         <button
           type="button"
           onClick={handleNewSession}
-          title="Nueva sesion"
+          title={isOpen ? undefined : 'Nueva sesion'}
           style={{
             width: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
-            padding: '10px 14px',
+            gap: isOpen ? 8 : 0,
+            padding: isOpen ? '10px 14px' : '10px 0',
             background: 'var(--mabel-600)',
             color: '#fff',
             border: 'none',
@@ -455,38 +445,46 @@ export default function StudentSidebarV3({
             cursor: 'pointer',
             letterSpacing: '-0.005em',
             boxShadow: 'var(--shadow-sm)',
-            transition: 'background var(--dur-fast) var(--ease-out)',
+            transition: `background var(--dur-fast) var(--ease-out), padding ${COLLAPSE_DURATION}ms var(--ease-out), gap ${COLLAPSE_DURATION}ms var(--ease-out)`,
           }}
           onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--mabel-700)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--mabel-600)')}
         >
-          <Plus size={16} strokeWidth={2.25} />
-          Nueva sesion
+          <Plus size={16} strokeWidth={2.25} style={{ flexShrink: 0 }} />
+          <Label open={isOpen}>Nueva sesion</Label>
         </button>
       </div>
 
       {/* Nav items */}
       <div
         style={{
-          padding: '8px 12px',
+          padding: isOpen ? '8px 12px' : '8px 10px',
           display: 'flex',
           flexDirection: 'column',
           gap: 2,
+          transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
         }}
       >
-        <SidebarItem icon={Search} label="Buscar sesiones" onClick={() => {}} />
-        <SidebarItem icon={MessageCircle} label="Conversaciones" active onClick={() => {}} />
+        <SidebarItem icon={Search} label="Buscar sesiones" open={isOpen} onClick={() => {}} />
+        <SidebarItem
+          icon={MessageCircle}
+          label="Conversaciones"
+          open={isOpen}
+          active
+          onClick={() => {}}
+        />
       </div>
 
-      {/* Sessions list */}
+      {/* Sessions list — fades and collapses height when sidebar is closed */}
       <div
         style={{
           flex: 1,
-          overflowY: 'auto',
-          padding: '0 12px 8px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
+          overflowY: isOpen ? 'auto' : 'hidden',
+          overflowX: 'hidden',
+          padding: isOpen ? '0 12px 8px' : '0',
+          opacity: isOpen ? 1 : 0,
+          pointerEvents: isOpen ? 'auto' : 'none',
+          transition: `opacity ${COLLAPSE_DURATION * 0.6}ms var(--ease-out), padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
         }}
       >
         {!historyEnabled ? (
@@ -575,17 +573,23 @@ export default function StudentSidebarV3({
       </div>
 
       {/* Sticky SOS — always above profile */}
-      <div style={{ padding: '0 12px 8px' }}>
+      <div
+        style={{
+          padding: isOpen ? '0 12px 8px' : '0 10px 8px',
+          transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
+        }}
+      >
         <button
           type="button"
           onClick={handleOpenCrisis}
-          title="Linea de crisis SOS"
+          title={isOpen ? undefined : 'Linea de crisis SOS'}
           style={{
             width: '100%',
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
-            padding: '10px 12px',
+            justifyContent: isOpen ? 'flex-start' : 'center',
+            gap: isOpen ? 10 : 0,
+            padding: isOpen ? '10px 12px' : '10px 0',
             background: 'var(--mabel-50)',
             color: 'var(--mabel-700)',
             border: '1px solid var(--mabel-100)',
@@ -594,22 +598,23 @@ export default function StudentSidebarV3({
             fontWeight: 600,
             fontFamily: 'var(--font-sans)',
             cursor: 'pointer',
-            transition: 'background var(--dur-fast) var(--ease-out)',
+            transition: `background var(--dur-fast) var(--ease-out), padding ${COLLAPSE_DURATION}ms var(--ease-out), gap ${COLLAPSE_DURATION}ms var(--ease-out), justify-content ${COLLAPSE_DURATION}ms var(--ease-out)`,
           }}
           onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--mabel-100)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--mabel-50)')}
         >
-          <AlertTriangle size={16} />
-          Linea de crisis SOS
+          <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+          <Label open={isOpen}>Linea de crisis SOS</Label>
         </button>
       </div>
 
       {/* Profile pill footer */}
       <div
         style={{
-          padding: '10px 12px 12px',
+          padding: isOpen ? '10px 12px 12px' : '10px 10px 12px',
           borderTop: '1px solid var(--ink-200)',
           position: 'relative',
+          transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
         }}
       >
         <button
@@ -619,19 +624,21 @@ export default function StudentSidebarV3({
           aria-haspopup="menu"
           aria-expanded={userMenuOpen}
           aria-label="Abrir menu de cuenta"
+          title={isOpen ? undefined : displayName}
           style={{
             width: '100%',
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
-            padding: '8px 10px',
+            justifyContent: isOpen ? 'flex-start' : 'center',
+            gap: isOpen ? 10 : 0,
+            padding: isOpen ? '8px 10px' : '8px 0',
             background: userMenuOpen ? 'var(--ink-100)' : 'transparent',
             border: 'none',
             borderRadius: 10,
             cursor: 'pointer',
             fontFamily: 'var(--font-sans)',
             textAlign: 'left',
-            transition: 'background var(--dur-fast) var(--ease-out)',
+            transition: `background var(--dur-fast) var(--ease-out), padding ${COLLAPSE_DURATION}ms var(--ease-out), gap ${COLLAPSE_DURATION}ms var(--ease-out)`,
           }}
           onMouseEnter={(e) => {
             if (!userMenuOpen) e.currentTarget.style.background = 'var(--ink-100)'
@@ -641,32 +648,36 @@ export default function StudentSidebarV3({
           }}
         >
           <Avatar initials={initials} size={32} />
-          <div style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-            <div
-              style={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: 'var(--ink-900)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {displayName}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: 'var(--ink-400)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {email}
-            </div>
-          </div>
-          <ChevronUp size={14} style={{ color: 'var(--ink-400)' }} />
+          <Label open={isOpen}>
+            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2, display: 'block' }}>
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: 'var(--ink-900)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {displayName}
+              </span>
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 11,
+                  color: 'var(--ink-400)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {email}
+              </span>
+            </span>
+          </Label>
+          {isOpen && <ChevronUp size={14} style={{ color: 'var(--ink-400)', flexShrink: 0 }} />}
         </button>
         <UserMenu
           open={userMenuOpen}
@@ -680,8 +691,8 @@ export default function StudentSidebarV3({
         <button
           type="button"
           onClick={onToggle}
-          title="Colapsar"
-          aria-label="Colapsar sidebar"
+          title={isOpen ? 'Colapsar' : 'Expandir'}
+          aria-label={isOpen ? 'Colapsar sidebar' : 'Expandir sidebar'}
           style={{
             position: 'absolute',
             top: 18,
@@ -703,7 +714,11 @@ export default function StudentSidebarV3({
           onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--mabel-600)')}
           onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-500)')}
         >
-          <ChevronLeft size={14} strokeWidth={2.25} />
+          {isOpen ? (
+            <ChevronLeft size={14} strokeWidth={2.25} />
+          ) : (
+            <ChevronRight size={14} strokeWidth={2.25} />
+          )}
         </button>
       )}
     </aside>

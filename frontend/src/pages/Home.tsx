@@ -101,11 +101,11 @@ export default function Home() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '32px 24px',
+        padding: '40px 24px',
         overflowY: 'auto',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 720, textAlign: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 640, textAlign: 'center' }}>
         {/* Mabel M avatar with brand shadow */}
         <div
           aria-hidden="true"

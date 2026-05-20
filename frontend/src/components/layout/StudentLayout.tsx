@@ -163,7 +163,7 @@ export default function StudentLayout() {
             onOpenCrisis={openCrisis}
           />
         )}
-        <main className="flex-1 overflow-y-auto bg-bg-main relative">
+        <main className="flex-1 overflow-y-auto bg-bg-main relative flex flex-col">
           <Outlet />
           <SosFab onOpen={openCrisis} />
         </main>
