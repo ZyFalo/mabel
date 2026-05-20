@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Type, MonitorSmartphone, Bot } from 'lucide-react'
+import Toggle from '../components/ui/Toggle'
+import Segmented from '../components/ui/Segmented'
+import NativeSelect from '../components/ui/NativeSelect'
 import { usePreferencesStore } from '../stores/preferencesStore'
 import { useToastStore } from '../stores/toastStore'
 
@@ -72,205 +76,255 @@ export default function Onboarding() {
     }
   }
 
+  const progressPct = ((step + 1) / STEPS.length) * 100
+
   return (
-    <div className="max-w-lg mx-auto py-8 px-4">
-      {/* Progress */}
-      <div className="flex items-center gap-2 mb-8">
-        {STEPS.map((s, i) => (
-          <div key={s} className="flex-1">
-            <div
-              className={`h-1.5 rounded-full transition-colors ${
-                i <= step ? 'bg-primary' : 'bg-gray-200'
-              }`}
-            />
-            <p
-              className={`text-xs mt-1.5 text-center ${
-                i === step ? 'text-primary font-medium' : 'text-text-primary/40'
-              }`}
-            >
-              {s}
+    <div className="min-h-screen w-full bg-[var(--bg)] flex flex-col items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-xl">
+        {/* Progress bar */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[12px] uppercase tracking-wider text-[var(--text-faint)]">
+              Paso {step + 1} / {STEPS.length}
             </p>
+            <p className="text-[12px] font-medium text-[var(--text-muted)]">{STEPS[step]}</p>
           </div>
-        ))}
-      </div>
-
-      <p className="text-sm text-text-primary/50 mb-6">
-        Paso {step + 1} de {STEPS.length}
-      </p>
-
-      {/* Step 1: Privacidad */}
-      {step === 0 && (
-        <div className="space-y-5">
-          <h2 className="text-xl font-bold text-text-primary">Privacidad</h2>
-          <p className="text-sm text-text-primary/60">
-            Configura como Mabel IA maneja tu informacion.
-          </p>
-
-          <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer">
-            <div>
-              <p className="text-sm font-medium text-text-primary">Guardar historial de conversaciones</p>
-              <p className="text-xs text-text-primary/50 mt-0.5">
-                Si esta desactivado, los mensajes no se guardan despues de cerrar la sesion.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              checked={form.save_history}
-              onChange={(e) => update('save_history', e.target.checked)}
-              className="w-5 h-5 rounded text-primary focus:ring-primary"
-            />
-          </label>
-
-          <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer">
-            <div>
-              <p className="text-sm font-medium text-text-primary">Check-in emocional al inicio</p>
-              <p className="text-xs text-text-primary/50 mt-0.5">
-                Te preguntaremos como te sientes antes de iniciar la conversacion.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              checked={form.checkin_enabled}
-              onChange={(e) => update('checkin_enabled', e.target.checked)}
-              className="w-5 h-5 rounded text-primary focus:ring-primary"
-            />
-          </label>
-        </div>
-      )}
-
-      {/* Step 2: Accesibilidad */}
-      {step === 1 && (
-        <div className="space-y-5">
-          <h2 className="text-xl font-bold text-text-primary">Accesibilidad</h2>
-          <p className="text-sm text-text-primary/60">
-            Ajusta la interfaz a tus necesidades.
-          </p>
-
-          <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer">
-            <div>
-              <p className="text-sm font-medium text-text-primary">Alto contraste</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={form.contrast}
-              onChange={(e) => update('contrast', e.target.checked)}
-              className="w-5 h-5 rounded text-primary focus:ring-primary"
-            />
-          </label>
-
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm font-medium text-text-primary mb-2">Tamano de fuente</p>
-            <div className="flex gap-2">
-              {(['small', 'normal', 'large'] as const).map((size) => (
-                <button
-                  key={size}
-                  onClick={() => update('font_size', size)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    form.font_size === size
-                      ? 'bg-primary text-white'
-                      : 'bg-white border border-gray-200 text-text-primary hover:border-primary/30'
-                  }`}
-                >
-                  {size === 'small' ? 'Pequena' : size === 'normal' ? 'Normal' : 'Grande'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer">
-            <div>
-              <p className="text-sm font-medium text-text-primary">Subtitulos TTS</p>
-              <p className="text-xs text-text-primary/50 mt-0.5">
-                Resalta el texto mientras Mabel habla.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              checked={form.subtitles}
-              onChange={(e) => update('subtitles', e.target.checked)}
-              className="w-5 h-5 rounded text-primary focus:ring-primary"
-            />
-          </label>
-        </div>
-      )}
-
-      {/* Step 3: Voz */}
-      {step === 2 && (
-        <div className="space-y-5">
-          <h2 className="text-xl font-bold text-text-primary">Voz</h2>
-          <p className="text-sm text-text-primary/60">
-            Configura como suena Mabel IA.
-          </p>
-
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm font-medium text-text-primary mb-2">Voz del asistente</p>
-            <select
-              value={form.tts_voice}
-              onChange={(e) => update('tts_voice', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-text-primary focus:border-primary focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Por defecto</option>
-              <option value="es-female-1">Femenina 1</option>
-              <option value="es-female-2">Femenina 2</option>
-              <option value="es-male-1">Masculina 1</option>
-            </select>
-          </div>
-
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm font-medium text-text-primary mb-2">Modo de interaccion</p>
-            <div className="flex gap-2">
-              {(['chat', 'avatar'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => update('preferred_chat_mode', mode)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    form.preferred_chat_mode === mode
-                      ? 'bg-primary text-white'
-                      : 'bg-white border border-gray-200 text-text-primary hover:border-primary/30'
-                  }`}
-                >
-                  {mode === 'chat' ? 'Chat clasico' : 'Avatar 3D'}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Navigation */}
-      <div className="flex gap-3 mt-8">
-        {step > 0 && (
-          <button
-            onClick={() => setStep(step - 1)}
-            className="px-5 py-2.5 border border-gray-200 text-sm font-medium rounded-lg text-text-primary hover:bg-gray-50 transition-colors"
+          <div
+            className="h-1 rounded-full overflow-hidden"
+            style={{ backgroundColor: 'var(--border)' }}
           >
-            Anterior
-          </button>
-        )}
-        <div className="flex-1" />
-        <button
-          onClick={handleSkip}
-          disabled={saving}
-          className="px-5 py-2.5 text-sm text-text-primary/50 hover:text-text-primary transition-colors"
+            <div
+              className="h-full transition-all duration-500 ease-out"
+              style={{
+                width: `${progressPct}%`,
+                backgroundColor: 'var(--accent)',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Card */}
+        <div
+          key={step}
+          className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 fade-in"
         >
-          Omitir
-        </button>
-        {step < STEPS.length - 1 ? (
-          <button
-            onClick={() => setStep(step + 1)}
-            className="px-5 py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            Siguiente
-          </button>
-        ) : (
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-5 py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {saving ? 'Guardando...' : 'Empezar'}
-          </button>
-        )}
+          {/* Step 1: Privacidad */}
+          {step === 0 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-[24px] font-display italic text-[var(--text-strong)] mb-2">
+                  Privacidad
+                </h2>
+                <p className="text-[14px] text-[var(--text-muted)]">
+                  Configura como Mabel IA maneja tu informacion.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div className="flex items-start justify-between gap-4 py-2">
+                  <div className="flex-1">
+                    <p className="text-[14px] font-medium text-[var(--text-strong)]">
+                      Guardar historial de conversaciones
+                    </p>
+                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                      Si esta desactivado, los mensajes no se guardan despues de cerrar la sesion.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={form.save_history}
+                    onChange={(v) => update('save_history', v)}
+                    label="Guardar historial"
+                  />
+                </div>
+
+                <div
+                  className="h-px"
+                  style={{ backgroundColor: 'var(--border-subtle)' }}
+                  aria-hidden="true"
+                />
+
+                <div className="flex items-start justify-between gap-4 py-2">
+                  <div className="flex-1">
+                    <p className="text-[14px] font-medium text-[var(--text-strong)]">
+                      Check-in emocional al inicio
+                    </p>
+                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                      Te preguntaremos como te sientes antes de iniciar la conversacion.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={form.checkin_enabled}
+                    onChange={(v) => update('checkin_enabled', v)}
+                    label="Check-in"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Accesibilidad */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-[24px] font-display italic text-[var(--text-strong)] mb-2">
+                  Accesibilidad
+                </h2>
+                <p className="text-[14px] text-[var(--text-muted)]">
+                  Ajusta la interfaz a tus necesidades.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div className="flex items-start justify-between gap-4 py-2">
+                  <div className="flex-1">
+                    <p className="text-[14px] font-medium text-[var(--text-strong)]">Alto contraste</p>
+                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                      Aumenta el contraste de colores para mejor legibilidad.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={form.contrast}
+                    onChange={(v) => update('contrast', v)}
+                    label="Alto contraste"
+                  />
+                </div>
+
+                <div
+                  className="h-px"
+                  style={{ backgroundColor: 'var(--border-subtle)' }}
+                  aria-hidden="true"
+                />
+
+                <div className="py-2">
+                  <p className="text-[14px] font-medium text-[var(--text-strong)] mb-3">
+                    Tamano de fuente
+                  </p>
+                  <Segmented
+                    ariaLabel="Tamano de fuente"
+                    value={form.font_size}
+                    onChange={(v) => update('font_size', v)}
+                    options={[
+                      { value: 'small', label: 'Pequena', icon: Type },
+                      { value: 'normal', label: 'Normal', icon: Type },
+                      { value: 'large', label: 'Grande', icon: Type },
+                    ]}
+                  />
+                </div>
+
+                <div
+                  className="h-px"
+                  style={{ backgroundColor: 'var(--border-subtle)' }}
+                  aria-hidden="true"
+                />
+
+                <div className="flex items-start justify-between gap-4 py-2">
+                  <div className="flex-1">
+                    <p className="text-[14px] font-medium text-[var(--text-strong)]">Subtitulos TTS</p>
+                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                      Resalta el texto mientras Mabel habla.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={form.subtitles}
+                    onChange={(v) => update('subtitles', v)}
+                    label="Subtitulos"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Voz */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-[24px] font-display italic text-[var(--text-strong)] mb-2">
+                  Voz
+                </h2>
+                <p className="text-[14px] text-[var(--text-muted)]">
+                  Configura como suena Mabel IA.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div className="py-2">
+                  <p className="text-[14px] font-medium text-[var(--text-strong)] mb-3">
+                    Voz del asistente
+                  </p>
+                  <NativeSelect
+                    value={form.tts_voice}
+                    onChange={(v) => update('tts_voice', v)}
+                    ariaLabel="Voz del asistente"
+                  >
+                    <option value="">Por defecto</option>
+                    <option value="es-female-1">Femenina 1</option>
+                    <option value="es-female-2">Femenina 2</option>
+                    <option value="es-male-1">Masculina 1</option>
+                  </NativeSelect>
+                </div>
+
+                <div
+                  className="h-px"
+                  style={{ backgroundColor: 'var(--border-subtle)' }}
+                  aria-hidden="true"
+                />
+
+                <div className="py-2">
+                  <p className="text-[14px] font-medium text-[var(--text-strong)] mb-3">
+                    Modo de interaccion
+                  </p>
+                  <Segmented
+                    ariaLabel="Modo de interaccion"
+                    value={form.preferred_chat_mode}
+                    onChange={(v) => update('preferred_chat_mode', v)}
+                    options={[
+                      { value: 'chat', label: 'Chat clasico', icon: MonitorSmartphone },
+                      { value: 'avatar', label: 'Avatar 3D', icon: Bot },
+                    ]}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div className="flex items-center gap-3 mt-8 pt-6 border-t border-[var(--border-subtle)]">
+            {step > 0 ? (
+              <button
+                onClick={() => setStep(step - 1)}
+                className="px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                Anterior
+              </button>
+            ) : (
+              <div className="w-[88px]" />
+            )}
+            <div className="flex-1" />
+            <button
+              onClick={handleSkip}
+              disabled={saving}
+              className="px-3 py-2.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors"
+            >
+              Omitir
+            </button>
+            {step < STEPS.length - 1 ? (
+              <button
+                onClick={() => setStep(step + 1)}
+                className="px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Siguiente
+              </button>
+            ) : (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+              >
+                {saving ? 'Guardando...' : 'Finalizar'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

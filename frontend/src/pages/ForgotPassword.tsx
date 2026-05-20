@@ -23,39 +23,61 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-main flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <h1 className="text-3xl font-bold text-primary mb-4 text-center">Recuperar contrasena</h1>
-        <p className="text-sm text-text-primary/60 text-center mb-8">
-          Ingresa tu email y te enviaremos instrucciones
+    <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+          Recuperar contrasena
+        </h1>
+        <p className="text-[14px] text-[var(--text-muted)] text-center mb-8">
+          Ingresa tu email y te enviaremos instrucciones.
         </p>
 
         {sent ? (
           <div className="space-y-4">
-            <div className="p-4 bg-success/10 text-success text-sm rounded-lg">
+            <div
+              className="p-4 text-[13px] rounded-lg border"
+              style={{
+                backgroundColor: 'var(--bg-hover)',
+                color: 'var(--success)',
+                borderColor: 'var(--border-subtle)',
+              }}
+            >
               Si el email esta registrado, recibiras instrucciones.
             </div>
             {resetLink && (
-              <div className="p-4 bg-warning/10 rounded-lg">
-                <p className="text-sm font-medium text-text-primary mb-2">Enlace simulado (MVP):</p>
-                <Link to={resetLink} className="text-sm text-primary break-all hover:underline">
-                  {window.location.origin}{resetLink}
+              <div
+                className="p-4 rounded-lg border"
+                style={{
+                  backgroundColor: 'var(--bg-hover)',
+                  borderColor: 'var(--border-subtle)',
+                }}
+              >
+                <p className="text-[13px] font-medium text-[var(--text-strong)] mb-2">Enlace simulado (MVP):</p>
+                <Link
+                  to={resetLink}
+                  className="text-[12px] text-[var(--accent)] break-all hover:underline"
+                >
+                  {window.location.origin}
+                  {resetLink}
                 </Link>
               </div>
             )}
-            <Link to="/login" className="block text-center text-sm text-primary hover:underline">
+            <Link
+              to="/login"
+              className="block text-center text-[13px] text-[var(--accent)] hover:underline"
+            >
               Volver al login
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">Email</label>
+              <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors"
                 placeholder="tu@est.umb.edu.co"
                 required
               />
@@ -63,11 +85,14 @@ export default function ForgotPassword() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="w-full px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {loading ? 'Enviando...' : 'Enviar enlace'}
             </button>
-            <Link to="/login" className="block text-center text-sm text-primary/70 hover:underline">
+            <Link
+              to="/login"
+              className="block text-center text-[13px] text-[var(--accent)] hover:underline pt-2"
+            >
               Volver al login
             </Link>
           </form>

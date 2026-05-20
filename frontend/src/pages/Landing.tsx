@@ -8,65 +8,72 @@ const steps = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-bg-main">
-      {/* Hero */}
-      <section className="flex flex-col items-center justify-center px-4 pt-20 pb-16">
-        <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center mb-6">
-          <span className="text-white text-2xl font-bold">M</span>
-        </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-primary mb-3">Mabel IA</h1>
-        <p className="text-lg text-text-primary/70 mb-8 text-center max-w-lg">
-          Asistente virtual de apoyo psicoeducativo para estudiantes de la Universidad Manuela Beltran
-        </p>
-        <p className="text-text-primary/60 text-center max-w-md mb-10 text-sm leading-relaxed">
-          Mabel IA te ofrece un espacio seguro para conversar sobre bienestar emocional,
-          tecnicas de manejo del estres y orientacion psicoeducativa. No reemplaza atencion
-          profesional en salud mental.
-        </p>
-        <div className="flex gap-4">
-          <Link
-            to="/register"
-            className="px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors"
+    <div className="min-h-screen w-full bg-[var(--bg)] flex flex-col items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        {/* Logo */}
+        <div className="flex justify-center mb-6">
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center shadow-sm"
+            style={{ backgroundColor: 'var(--accent)' }}
           >
-            Registrarse
-          </Link>
+            <span className="text-white text-xl font-display italic">M</span>
+          </div>
+        </div>
+
+        {/* Title */}
+        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+          Mabel IA
+        </h1>
+        <p className="text-[14px] text-[var(--text-muted)] text-center mb-8 leading-relaxed">
+          Asistente virtual de apoyo psicoeducativo para estudiantes de la Universidad Manuela Beltran.
+        </p>
+
+        {/* CTAs */}
+        <div className="flex flex-col gap-3">
           <Link
             to="/login"
-            className="px-6 py-3 border-2 border-primary text-primary rounded-lg font-medium hover:bg-primary/5 transition-colors"
+            className="w-full px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium text-center hover:opacity-90 transition-opacity"
           >
             Iniciar sesion
           </Link>
+          <Link
+            to="/register"
+            className="w-full px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] rounded-lg font-medium text-center hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            Crear cuenta
+          </Link>
         </div>
-      </section>
 
-      {/* How it works */}
-      <section className="bg-gray-50 py-16 px-4">
-        <h2 className="text-2xl font-bold text-accent text-center mb-10">Como funciona?</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {steps.map((step, i) => (
-            <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center mb-4">
-                {i + 1}
-              </div>
-              <h3 className="font-semibold text-text-primary mb-2">{step.title}</h3>
-              <p className="text-sm text-text-primary/60">{step.desc}</p>
-            </div>
-          ))}
+        {/* Divider + steps */}
+        <div className="mt-10 pt-6 border-t border-[var(--border-subtle)]">
+          <p className="text-[12px] uppercase tracking-wider text-[var(--text-faint)] text-center mb-4">
+            Como funciona
+          </p>
+          <ol className="space-y-3">
+            {steps.map((step, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span
+                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-medium"
+                  style={{
+                    backgroundColor: 'var(--bg-hover)',
+                    color: 'var(--accent)',
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="text-[14px] font-medium text-[var(--text-strong)]">{step.title}</p>
+                  <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">{step.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </div>
-      </section>
+      </div>
 
-      {/* Institutional */}
-      <section className="py-12 px-4 text-center">
-        <p className="text-sm text-text-primary/50">
-          Proyecto de tesis — Ingenieria de Software, Universidad Manuela Beltran (UMB), Bogota, Colombia, 2025.
-        </p>
-        <button
-          onClick={() => alert('Politica de privacidad: Ver consentimiento informado al registrarse.')}
-          className="mt-3 text-sm text-primary/70 underline hover:text-primary"
-        >
-          Politica de privacidad
-        </button>
-      </section>
+      <p className="mt-6 text-[11px] text-[var(--text-faint)] text-center max-w-md">
+        Proyecto de tesis — Ingenieria de Software, Universidad Manuela Beltran (UMB), Bogota, Colombia, 2025.
+      </p>
     </div>
   )
 }

@@ -2,16 +2,16 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
 
-function getPasswordStrength(pw: string): { label: string; color: string; pct: number } {
+function getPasswordStrength(pw: string): { label: string; varName: string; pct: number } {
   let score = 0
   if (pw.length >= 8) score++
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^a-zA-Z0-9]/.test(pw)) score++
-  if (score <= 1) return { label: 'Debil', color: 'bg-danger', pct: 25 }
-  if (score === 2) return { label: 'Regular', color: 'bg-warning', pct: 50 }
-  if (score === 3) return { label: 'Buena', color: 'bg-warning', pct: 75 }
-  return { label: 'Fuerte', color: 'bg-success', pct: 100 }
+  if (score <= 1) return { label: 'Debil', varName: 'var(--danger)', pct: 25 }
+  if (score === 2) return { label: 'Regular', varName: 'var(--warning)', pct: 50 }
+  if (score === 3) return { label: 'Buena', varName: 'var(--warning)', pct: 75 }
+  return { label: 'Fuerte', varName: 'var(--success)', pct: 100 }
 }
 
 export default function Register() {
@@ -59,88 +59,129 @@ export default function Register() {
     }
   }
 
+  const inputClass =
+    'w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors'
+
   return (
-    <div className="min-h-screen bg-bg-main flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <h1 className="text-3xl font-bold text-primary mb-8 text-center">Crear cuenta</h1>
+    <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+          Crear cuenta
+        </h1>
+        <p className="text-[14px] text-[var(--text-muted)] text-center mb-8">
+          Comienza tu acompanamiento con Mabel IA.
+        </p>
 
         {toast && (
-          <div className="mb-4 p-3 bg-danger/10 text-danger text-sm rounded-lg">{toast}</div>
+          <div
+            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
+            style={{
+              backgroundColor: 'var(--bg-hover)',
+              color: 'var(--danger)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            {toast}
+          </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Display name */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Nombre</label>
+            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Nombre</label>
             <input
               type="text"
               value={form.display_name}
               onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+              className={inputClass}
               placeholder="Tu nombre"
             />
-            {errors.display_name && <p className="mt-1 text-sm text-danger">{errors.display_name}</p>}
+            {errors.display_name && (
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger)' }}>
+                {errors.display_name}
+              </p>
+            )}
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Email institucional</label>
+            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Email institucional</label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+              className={inputClass}
               placeholder="usuario@est.umb.edu.co"
             />
-            {errors.email && <p className="mt-1 text-sm text-danger">{errors.email}</p>}
+            {errors.email && (
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger)' }}>
+                {errors.email}
+              </p>
+            )}
           </div>
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Contrasena</label>
+            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Contrasena</label>
             <input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+              className={inputClass}
               placeholder="Minimo 8 caracteres"
             />
             {form.password && (
               <div className="mt-2">
-                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div className={`h-full ${strength.color} transition-all`} style={{ width: `${strength.pct}%` }} />
+                <div
+                  className="h-1.5 rounded-full overflow-hidden"
+                  style={{ backgroundColor: 'var(--bg-hover)' }}
+                >
+                  <div
+                    className="h-full transition-all"
+                    style={{ width: `${strength.pct}%`, backgroundColor: strength.varName }}
+                  />
                 </div>
-                <p className="text-xs text-text-primary/50 mt-1">{strength.label}</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                  {strength.label}
+                </p>
               </div>
             )}
-            {errors.password && <p className="mt-1 text-sm text-danger">{errors.password}</p>}
+            {errors.password && (
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger)' }}>
+                {errors.password}
+              </p>
+            )}
           </div>
 
           {/* Confirm */}
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Confirmar contrasena</label>
+            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Confirmar contrasena</label>
             <input
               type="password"
               value={form.confirm}
               onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+              className={inputClass}
               placeholder="Repite la contrasena"
             />
-            {errors.confirm && <p className="mt-1 text-sm text-danger">{errors.confirm}</p>}
+            {errors.confirm && (
+              <p className="mt-1 text-[12px]" style={{ color: 'var(--danger)' }}>
+                {errors.confirm}
+              </p>
+            )}
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="w-full px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
           >
             {loading ? 'Registrando...' : 'Registrarse'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-text-primary/60">
+        <p className="mt-6 text-center text-[13px] text-[var(--text-muted)]">
           Ya tienes cuenta?{' '}
-          <Link to="/login" className="text-primary font-medium hover:underline">
+          <Link to="/login" className="text-[var(--accent)] font-medium hover:underline">
             Inicia sesion
           </Link>
         </p>

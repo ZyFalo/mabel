@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { AlertTriangle } from 'lucide-react'
 import apiClient from '../api/client'
 
 function getPasswordStrength(pw: string) {
@@ -8,10 +9,10 @@ function getPasswordStrength(pw: string) {
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^a-zA-Z0-9]/.test(pw)) score++
-  if (score <= 1) return { label: 'Debil', color: 'bg-danger', pct: 25 }
-  if (score === 2) return { label: 'Regular', color: 'bg-warning', pct: 50 }
-  if (score === 3) return { label: 'Buena', color: 'bg-warning', pct: 75 }
-  return { label: 'Fuerte', color: 'bg-success', pct: 100 }
+  if (score <= 1) return { label: 'Debil', varName: 'var(--danger)', pct: 25 }
+  if (score === 2) return { label: 'Regular', varName: 'var(--warning)', pct: 50 }
+  if (score === 3) return { label: 'Buena', varName: 'var(--warning)', pct: 75 }
+  return { label: 'Fuerte', varName: 'var(--success)', pct: 100 }
 }
 
 export default function ResetPassword() {
@@ -25,17 +26,23 @@ export default function ResetPassword() {
 
   useEffect(() => {
     if (!token) return
-    apiClient.get(`/auth/reset-password/${token}`).then((res) => {
-      setValid(res.data.valid)
-      if (!res.data.valid) setReason(res.data.reason || 'invalid')
-    }).catch(() => setValid(false))
+    apiClient
+      .get(`/auth/reset-password/${token}`)
+      .then((res) => {
+        setValid(res.data.valid)
+        if (!res.data.valid) setReason(res.data.reason || 'invalid')
+      })
+      .catch(() => setValid(false))
   }, [token])
 
   const strength = getPasswordStrength(form.password)
 
   async function handleSubmit(ev: FormEvent) {
     ev.preventDefault()
-    if (form.password !== form.confirm) { setError('Las contrasenas no coinciden'); return }
+    if (form.password !== form.confirm) {
+      setError('Las contrasenas no coinciden')
+      return
+    }
     setLoading(true)
     setError('')
     try {
@@ -50,22 +57,33 @@ export default function ResetPassword() {
 
   if (valid === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center">
+        <div
+          className="w-8 h-8 rounded-full animate-spin"
+          style={{
+            border: '4px solid var(--border)',
+            borderTopColor: 'var(--accent)',
+          }}
+        />
       </div>
     )
   }
 
   if (!valid) {
     return (
-      <div className="min-h-screen bg-bg-main flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="text-5xl mb-4">&#9888;</div>
-          <h1 className="text-2xl font-bold text-text-primary mb-3">Enlace invalido</h1>
-          <p className="text-text-primary/60 mb-6">
+      <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
+        <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in text-center">
+          <div className="flex justify-center mb-4">
+            <AlertTriangle size={48} style={{ color: 'var(--warning)' }} />
+          </div>
+          <h1 className="text-[22px] font-display italic text-[var(--text-strong)] mb-3">Enlace invalido</h1>
+          <p className="text-[14px] text-[var(--text-muted)] mb-6 leading-relaxed">
             {reason === 'expired' ? 'Este enlace ha expirado. Solicita uno nuevo.' : 'Este enlace no es valido.'}
           </p>
-          <Link to="/forgot-password" className="text-primary font-medium hover:underline">
+          <Link
+            to="/forgot-password"
+            className="inline-block px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+          >
             Solicitar nuevo enlace
           </Link>
         </div>
@@ -73,45 +91,73 @@ export default function ResetPassword() {
     )
   }
 
-  return (
-    <div className="min-h-screen bg-bg-main flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <h1 className="text-3xl font-bold text-primary mb-8 text-center">Nueva contrasena</h1>
-        {error && <div className="mb-4 p-3 bg-danger/10 text-danger text-sm rounded-lg">{error}</div>}
+  const inputClass =
+    'w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors'
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+  return (
+    <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+          Nueva contrasena
+        </h1>
+        <p className="text-[14px] text-[var(--text-muted)] text-center mb-8">
+          Elige una contrasena fuerte para tu cuenta.
+        </p>
+
+        {error && (
+          <div
+            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
+            style={{
+              backgroundColor: 'var(--bg-hover)',
+              color: 'var(--danger)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Nueva contrasena</label>
+            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Nueva contrasena</label>
             <input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+              className={inputClass}
               required
             />
             {form.password && (
               <div className="mt-2">
-                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div className={`h-full ${strength.color} transition-all`} style={{ width: `${strength.pct}%` }} />
+                <div
+                  className="h-1.5 rounded-full overflow-hidden"
+                  style={{ backgroundColor: 'var(--bg-hover)' }}
+                >
+                  <div
+                    className="h-full transition-all"
+                    style={{ width: `${strength.pct}%`, backgroundColor: strength.varName }}
+                  />
                 </div>
-                <p className="text-xs text-text-primary/50 mt-1">{strength.label}</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--text-faint)' }}>
+                  {strength.label}
+                </p>
               </div>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Confirmar contrasena</label>
+            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Confirmar contrasena</label>
             <input
               type="password"
               value={form.confirm}
               onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+              className={inputClass}
               required
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="w-full px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
           >
             {loading ? 'Cambiando...' : 'Cambiar contrasena'}
           </button>

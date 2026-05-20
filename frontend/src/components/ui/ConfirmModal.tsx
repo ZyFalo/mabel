@@ -39,22 +39,25 @@ export default function ConfirmModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={handleCancel} />
-      <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-        <h2 className="text-lg font-bold text-text-primary mb-2">{title}</h2>
-        <p className="text-sm text-text-primary/60 mb-4">{message}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={handleCancel} />
+      <div className="relative bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
+        <h2 className="text-[18px] font-display italic text-[var(--text-strong)] mb-2">
+          {title}
+        </h2>
+        <p className="text-[13px] text-[var(--text-muted)] mb-4 leading-relaxed">{message}</p>
 
         {variant === 'verification' && (
           <div className="mb-4">
-            <label className="text-sm text-text-primary/60 block mb-1">
-              Escribe <strong>{verificationText}</strong> para confirmar
+            <label className="text-[13px] text-[var(--text-muted)] block mb-1.5">
+              Escribe{' '}
+              <strong className="text-[var(--text-strong)]">{verificationText}</strong> para confirmar
             </label>
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--accent)] transition-colors"
               placeholder={verificationText}
             />
           </div>
@@ -63,14 +66,15 @@ export default function ConfirmModal({
         <div className="flex justify-end gap-3">
           <button
             onClick={handleCancel}
-            className="px-4 py-2 text-sm text-text-primary/60 hover:text-text-primary rounded-lg transition-colors"
+            className="px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="px-4 py-2 text-sm bg-danger text-white rounded-lg hover:bg-danger/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: 'var(--danger)' }}
           >
             {confirmLabel}
           </button>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AlertTriangle } from 'lucide-react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
 
@@ -33,27 +34,37 @@ export default function DeleteAccountModal({ open, onClose }: DeleteAccountModal
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-        <svg className="w-12 h-12 text-danger mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
+        <div className="flex justify-center mb-3">
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: 'var(--bg-hover)' }}
+          >
+            <AlertTriangle size={24} style={{ color: 'var(--danger)' }} />
+          </div>
+        </div>
 
-        <h2 className="text-lg font-bold text-text-primary text-center mb-2">Eliminar cuenta</h2>
-        <p className="text-sm text-danger font-medium text-center mb-3">
+        <h2 className="text-[18px] font-display italic text-[var(--text-strong)] text-center mb-1">
+          Eliminar cuenta
+        </h2>
+        <p
+          className="text-[13px] font-medium text-center mb-3"
+          style={{ color: 'var(--danger)' }}
+        >
           Esta accion es irreversible
         </p>
-        <p className="text-sm text-text-primary/60 mb-4">
+        <p className="text-[13px] text-[var(--text-muted)] mb-3 leading-relaxed">
           Se eliminaran permanentemente:
         </p>
-        <ul className="text-xs text-text-primary/50 mb-4 space-y-1 list-disc list-inside">
+        <ul className="text-[12px] text-[var(--text-muted)] mb-4 space-y-1 list-disc list-inside">
           <li>Todas tus conversaciones y mensajes</li>
           <li>Tus preferencias y configuracion</li>
           <li>Tu consentimiento y datos de cuenta</li>
           <li>Tus reportes de mensajes</li>
         </ul>
-        <p className="text-xs text-text-primary/40 mb-4">
+        <p className="text-[11px] text-[var(--text-faint)] mb-4">
           Los registros de seguridad se conservan de forma anonima.
         </p>
 
@@ -61,21 +72,25 @@ export default function DeleteAccountModal({ open, onClose }: DeleteAccountModal
           type="text"
           value={confirmation}
           onChange={(e) => setConfirmation(e.target.value)}
-          placeholder='Escribe ELIMINAR para confirmar'
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm mb-4 focus:border-danger focus:ring-1 focus:ring-danger"
+          placeholder="Escribe ELIMINAR para confirmar"
+          className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:outline-none transition-colors mb-4"
+          style={{
+            borderColor: confirmation ? 'var(--danger)' : 'var(--border)',
+          }}
         />
 
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 border border-gray-200 text-sm font-medium rounded-lg text-text-primary hover:bg-gray-50 transition-colors"
+            className="flex-1 px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleDelete}
             disabled={!isValid || deleting}
-            className="flex-1 py-2.5 bg-danger text-white text-sm font-medium rounded-lg hover:bg-danger/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 px-5 py-2.5 text-white text-[13px] font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
+            style={{ backgroundColor: 'var(--danger)' }}
           >
             {deleting ? 'Eliminando...' : 'Eliminar mi cuenta'}
           </button>

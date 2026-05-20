@@ -48,23 +48,30 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-        <h2 className="text-lg font-bold text-text-primary mb-4">Reportar mensaje</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-lg max-w-md w-full p-6 scale-in">
+        <h2 className="text-[18px] font-display italic text-[var(--text-strong)] mb-1">
+          Reportar mensaje
+        </h2>
+        <p className="text-[13px] text-[var(--text-muted)] mb-5">
+          Ayudanos a mejorar Mabel IA.
+        </p>
 
         {/* Reason */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-text-primary mb-2">
-            Motivo <span className="text-danger">*</span>
+          <label className="block text-[13px] font-medium text-[var(--text-strong)] mb-2">
+            Motivo <span style={{ color: 'var(--danger)' }}>*</span>
           </label>
           <div className="flex flex-col gap-2">
             {REASONS.map((r) => (
               <label
                 key={r.value}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
-                  reason === r.value ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
-                }`}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
+                style={{
+                  borderColor: reason === r.value ? 'var(--accent)' : 'var(--border)',
+                  backgroundColor: reason === r.value ? 'var(--bg-hover)' : 'transparent',
+                }}
               >
                 <input
                   type="radio"
@@ -72,9 +79,9 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
                   value={r.value}
                   checked={reason === r.value}
                   onChange={() => setReason(r.value)}
-                  className="accent-primary"
+                  style={{ accentColor: 'var(--accent)' }}
                 />
-                <span className="text-sm text-text-primary">{r.label}</span>
+                <span className="text-[13px] text-[var(--text)]">{r.label}</span>
               </label>
             ))}
           </div>
@@ -82,7 +89,7 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
 
         {/* Severity */}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-text-primary mb-2">
+          <label className="block text-[13px] font-medium text-[var(--text-strong)] mb-2">
             Severidad (opcional)
           </label>
           <div className="flex gap-2">
@@ -90,11 +97,11 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
               <button
                 key={n}
                 onClick={() => setSeverity(severity === n ? null : n)}
-                className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
-                  severity === n
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-text-primary/60 hover:bg-gray-200'
-                }`}
+                className="w-9 h-9 rounded-lg text-[13px] font-medium transition-colors"
+                style={{
+                  backgroundColor: severity === n ? 'var(--accent)' : 'var(--bg-hover)',
+                  color: severity === n ? 'white' : 'var(--text-muted)',
+                }}
               >
                 {n}
               </button>
@@ -104,7 +111,7 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
 
         {/* Details */}
         <div className="mb-5">
-          <label className="block text-sm font-medium text-text-primary mb-2">
+          <label className="block text-[13px] font-medium text-[var(--text-strong)] mb-2">
             Detalles (opcional)
           </label>
           <textarea
@@ -113,23 +120,25 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
             maxLength={1000}
             rows={3}
             placeholder="Describe el problema..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[13px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
           />
-          <p className="text-xs text-text-primary/40 text-right mt-1">{details.length}/1000</p>
+          <p className="text-[11px] text-right mt-1" style={{ color: 'var(--text-faint)' }}>
+            {details.length}/1000
+          </p>
         </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-text-primary/60 hover:text-text-primary rounded-lg transition-colors"
+            className="px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] text-[13px] font-medium rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={!reason || submitting}
-            className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 bg-[var(--accent)] text-white text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Enviando...' : 'Enviar reporte'}
           </button>

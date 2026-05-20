@@ -78,21 +78,21 @@
 
 ### Capability 5 — auth-onboarding-redesign
 
-- [ ] 47. Update `frontend/src/pages/Landing.tsx`: card layout with Fraunces title, animations on mount.
-- [ ] 48. Update `frontend/src/pages/Login.tsx`: card layout, primitives for inputs, `fade-in` on card. Existing logic intact.
-- [ ] 49. Update `frontend/src/pages/Register.tsx`: same pattern.
-- [ ] 50. Update `frontend/src/pages/ForgotPassword.tsx` and `ResetPassword.tsx`: same pattern.
-- [ ] 51. Update `frontend/src/pages/Consent.tsx`, `ConsentRejected.tsx`, `ConsentRequired.tsx`: wider card (max-w-2xl), prose for legal body, accept/reject buttons styled.
-- [ ] 52. Update `frontend/src/pages/Onboarding.tsx`: step indicator with progress bar at accent color, card layout per step, primitives for toggles/segmented, `fade-in` on step change.
-- [ ] 53. Restyle modals: ChangePasswordModal, RevokeConsentModal, DeleteAccountModal, ArcoExportModal, ConfirmModal, SessionExpiredModal, ReportModal — backdrop bg-black/40 backdrop-blur-sm, card with `scale-in`, Fraunces titles. Logic intact.
-- [ ] 54. `npx tsc --noEmit` clean. Smoke: test full flow new user — Register → Consent → Onboarding 3 steps → Home → Chat → Settings, verify all modals scale-in, theme persists across pages.
+- [x] 47. Update `frontend/src/pages/Landing.tsx`: card layout with Fraunces title, animations on mount.
+- [x] 48. Update `frontend/src/pages/Login.tsx`: card layout, primitives for inputs, `fade-in` on card. Existing logic intact.
+- [x] 49. Update `frontend/src/pages/Register.tsx`: same pattern.
+- [x] 50. Update `frontend/src/pages/ForgotPassword.tsx` and `ResetPassword.tsx`: same pattern.
+- [x] 51. Update `frontend/src/pages/Consent.tsx`, `ConsentRejected.tsx`, `ConsentRequired.tsx`: wider card (max-w-2xl), prose for legal body, accept/reject buttons styled.
+- [x] 52. Update `frontend/src/pages/Onboarding.tsx`: step indicator with progress bar at accent color, card layout per step, primitives for toggles/segmented, `fade-in` on step change.
+- [x] 53. Restyle modals: ChangePasswordModal, RevokeConsentModal, DeleteAccountModal, ArcoExportModal, ConfirmModal, SessionExpiredModal, ReportModal — backdrop bg-black/40 backdrop-blur-sm, card with `scale-in`, Fraunces titles. Logic intact.
+- [x] 54. `npx tsc --noEmit` clean. Smoke: test full flow new user — Register → Consent → Onboarding 3 steps → Home → Chat → Settings, verify all modals scale-in, theme persists across pages.
 
 ### Verification
 
-- [ ] 55. Backend imports OK (should not require, since no backend changes): `cd backend && source .venv/bin/activate && python -c "from app.main import app; print('OK')"`
-- [ ] 56. Frontend: `npx tsc --noEmit` clean + `npm run build` succeeds.
-- [ ] 57. Admin panel unaffected: navigate to `/admin` (with admin user) and confirm all admin pages look unchanged (same Lumen-style is NOT applied to admin).
-- [ ] 58. Manual smoke checklist:
+- [x] 55. Backend imports OK (should not require, since no backend changes): `cd backend && source .venv/bin/activate && python -c "from app.main import app; print('OK')"`
+- [x] 56. Frontend: `npx tsc --noEmit` clean + `npm run build` succeeds.
+- [x] 57. Admin panel unaffected: navigate to `/admin` (with admin user) and confirm all admin pages look unchanged (same Lumen-style is NOT applied to admin).
+- [x] 58. Manual smoke checklist:
   - SOS FAB visible and functional on every student page
   - Crisis automatica trigger (send "suicidio" — guardrail) opens SOS panel
   - Microfono pulse red while recording

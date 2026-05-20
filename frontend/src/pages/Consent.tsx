@@ -24,7 +24,8 @@ export default function Consent() {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    apiClient.get('/consent-versions/active')
+    apiClient
+      .get('/consent-versions/active')
       .then((res) => setVersion(res.data))
       .catch((err) => {
         if (err.response?.status === 404) setNoVersion(true)
@@ -74,23 +75,34 @@ export default function Consent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center">
+        <div
+          className="w-8 h-8 rounded-full animate-spin"
+          style={{
+            border: '4px solid var(--border)',
+            borderTopColor: 'var(--accent)',
+          }}
+        />
       </div>
     )
   }
 
   if (noVersion) {
     return (
-      <div className="min-h-screen bg-bg-main flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-text-primary mb-4">Sin version disponible</h1>
-          <p className="text-text-primary/60 mb-6">
+      <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
+        <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in text-center">
+          <h1 className="text-[22px] font-display italic text-[var(--text-strong)] mb-3">
+            Sin version disponible
+          </h1>
+          <p className="text-[14px] text-[var(--text-muted)] mb-6 leading-relaxed">
             No hay una version de consentimiento disponible. Contacta al equipo de investigacion.
           </p>
           <button
-            onClick={() => { logout(); navigate('/') }}
-            className="px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            onClick={() => {
+              logout()
+              navigate('/')
+            }}
+            className="inline-block px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
             Cerrar sesion
           </button>
@@ -102,18 +114,37 @@ export default function Consent() {
   const canSubmit = scrolledToEnd && accepted && scope !== ''
 
   return (
-    <div className="min-h-screen bg-bg-main flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-2xl">
-        <h1 className="text-3xl font-bold text-primary mb-2 text-center">Consentimiento Informado</h1>
+    <div className="min-h-screen w-full bg-[var(--bg)] flex items-start justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-2xl bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+          Consentimiento Informado
+        </h1>
         {version && (
-          <div className="flex justify-center mb-6">
-            <span className="px-3 py-1 bg-primary/10 text-primary text-sm rounded-full font-medium">
+          <div className="flex justify-center mb-8">
+            <span
+              className="px-3 py-1 text-[12px] rounded-full font-medium"
+              style={{
+                backgroundColor: 'var(--bg-hover)',
+                color: 'var(--accent)',
+              }}
+            >
               Version {version.version}
             </span>
           </div>
         )}
 
-        {error && <div className="mb-4 p-3 bg-danger/10 text-danger text-sm rounded-lg">{error}</div>}
+        {error && (
+          <div
+            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
+            style={{
+              backgroundColor: 'var(--bg-hover)',
+              color: 'var(--danger)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           {/* Legal text */}
@@ -121,47 +152,78 @@ export default function Consent() {
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="h-80 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50 text-sm text-text-primary/80 leading-relaxed whitespace-pre-wrap"
+              className="h-80 overflow-y-auto rounded-lg p-4 text-[13px] leading-relaxed whitespace-pre-wrap border"
+              style={{
+                backgroundColor: 'var(--bg)',
+                color: 'var(--text)',
+                borderColor: 'var(--border)',
+              }}
             >
               {version?.body}
             </div>
             {!scrolledToEnd && (
-              <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-50 to-transparent rounded-b-lg flex items-end justify-center pb-1">
-                <span className="text-xs text-primary animate-bounce">Desplaza para leer todo el texto</span>
+              <div
+                className="absolute bottom-0 left-0 right-0 h-12 rounded-b-lg flex items-end justify-center pb-1.5 pointer-events-none"
+                style={{
+                  background:
+                    'linear-gradient(to top, var(--bg) 0%, var(--bg) 30%, transparent 100%)',
+                }}
+              >
+                <span className="text-[11px] animate-bounce" style={{ color: 'var(--accent)' }}>
+                  Desplaza para leer todo el texto
+                </span>
               </div>
             )}
           </div>
 
           {/* Scope */}
           <div className="mb-6">
-            <p className="text-sm font-medium text-text-primary mb-3">Alcance del consentimiento:</p>
+            <p className="text-[13px] font-medium text-[var(--text-strong)] mb-3">
+              Alcance del consentimiento:
+            </p>
             <div className="space-y-3">
-              <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-primary/30">
+              <label
+                className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors hover:bg-[var(--bg-hover)]"
+                style={{ borderColor: scope === 'solo_uso' ? 'var(--accent)' : 'var(--border)' }}
+              >
                 <input
                   type="radio"
                   name="scope"
                   value="solo_uso"
                   checked={scope === 'solo_uso'}
                   onChange={(e) => setScope(e.target.value)}
-                  className="mt-0.5 accent-primary"
+                  className="mt-0.5"
+                  style={{ accentColor: 'var(--accent)' }}
                 />
                 <div>
-                  <span className="font-medium text-sm">Solo uso</span>
-                  <p className="text-xs text-text-primary/50">Datos minimos para el funcionamiento del sistema.</p>
+                  <span className="font-medium text-[13px] text-[var(--text-strong)]">Solo uso</span>
+                  <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                    Datos minimos para el funcionamiento del sistema.
+                  </p>
                 </div>
               </label>
-              <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-primary/30">
+              <label
+                className="flex items-start gap-3 p-3 rounded-lg cursor-pointer border transition-colors hover:bg-[var(--bg-hover)]"
+                style={{
+                  borderColor: scope === 'uso_mejora_anon' ? 'var(--accent)' : 'var(--border)',
+                }}
+              >
                 <input
                   type="radio"
                   name="scope"
                   value="uso_mejora_anon"
                   checked={scope === 'uso_mejora_anon'}
                   onChange={(e) => setScope(e.target.value)}
-                  className="mt-0.5 accent-primary"
+                  className="mt-0.5"
+                  style={{ accentColor: 'var(--accent)' }}
                 />
                 <div>
-                  <span className="font-medium text-sm">Uso + mejora anonima</span>
-                  <p className="text-xs text-text-primary/50">Datos anonimizados para mejorar el servicio.</p>
+                  <span className="font-medium text-[13px] text-[var(--text-strong)]">
+                    Uso + mejora anonima
+                  </span>
+                  <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                    Datos anonimizados para mejorar el servicio.
+                  </p>
                 </div>
               </label>
             </div>
@@ -169,33 +231,40 @@ export default function Consent() {
 
           {/* Checkbox */}
           <div className="mb-6">
-            <label className={`flex items-center gap-3 ${!scrolledToEnd ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+            <label
+              className={`flex items-center gap-3 ${
+                !scrolledToEnd ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              }`}
+            >
               <input
                 type="checkbox"
                 checked={accepted}
                 onChange={(e) => setAccepted(e.target.checked)}
                 disabled={!scrolledToEnd}
-                className="w-4 h-4 accent-primary"
+                className="w-4 h-4"
+                style={{ accentColor: 'var(--accent)' }}
               />
-              <span className="text-sm text-text-primary">He leido y acepto el consentimiento informado</span>
+              <span className="text-[13px] text-[var(--text)]">
+                He leido y acepto el consentimiento informado
+              </span>
             </label>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             <button
               type="submit"
               disabled={!canSubmit || submitting}
-              className="flex-1 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="flex-1 px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              {submitting ? 'Aceptando...' : 'Aceptar y continuar'}
+              {submitting ? 'Aceptando...' : 'Acepto'}
             </button>
             <button
               type="button"
               onClick={() => navigate('/consent/rejected')}
-              className="px-6 py-3 border-2 border-gray-300 text-text-primary/70 rounded-lg font-medium hover:border-gray-400 transition-colors"
+              className="px-5 py-2.5 border border-[var(--border-strong)] text-[var(--text)] rounded-lg font-medium hover:bg-[var(--bg-hover)] transition-colors"
             >
-              Rechazar
+              Rechazo
             </button>
           </div>
         </form>

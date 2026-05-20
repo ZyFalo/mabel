@@ -41,64 +41,92 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-main flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <h1 className="text-3xl font-bold text-primary mb-8 text-center">Iniciar sesion</h1>
+    <div className="min-h-screen w-full bg-[var(--bg)] flex items-center justify-center px-4 py-12 fade-in">
+      <div className="w-full max-w-md bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl shadow-sm px-6 py-8 md:px-10 md:py-10 scale-in">
+        <h1 className="text-[28px] font-display italic text-[var(--text-strong)] text-center mb-2">
+          Iniciar sesion
+        </h1>
+        <p className="text-[14px] text-[var(--text-muted)] text-center mb-8">
+          Continua tu camino con Mabel IA.
+        </p>
 
         {successToast && (
-          <div className="mb-4 p-3 bg-success/10 text-success text-sm rounded-lg">{successToast}</div>
+          <div
+            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
+            style={{
+              backgroundColor: 'var(--bg-hover)',
+              color: 'var(--success)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            {successToast}
+          </div>
         )}
-        {error && <div className="mb-4 p-3 bg-danger/10 text-danger text-sm rounded-lg">{error}</div>}
+        {error && (
+          <div
+            className="mb-4 px-3 py-2.5 text-[13px] rounded-lg border"
+            style={{
+              backgroundColor: 'var(--bg-hover)',
+              color: 'var(--danger)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Email</label>
+            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Email</label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors"
               placeholder="tu@est.umb.edu.co"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">Contrasena</label>
+            <label className="block text-[13px] font-medium text-[var(--text)] mb-1.5">Contrasena</label>
             <input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none"
+              className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--text)] placeholder:text-[var(--text-placeholder)] focus:border-[var(--accent)] focus:outline-none transition-colors"
               required
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1">
             <input
               type="checkbox"
               id="remember"
               checked={form.remember_me}
               onChange={(e) => setForm({ ...form, remember_me: e.target.checked })}
-              className="w-4 h-4 accent-primary"
+              className="w-4 h-4 rounded border-[var(--border-strong)]"
+              style={{ accentColor: 'var(--accent)' }}
             />
-            <label htmlFor="remember" className="text-sm text-text-primary/60">Recordar sesion</label>
+            <label htmlFor="remember" className="text-[13px] text-[var(--text-muted)] cursor-pointer">
+              Recordar sesion
+            </label>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="w-full px-5 py-2.5 bg-[var(--accent)] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity mt-2"
           >
             {loading ? 'Ingresando...' : 'Iniciar sesion'}
           </button>
         </form>
 
         <div className="mt-6 text-center space-y-2">
-          <Link to="/forgot-password" className="block text-sm text-primary/70 hover:underline">
+          <Link to="/forgot-password" className="block text-[13px] text-[var(--accent)] hover:underline">
             Olvidaste tu contrasena?
           </Link>
-          <p className="text-sm text-text-primary/60">
+          <p className="text-[13px] text-[var(--text-muted)]">
             No tienes cuenta?{' '}
-            <Link to="/register" className="text-primary font-medium hover:underline">
+            <Link to="/register" className="text-[var(--accent)] font-medium hover:underline">
               Registrate
             </Link>
           </p>
