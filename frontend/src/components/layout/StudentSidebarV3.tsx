@@ -383,7 +383,10 @@ export default function StudentSidebarV3({
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        zIndex: 5,
+        // Stacking: must beat the chat header's backdrop-filter stacking context
+        // so the floating collapse toggle (overflowing 12px to the right) stays
+        // visible above the main content.
+        zIndex: 30,
         transition: mobileDrawer ? undefined : 'width var(--dur-base) var(--ease-out)',
         fontFamily: 'var(--font-sans)',
       }}
