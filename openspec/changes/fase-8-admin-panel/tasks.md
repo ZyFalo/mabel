@@ -41,15 +41,15 @@
 
 #### Backend
 
-- [ ] 22. Create `app/routers/admin/reports_router.py` with GET `/admin/reports`, PATCH `/admin/reports/:id`, GET `/admin/reports/export.csv`. Enforce state transitions. Use `require_admin`. Never return `messages.content`.
-- [ ] 23. Create `app/routers/admin/safety_events_router.py` with GET `/admin/safety-events`, PATCH `/admin/safety-events/:id`, GET `/admin/safety-events/export.csv`. Use `require_admin`. Anonymize via SHA-256 truncated hashes in CSV.
-- [ ] 24. Extend `MessageReportRepository` with `list_with_filters()` and `update_status()` if missing
-- [ ] 25. Extend `SafetyEventRepository` with `list_with_filters()` and `update_status()` if missing
+- [x] 22. Create `app/routers/admin/reports_router.py` with GET `/admin/reports`, PATCH `/admin/reports/:id`, GET `/admin/reports/export.csv`. Enforce state transitions. Use `require_admin`. Never return `messages.content`.
+- [x] 23. Create `app/routers/admin/safety_events_router.py` with GET `/admin/safety-events`, PATCH `/admin/safety-events/:id`, GET `/admin/safety-events/export.csv`. Use `require_admin`. Anonymize via SHA-256 truncated hashes in CSV.
+- [x] 24. Extend `MessageReportRepository` with `list_with_filters()` and `update_status()` if missing
+- [x] 25. Extend `SafetyEventRepository` with `list_with_filters()` and `update_status()` if missing
 
 #### Frontend
 
-- [ ] 26. Create `frontend/src/pages/admin/Reports.tsx` (#26) — indicadores + FilterBar + DataTable con expandable rows + state buttons + ExportCsvButton
-- [ ] 27. Create `frontend/src/pages/admin/SafetyEvents.tsx` (#25) — FilterBar + DataTable con expandable rows mostrando payload JSON formateado + state buttons + ExportCsvButton
+- [x] 26. Create `frontend/src/pages/admin/Reports.tsx` (#26) — indicadores + FilterBar + DataTable con expandable rows + state buttons + ExportCsvButton
+- [x] 27. Create `frontend/src/pages/admin/SafetyEvents.tsx` (#25) — FilterBar + DataTable con expandable rows mostrando payload JSON formateado + state buttons + ExportCsvButton
 
 ### Capability 4 — admin-metrics
 

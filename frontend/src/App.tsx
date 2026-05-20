@@ -8,6 +8,8 @@ import RoleGuard from './guards/RoleGuard'
 import AdminLayout from './components/admin/AdminLayout'
 import AdminUsers from './pages/admin/Users'
 import AdminUserDetail from './pages/admin/UserDetail'
+import AdminReports from './pages/admin/Reports'
+import AdminSafetyEvents from './pages/admin/SafetyEvents'
 import StudentLayout from './components/layout/StudentLayout'
 import SessionExpiredModal from './components/ui/SessionExpiredModal'
 import ToastContainer from './components/ui/Toast'
@@ -120,8 +122,8 @@ export default function App() {
               <Route path="/admin" element={<AdminPageStub title="Dashboard" />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/users/:id" element={<AdminUserDetail />} />
-              <Route path="/admin/reports" element={<AdminPageStub title="Reportes" />} />
-              <Route path="/admin/safety-events" element={<AdminPageStub title="Safety Events" />} />
+              <Route path="/admin/reports" element={<AdminReports />} />
+              <Route path="/admin/safety-events" element={<AdminSafetyEvents />} />
               <Route path="/admin/metrics" element={<AdminPageStub title="Metricas" />} />
               <Route path="/admin/config" element={<AdminPageStub title="Configuracion" />} />
               <Route path="/admin/logs" element={<AdminPageStub title="Logs de auditoria" />} />

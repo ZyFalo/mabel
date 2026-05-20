@@ -2,6 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+
+# Admin routers (Fase 8)
+from app.routers.admin.reports_router import router as admin_reports_router
+from app.routers.admin.safety_events_router import router as admin_safety_events_router
+from app.routers.admin.users_router import router as admin_users_router
 from app.routers.asr_router import router as asr_router
 from app.routers.auth_router import router as auth_router
 from app.routers.consent_router import router as consent_router
@@ -12,9 +17,6 @@ from app.routers.session_router import router as session_router
 from app.routers.system_config_router import router as system_config_router
 from app.routers.tts_router import router as tts_router
 from app.routers.users_router import router as users_router
-
-# Admin routers (Fase 8)
-from app.routers.admin.users_router import router as admin_users_router
 
 app = FastAPI(title="Mabel IA", version="0.1.0")
 
@@ -39,6 +41,8 @@ app.include_router(tts_router, prefix="/api/v1")
 
 # Admin routers (grouped at the end)
 app.include_router(admin_users_router, prefix="/api/v1")
+app.include_router(admin_reports_router, prefix="/api/v1")
+app.include_router(admin_safety_events_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")

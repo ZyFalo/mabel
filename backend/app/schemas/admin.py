@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -116,3 +116,17 @@ class DisableUserRequest(BaseModel):
     """Payload for PATCH /admin/users/:id/disable. Reason mandatory (audited)."""
 
     reason: str = Field(min_length=10)
+
+
+class ReportStatusUpdate(BaseModel):
+    """Payload for PATCH /admin/reports/:id. Enforced transitions in service layer."""
+
+    status: Literal["triaged", "resolved", "dismissed"]
+    notes: str | None = None
+
+
+class SafetyEventStatusUpdate(BaseModel):
+    """Payload for PATCH /admin/safety-events/:id. Enforced transitions in service layer."""
+
+    status: Literal["reviewed", "resolved"]
+    notes: str | None = None
