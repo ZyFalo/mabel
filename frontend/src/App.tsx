@@ -12,6 +12,8 @@ import AdminUsers from './pages/admin/Users'
 import AdminUserDetail from './pages/admin/UserDetail'
 import AdminReports from './pages/admin/Reports'
 import AdminSafetyEvents from './pages/admin/SafetyEvents'
+import AdminConfig from './pages/admin/Config'
+import AdminAuditLogs from './pages/admin/AuditLogs'
 import StudentLayout from './components/layout/StudentLayout'
 import SessionExpiredModal from './components/ui/SessionExpiredModal'
 import ToastContainer from './components/ui/Toast'
@@ -33,22 +35,6 @@ import SessionDetail from './pages/SessionDetail'
 import SessionEnd from './pages/SessionEnd'
 import Settings from './pages/Settings'
 import { useAuthStore } from './stores/authStore'
-
-function AdminPageStub({ title }: { title: string }) {
-  return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-text-primary">{title}</h1>
-        <p className="text-sm text-text-primary/60 mt-1">En construccion (Fase 8)</p>
-      </div>
-      <div className="border border-dashed border-gray-300 rounded-lg p-10 text-center bg-white">
-        <p className="text-text-primary/50 text-sm">
-          Esta vista se implementara en una proxima capacidad de Fase 8.
-        </p>
-      </div>
-    </div>
-  )
-}
 
 function SessionExpiredHandler() {
   const [showExpired, setShowExpired] = useState(false)
@@ -127,8 +113,8 @@ export default function App() {
               <Route path="/admin/reports" element={<AdminReports />} />
               <Route path="/admin/safety-events" element={<AdminSafetyEvents />} />
               <Route path="/admin/metrics" element={<AdminMetrics />} />
-              <Route path="/admin/config" element={<AdminPageStub title="Configuracion" />} />
-              <Route path="/admin/logs" element={<AdminPageStub title="Logs de auditoria" />} />
+              <Route path="/admin/config" element={<AdminConfig />} />
+              <Route path="/admin/logs" element={<AdminAuditLogs />} />
             </Route>
           </Route>
         </Route>

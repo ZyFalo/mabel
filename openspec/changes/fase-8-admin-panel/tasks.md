@@ -71,15 +71,15 @@
 
 #### Backend
 
-- [ ] 36. Extend `SystemConfigRepository` with `update_value(key, value)` if missing; extend service with validation helpers
-- [ ] 37. Create `app/routers/admin/config_router.py` with GET `/admin/config`, PATCH `/admin/config/:key`, POST `/admin/consent-versions`, POST `/admin/consent-versions/:id/publish`, POST `/admin/config/gemini/test`. Per-key validation. Audit log every change.
-- [ ] 38. Create `app/routers/admin/audit_logs_router.py` with GET `/admin/logs`, GET `/admin/logs/export.csv`. Append-only — no PATCH/DELETE.
-- [ ] 39. Register all 6 admin routers in `app/main.py`
+- [x] 36. Extend `SystemConfigRepository` with `update_value(key, value)` if missing; extend service with validation helpers
+- [x] 37. Create `app/routers/admin/config_router.py` with GET `/admin/config`, PATCH `/admin/config/:key`, POST `/admin/consent-versions`, POST `/admin/consent-versions/:id/publish`, POST `/admin/config/gemini/test`. Per-key validation. Audit log every change.
+- [x] 38. Create `app/routers/admin/audit_logs_router.py` with GET `/admin/logs`, GET `/admin/logs/export.csv`. Append-only — no PATCH/DELETE.
+- [x] 39. Register all 6 admin routers in `app/main.py`
 
 #### Frontend
 
-- [ ] 40. Create `frontend/src/pages/admin/Config.tsx` (#30) — 5 secciones (Consentimiento, Guardrails, SOS hotlines, Gemini, Estado sistema). Cada edicion va a PATCH `/admin/config/:key`. Test Gemini button.
-- [ ] 41. Create `frontend/src/pages/admin/AuditLogs.tsx` (#31) — FilterBar + DataTable con expandable rows mostrando `details` JSON + ExportCsvButton
+- [x] 40. Create `frontend/src/pages/admin/Config.tsx` (#30) — 5 secciones (Consentimiento, Guardrails, SOS hotlines, Gemini, Estado sistema). Cada edicion va a PATCH `/admin/config/:key`. Test Gemini button.
+- [x] 41. Create `frontend/src/pages/admin/AuditLogs.tsx` (#31) — FilterBar + DataTable con expandable rows mostrando `details` JSON + ExportCsvButton
 
 ### Verification & polish
 

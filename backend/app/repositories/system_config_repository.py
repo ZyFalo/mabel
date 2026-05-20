@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,3 +59,29 @@ class SystemConfigRepository:
         if isinstance(value, str):
             return json.loads(value)
         return []
+
+    async def list_all(self) -> list[SystemConfig]:
+        """Return all system_config rows (admin list endpoint)."""
+        result = await self.db.execute(select(SystemConfig).order_by(SystemConfig.key))
+        return list(result.scalars().all())
+
+    async def get_row(self, key: str) -> SystemConfig | None:
+        """Return the raw ORM row for `key` (or None)."""
+        result = await self.db.execute(select(SystemConfig).where(SystemConfig.key == key))
+        return result.scalar_one_or_none()
+
+    async def update_value(self, key: str, new_value) -> SystemConfig:
+        """Update `value` for the row identified by `key`.
+
+        Sets `updated_at = now()` and flushes (does NOT commit, per D-12).
+        Raises ValueError("KEY_NOT_FOUND") if the row does not exist.
+        """
+        row = await self.get_row(key)
+        if row is None:
+            raise ValueError("KEY_NOT_FOUND")
+        row.value = new_value
+        row.updated_at = datetime.now(UTC)
+        await self.db.flush()
+        # Invalidate local cache (next read re-fetches).
+        self._cache = None
+        return row

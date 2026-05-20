@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -130,3 +130,51 @@ class SafetyEventStatusUpdate(BaseModel):
 
     status: Literal["reviewed", "resolved"]
     notes: str | None = None
+
+
+# --- Capability 5: admin-config-audit ---
+
+
+class SystemConfigItem(BaseModel):
+    """Row used in #30 Admin Config page. Value is opaque JSON shape per key."""
+
+    key: str
+    value: Any
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConfigUpdateRequest(BaseModel):
+    """Payload for PATCH /admin/config/:key. Shape validated server-side per key."""
+
+    value: Any
+
+
+class ConsentVersionCreate(BaseModel):
+    """Payload for POST /admin/consent-versions. New row starts as `draft`."""
+
+    version: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    body: str = Field(min_length=10)
+
+
+class ConsentVersionItem(BaseModel):
+    id: uuid.UUID
+    version: str
+    title: str
+    body: str
+    status: str
+    published_at: datetime | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GeminiTestResponse(BaseModel):
+    """Response for POST /admin/config/gemini/test."""
+
+    ok: bool
+    latency_ms: int
+    model: str
+    error: str | None = None
