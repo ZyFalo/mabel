@@ -66,7 +66,10 @@ async def require_consent(
 
     consent_repo = ConsentRepository(db)
     version_repo = ConsentVersionRepository(db)
-    service = ConsentService(consent_repo, version_repo)
+    # `db` is now required by ConsentService — passed even though this
+    # middleware only reads (get_consent_status), so the type contract is
+    # honored uniformly across callers.
+    service = ConsentService(consent_repo, version_repo, db=db)
 
     status_response = await service.get_consent_status(current_user.id)
 

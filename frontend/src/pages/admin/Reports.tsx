@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import apiClient from '../../api/client'
 import DataTable, { DataTableColumn } from '../../components/admin/DataTable'
 import FilterBar from '../../components/admin/FilterBar'
@@ -6,6 +7,7 @@ import Pagination from '../../components/admin/Pagination'
 import MetricCard from '../../components/admin/MetricCard'
 import ExportCsvButton from '../../components/admin/ExportCsvButton'
 import { useToastStore } from '../../stores/toastStore'
+import { SEVERITY_LABELS, severityLong } from '../../utils/severity'
 
 type ReportStatus = 'open' | 'triaged' | 'resolved' | 'dismissed'
 type ReportReason = 'hallucination' | 'harmful' | 'privacy' | 'low_empathy' | 'other'
@@ -15,8 +17,12 @@ type ReasonFilter = 'todos' | ReportReason
 type SeverityFilter = 'todos' | '1' | '2' | '3' | '4' | '5'
 
 interface ReportNoteEntry {
-  admin_id?: string | null
-  admin_id_truncated?: string | null
+  // Backend `_split_details` parses lines `[ISO_timestamp] <status>: <notes>`
+  // and emits these three fields per admin transition. The previous schema
+  // also had `admin_id` / `admin_id_truncated` but the parser never
+  // populated them (the source `message_reports.details` blob has no
+  // author info), so the JSX always fell back to the literal "admin" —
+  // misleading attribution. Removed to align types with reality.
   notes?: string | null
   status?: string | null
   at?: string | null
@@ -25,13 +31,18 @@ interface ReportNoteEntry {
 interface ReportAdminItem {
   id: string
   message_id: string
+  reporter_id: string
   reporter_id_truncated: string
   reason: ReportReason | string
   severity: number
   status: ReportStatus | string
   created_at: string
   triaged_at: string | null
-  // The backend may include a notes history array; we render defensively
+  // Free-text context written by the reporting student at filing time.
+  // Surfaced separately from admin notes so the UI does not mis-attribute
+  // the student's words as a moderator note.
+  reporter_context?: string | null
+  // Chronological notes added by admins on each status transition.
   notes_history?: ReportNoteEntry[] | null
 }
 
@@ -96,8 +107,14 @@ const SEVERITY_BADGE_STYLES: Record<number, React.CSSProperties> = {
   5: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
 }
 
+// Mirror of backend `_ALLOWED_TRANSITIONS` in `reports_service.py`. Keep in
+// sync: backend rejects any out-of-machine transition with HTTP 409.
+// Rationale for `open → dismissed`: trivial reports (spam, duplicates,
+// false positives) can be closed without an explicit triage step.
+// Resolving still requires prior triage because it implies corrective
+// action was taken.
 const TRANSITIONS: Record<string, ReportStatus[]> = {
-  open: ['triaged', 'resolved', 'dismissed'],
+  open: ['triaged', 'dismissed'],
   triaged: ['resolved', 'dismissed'],
   resolved: [],
   dismissed: [],
@@ -108,6 +125,27 @@ const ACTION_LABELS: Record<ReportStatus, string> = {
   triaged: 'Marcar como triado',
   resolved: 'Marcar como resuelto',
   dismissed: 'Marcar como descartado',
+}
+
+// Contextual placeholders for the notes textarea. They guide the admin to
+// write the right kind of note for each transition: triage = initial
+// assessment, resolved = corrective action, dismissed = reason for closing
+// without action, reopen = justification for reverting the decision.
+const NOTE_PLACEHOLDERS: Record<ReportStatus, string> = {
+  triaged:
+    'Resumen del triaje: ¿qué motiva el reporte? ¿severidad confirmada? ¿requiere acción correctiva o es falso positivo?',
+  resolved:
+    'Resolución: ¿qué acción se tomó (ajuste de prompt, actualización de guardrails, comunicación al usuario)? Adjunta enlaces o IDs si aplica.',
+  dismissed:
+    'Motivo del descarte: ¿por qué no procede (duplicado, fuera de alcance, sin evidencia suficiente, comportamiento esperado)?',
+  open: 'Justificación para reabrir el reporte: nueva evidencia o aspecto no contemplado en la decisión previa.',
+}
+
+const NOTE_HELPER: Record<ReportStatus, string> = {
+  triaged: 'Estas notas quedan en el historial del reporte (auditoría).',
+  resolved: 'Estas notas se registran como cierre formal del reporte.',
+  dismissed: 'Estas notas explican por qué el reporte no avanza.',
+  open: 'Estas notas explican por qué el reporte vuelve a abrirse.',
 }
 
 function formatDateTime(iso: string | null | undefined): string {
@@ -201,9 +239,14 @@ function SeverityBadge({ severity }: { severity: number }) {
     color: 'var(--ink-600)',
     borderColor: 'var(--ink-200)',
   }
+  const long =
+    severity >= 1 && severity <= 5
+      ? severityLong(severity as 1 | 2 | 3 | 4 | 5)
+      : `Severidad ${severity}`
   return (
     <span
-      aria-label={`Severidad ${severity}`}
+      aria-label={long}
+      title={long}
       className="inline-flex items-center justify-center"
       style={{
         minWidth: 28,
@@ -303,16 +346,19 @@ function ActionsForm({ current, reportId, onSuccess }: ActionFormProps) {
             htmlFor={`notes-${reportId}`}
             className="text-[11px] font-semibold uppercase tracking-wider text-text-primary/60"
           >
-            Notas (opcional)
+            Notas para "{ACTION_LABELS[selectedTarget]}" (opcional)
           </label>
           <textarea
             id={`notes-${reportId}`}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            placeholder="Contexto interno sobre la decisión tomada"
+            placeholder={NOTE_PLACEHOLDERS[selectedTarget]}
             className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-y"
           />
+          <p className="text-[11px] text-text-primary/50 italic">
+            {NOTE_HELPER[selectedTarget]}
+          </p>
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
@@ -378,14 +424,31 @@ function ExpandedDetail({
         </div>
       </div>
 
-      {/* Notes history */}
+      {/* Reporter context — what the student wrote when filing the report */}
+      {row.reporter_context && (
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-text-primary/60 mb-2">
+            Contexto del reportante
+          </p>
+          <div className="bg-mabel-50 border border-mabel-200 rounded-md px-3 py-2 text-[12px]">
+            <p className="text-text-primary whitespace-pre-wrap">
+              {row.reporter_context}
+            </p>
+            <p className="text-[10px] text-text-primary/50 italic mt-1">
+              Texto libre escrito por el estudiante al reportar el mensaje.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Admin notes history — only admin-authored entries from transitions */}
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-text-primary/60 mb-2">
-          Historial de notas
+          Historial de notas del admin
         </p>
         {history.length === 0 ? (
           <p className="text-[12px] text-text-primary/50 italic">
-            Aún no hay notas registradas para este reporte.
+            Aún no hay notas del admin registradas para este reporte.
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -395,12 +458,13 @@ function ExpandedDetail({
                 className="bg-white border border-gray-200 rounded-md px-3 py-2 text-[12px]"
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="font-mono text-[11px] text-text-primary/60">
-                    {entry.admin_id_truncated ?? entry.admin_id?.slice(0, 8) ?? 'admin'}
+                  <span className="text-[11px] font-semibold text-text-primary/70">
+                    {entry.status
+                      ? STATUS_LABELS[entry.status] ?? entry.status
+                      : 'Nota'}
                   </span>
                   <span className="text-text-primary/50 tabular-nums text-[11px]">
-                    {formatDateTime(entry.at)}
-                    {entry.status ? ` · ${STATUS_LABELS[entry.status] ?? entry.status}` : ''}
+                    {entry.at ? formatDateTime(entry.at) : '—'}
                   </span>
                 </div>
                 <p className="text-text-primary whitespace-pre-wrap">
@@ -579,11 +643,21 @@ export default function Reports() {
       {
         key: 'reporter',
         header: 'Reportante',
-        accessor: (row) => (
-          <span className="font-mono text-[11px] text-text-primary/70 tracking-tight">
-            {row.reporter_id_truncated || '—'}
-          </span>
-        ),
+        accessor: (row) =>
+          row.reporter_id ? (
+            <Link
+              to={`/admin/users/${row.reporter_id}`}
+              onClick={(e) => e.stopPropagation()}
+              title={`Ver detalle del estudiante ${row.reporter_id_truncated}`}
+              className="font-mono text-[11px] tracking-tight text-primary hover:underline focus:outline-none focus:underline"
+            >
+              {row.reporter_id_truncated || '—'}
+            </Link>
+          ) : (
+            <span className="font-mono text-[11px] text-text-primary/70 tracking-tight">
+              {row.reporter_id_truncated || '—'}
+            </span>
+          ),
         className: 'w-[130px]',
       },
     ],
@@ -745,11 +819,11 @@ export default function Reports() {
             className="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           >
             <option value="todos">Todas</option>
-            <option value="1">1 — leve</option>
-            <option value="2">2</option>
-            <option value="3">3 — media</option>
-            <option value="4">4</option>
-            <option value="5">5 — crítica</option>
+            <option value="1">1 — {SEVERITY_LABELS[1].toLowerCase()}</option>
+            <option value="2">2 — {SEVERITY_LABELS[2].toLowerCase()}</option>
+            <option value="3">3 — {SEVERITY_LABELS[3].toLowerCase()}</option>
+            <option value="4">4 — {SEVERITY_LABELS[4].toLowerCase()}</option>
+            <option value="5">5 — {SEVERITY_LABELS[5].toLowerCase()}</option>
           </select>
         </div>
 

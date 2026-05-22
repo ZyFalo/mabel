@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
+import { SEVERITY_LABELS, severityLong, SeverityLevel } from '../../utils/severity'
 
 const REASONS = [
   { value: 'hallucination', label: 'Alucinacion' },
@@ -187,16 +188,21 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
             Severidad (opcional)
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
-            {[1, 2, 3, 4, 5].map((n) => {
+            {([1, 2, 3, 4, 5] as SeverityLevel[]).map((n) => {
               const on = severity === n
+              const long = severityLong(n)
               return (
                 <button
                   key={n}
                   type="button"
                   onClick={() => setSeverity(on ? null : n)}
+                  aria-label={long}
+                  aria-pressed={on}
+                  title={long}
                   style={{
-                    width: 38,
-                    height: 38,
+                    flex: 1,
+                    minWidth: 56,
+                    padding: '6px 4px',
                     borderRadius: 10,
                     fontSize: 13,
                     fontWeight: 600,
@@ -206,13 +212,39 @@ export default function ReportModal({ messageId, onClose, onReported }: ReportMo
                     cursor: 'pointer',
                     fontFamily: 'var(--font-sans)',
                     transition: 'all var(--dur-fast) var(--ease-out)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 2,
+                    lineHeight: 1.1,
                   }}
                 >
-                  {n}
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{n}</span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 500,
+                      opacity: 0.85,
+                    }}
+                  >
+                    {SEVERITY_LABELS[n]}
+                  </span>
                 </button>
               )
             })}
           </div>
+          {severity !== null && (
+            <p
+              style={{
+                marginTop: 8,
+                fontSize: 11,
+                color: 'var(--ink-500)',
+                fontStyle: 'italic',
+              }}
+            >
+              {severityLong(severity as SeverityLevel)}
+            </p>
+          )}
         </div>
 
         {/* Details */}

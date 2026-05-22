@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,9 +11,7 @@ class PasswordResetRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(
-        self, user_id: uuid.UUID, token_hash: str, expires_at: datetime
-    ) -> PasswordResetToken:
+    async def create(self, user_id: uuid.UUID, token_hash: str, expires_at: datetime) -> PasswordResetToken:
         token = PasswordResetToken(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
         self.db.add(token)
         await self.db.commit()
@@ -30,10 +28,8 @@ class PasswordResetRepository:
         return result.scalar_one_or_none()
 
     async def mark_used(self, token_id: uuid.UUID) -> None:
-        result = await self.db.execute(
-            select(PasswordResetToken).where(PasswordResetToken.id == token_id)
-        )
+        result = await self.db.execute(select(PasswordResetToken).where(PasswordResetToken.id == token_id))
         token = result.scalar_one_or_none()
         if token:
-            token.used_at = datetime.utcnow()
+            token.used_at = datetime.now(UTC)
             await self.db.commit()

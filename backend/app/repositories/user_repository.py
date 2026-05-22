@@ -19,9 +19,16 @@ class UserRepository:
         return result.scalar_one_or_none()
 
     async def create(self, email: str, hashed_password: str, display_name: str) -> User:
+        """Insert a new user. Does NOT commit (per D-12).
+
+        The caller (`AuthService.register`) bundles this with the matching
+        `audit_log_action(action='user_register')` and commits both
+        atomically, so a failure in the audit write rolls back the user
+        creation too.
+        """
         user = User(email=email, hashed_password=hashed_password, display_name=display_name)
         self.db.add(user)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(user)
         return user
 

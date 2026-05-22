@@ -7,10 +7,14 @@ Endpoints:
 Append-only by design — no PATCH or DELETE.
 
 Privacy/audit rules:
-- Admin emails are masked to `{first_char}***@{domain}` (D-04) in the API.
-- CSV anonymizes `admin_id` and `target_id` via `sha256(value)[:16]` (D-08).
+- Actor emails are masked to `{first_char}***@{domain}` (D-04) in the API.
+- CSV anonymizes `actor_id` and `target_id` via `sha256(value)[:16]` (D-08).
 - The CSV export action is itself audited (`action="export_data"`,
   `details.resource="logs"`).
+
+Evolucion 007: `admin_id` filter renamed to `actor_id`; new optional
+`actor_role` filter (`admin|student|system`) exposed so the panel can scope
+to either admin activity or student-originated events.
 """
 
 from __future__ import annotations
@@ -20,6 +24,7 @@ import hashlib
 import io
 import uuid
 from datetime import UTC, date, datetime, time
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
@@ -34,6 +39,8 @@ from app.schemas.admin import AuditLogItem, PaginatedResponse
 from app.services.audit_service import audit_log_action
 
 router = APIRouter(prefix="/admin/logs", tags=["admin"])
+
+ActorRole = Literal["admin", "student", "system"]
 
 
 def _client_ip(request: Request) -> str | None:
@@ -69,17 +76,18 @@ def _to_datetime_end(value: date | None) -> datetime | None:
     return datetime.combine(value, time.max, tzinfo=UTC)
 
 
-async def _resolve_admin_emails(db: AsyncSession, admin_ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
-    """Batch lookup admin emails for masking (single query, no N+1)."""
-    if not admin_ids:
+async def _resolve_actor_emails(db: AsyncSession, actor_ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """Batch lookup actor emails for masking (single query, no N+1)."""
+    if not actor_ids:
         return {}
-    result = await db.execute(select(User.id, User.email).where(User.id.in_(admin_ids)))
+    result = await db.execute(select(User.id, User.email).where(User.id.in_(actor_ids)))
     return {row.id: row.email for row in result}
 
 
 @router.get("", response_model=PaginatedResponse[AuditLogItem])
 async def list_admin_logs(
-    admin_id: uuid.UUID | None = Query(default=None),
+    actor_id: uuid.UUID | None = Query(default=None),
+    actor_role: ActorRole | None = Query(default=None),
     action: str | None = Query(default=None),
     from_: date | None = Query(default=None, alias="from"),
     to: date | None = Query(default=None),
@@ -90,7 +98,8 @@ async def list_admin_logs(
 ) -> PaginatedResponse[AuditLogItem]:
     repo = AuditLogRepository(db)
     items, total = await repo.list_with_filters(
-        admin_id=admin_id,
+        actor_id=actor_id,
+        actor_role=actor_role,
         action=action,
         from_date=_to_datetime_start(from_),
         to_date=_to_datetime_end(to),
@@ -98,18 +107,19 @@ async def list_admin_logs(
         page_size=page_size,
     )
 
-    # Batch-resolve admin emails for masking (single SELECT).
-    admin_ids = {row.admin_id for row in items if row.admin_id is not None}
-    email_map = await _resolve_admin_emails(db, admin_ids)
+    # Batch-resolve actor emails for masking (single SELECT).
+    actor_ids = {row.actor_id for row in items if row.actor_id is not None}
+    email_map = await _resolve_actor_emails(db, actor_ids)
 
     out: list[AuditLogItem] = []
     for row in items:
-        email = email_map.get(row.admin_id) if row.admin_id else None
+        email = email_map.get(row.actor_id) if row.actor_id else None
         out.append(
             AuditLogItem(
                 id=row.id,
-                admin_id=row.admin_id,
-                admin_email_masked=_mask_email(email),
+                actor_id=row.actor_id,
+                actor_role=row.actor_role,
+                actor_email_masked=_mask_email(email),
                 action=row.action,
                 target_type=row.target_type,
                 target_id=str(row.target_id) if row.target_id else None,
@@ -124,7 +134,8 @@ async def list_admin_logs(
 @router.get("/export.csv")
 async def export_admin_logs_csv(
     request: Request,
-    admin_id: uuid.UUID | None = Query(default=None),
+    actor_id: uuid.UUID | None = Query(default=None),
+    actor_role: ActorRole | None = Query(default=None),
     action: str | None = Query(default=None),
     from_: date | None = Query(default=None, alias="from"),
     to: date | None = Query(default=None),
@@ -135,14 +146,16 @@ async def export_admin_logs_csv(
     # client disconnects mid-stream.
     await audit_log_action(
         db,
-        admin_id=current_user.id,
+        actor_id=current_user.id,
+        actor_role="admin",
         action="export_data",
         target_type="audit_logs",
         target_id=None,
         details={
             "resource": "logs",
             "filters": {
-                "admin_id": str(admin_id) if admin_id else None,
+                "actor_id": str(actor_id) if actor_id else None,
+                "actor_role": actor_role,
                 "action": action,
                 "from": from_.isoformat() if from_ else None,
                 "to": to.isoformat() if to else None,
@@ -160,7 +173,16 @@ async def export_admin_logs_csv(
         # Header row.
         header_buf = io.StringIO()
         csv.writer(header_buf).writerow(
-            ["id", "admin_id_hash", "action", "target_type", "target_id_hash", "created_at", "ip"]
+            [
+                "id",
+                "actor_id_hash",
+                "actor_role",
+                "action",
+                "target_type",
+                "target_id_hash",
+                "created_at",
+                "ip",
+            ]
         )
         yield header_buf.getvalue()
 
@@ -168,7 +190,8 @@ async def export_admin_logs_csv(
         page_size = 200
         while True:
             items, _total = await repo.list_with_filters(
-                admin_id=admin_id,
+                actor_id=actor_id,
+                actor_role=actor_role,
                 action=action,
                 from_date=from_dt,
                 to_date=to_dt,
@@ -182,7 +205,8 @@ async def export_admin_logs_csv(
                 csv.writer(buf).writerow(
                     [
                         str(row.id),
-                        _sha16(row.admin_id),
+                        _sha16(row.actor_id),
+                        row.actor_role,
                         row.action,
                         row.target_type or "",
                         _sha16(row.target_id),

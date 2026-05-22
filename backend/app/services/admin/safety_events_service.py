@@ -126,7 +126,8 @@ class AdminSafetyEventsService:
 
         await audit_log_action(
             self.db,
-            admin_id=admin_id,
+            actor_id=admin_id,
+            actor_role="admin",
             action="review_safety_event",
             target_type="safety_event",
             target_id=updated.id,
@@ -164,7 +165,8 @@ class AdminSafetyEventsService:
 
         await audit_log_action(
             self.db,
-            admin_id=admin_id,
+            actor_id=admin_id,
+            actor_role="admin",
             action="export_data",
             target_type="safety_event",
             target_id=None,

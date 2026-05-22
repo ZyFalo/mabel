@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +39,6 @@ class SessionRepository:
         result = await self.db.execute(
             update(Session)
             .where(Session.user_id == user_id, Session.ended_at.is_(None))
-            .values(ended_at=datetime.utcnow())
+            .values(ended_at=datetime.now(UTC))
         )
         return result.rowcount > 0

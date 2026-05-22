@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,11 +25,13 @@ async def get_me(current_user: User = Depends(get_current_user)):
 @router.delete("/me")
 async def delete_account(
     request: DeleteAccountRequest,
+    http_request: Request,
     current_user: User = Depends(require_role("student")),
     service: AccountService = Depends(_get_account_service),
 ):
+    ip = http_request.client.host if http_request.client else None
     try:
-        await service.delete_account(current_user.id, request.confirmation)
+        await service.delete_account(current_user.id, request.confirmation, ip=ip)
     except ValueError as e:
         msg = str(e)
         if msg == "INVALID_CONFIRMATION":

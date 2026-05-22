@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,17 +33,25 @@ class ConsentRepository:
     async def create(
         self, user_id: uuid.UUID, consent_version_id: uuid.UUID, scope: str
     ) -> Consent:
+        """Insert a new consent row. Does NOT commit (per D-12).
+
+        The caller (`ConsentService`) bundles this with the matching
+        `audit_log_action` and commits both atomically — so if the audit
+        write fails, the consent never persists either, and we preserve the
+        invariant that every consent change has its audit trail.
+        """
         consent = Consent(
             user_id=user_id, consent_version_id=consent_version_id, scope=scope
         )
         self.db.add(consent)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(consent)
         return consent
 
     async def update(self, consent: Consent, **kwargs: object) -> Consent:
+        """Update consent fields in place. Does NOT commit (per D-12)."""
         for key, value in kwargs.items():
             setattr(consent, key, value)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(consent)
         return consent

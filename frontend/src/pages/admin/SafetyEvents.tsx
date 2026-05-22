@@ -5,14 +5,18 @@ import FilterBar from '../../components/admin/FilterBar'
 import Pagination from '../../components/admin/Pagination'
 import ExportCsvButton from '../../components/admin/ExportCsvButton'
 import { useToastStore } from '../../stores/toastStore'
+import { SEVERITY_LABELS, severityLong } from '../../utils/severity'
 
 type EventStatus = 'active' | 'reviewed' | 'resolved'
 type StatusFilter = 'todos' | EventStatus
 type SeverityFilter = 'todos' | '1' | '2' | '3' | '4' | '5'
 
 interface SafetyEventNoteEntry {
-  admin_id?: string | null
-  admin_id_truncated?: string | null
+  // Backend emits `{at, status, notes}` per transition. The previous schema
+  // declared `admin_id` / `admin_id_truncated` but the parser never
+  // populated them (source `payload.notes` has no author info), so the JSX
+  // always fell back to literal "admin". Removed to align types with
+  // reality and stop misleading attribution.
   notes?: string | null
   status?: string | null
   at?: string | null
@@ -64,12 +68,27 @@ const STATUS_CHIP_STYLES: Record<string, React.CSSProperties> = {
   resolved: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
 }
 
+// Severity scale visual encoding. The mental-health convention is:
+//   1 (leve)    → verde, baja urgencia
+//   2           → azul/info
+//   3 (media)   → amarillo, atención
+//   4 (alta)    → naranja, atender pronto
+//   5 (crítica) → ROJO ALTO contraste + bold, debe gritar visualmente
+// Severity 5 deliberately uses solid danger-700 background with white text
+// so it cannot be confused with the lighter "Activo" status pill that
+// shares the same hue family. Critical ideation matches must communicate
+// urgency at a glance.
 const SEVERITY_BADGE_STYLES: Record<number, React.CSSProperties> = {
   1: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
   2: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37, 99, 235, 0.25)' },
   3: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
   4: { background: 'rgba(234, 88, 12, 0.10)', color: '#C2410C', borderColor: 'rgba(234, 88, 12, 0.30)' },
-  5: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  5: {
+    background: 'var(--danger-700)',
+    color: '#fff',
+    borderColor: 'var(--danger-700)',
+    fontWeight: 800,
+  },
 }
 
 const TRANSITIONS: Record<string, EventStatus[]> = {
@@ -87,6 +106,14 @@ const ACTION_LABELS: Record<EventStatus, string> = {
 // Defensive denylist: keys that, if ever present in payload, should NOT be rendered.
 // D-03: admin never sees message content. The backend should already exclude these,
 // but we filter on the frontend as a second line of defense.
+//
+// `message_id` added 2026-05-22 (L2 policy): the UUID itself is not "content",
+// but exposing it tempts/enables an admin with DB access to correlate the
+// safety event with `messages.content` and the originating user. Keep the
+// FK in the DB for forensic/crisis-response capability, but never render
+// it to the standard admin UI. A future role `clinical_reviewer` may
+// expose it with audit_log of every read (post-MVP). Retention policy:
+// cron job will null `message_id` after 30 days.
 const REDACTED_KEYS = new Set([
   'content',
   'message',
@@ -95,6 +122,7 @@ const REDACTED_KEYS = new Set([
   'assistant_content',
   'text',
   'transcript',
+  'message_id',
 ])
 
 function formatDateTime(iso: string | null | undefined): string {
@@ -160,6 +188,9 @@ function StatusChip({ status }: { status: string }) {
 
 function SeverityBadge({ severity }: { severity: number | null }) {
   if (severity == null) {
+    // Em-dash for events that don't carry a severity (e.g. redirect_shown
+    // is a UI-side event, not a risk detection). Previously rendered as
+    // a literal "null" pill which looked like a bug to the admin.
     return <span style={{ color: 'var(--ink-400)', fontSize: 13 }}>—</span>
   }
   const style: React.CSSProperties = SEVERITY_BADGE_STYLES[severity] ?? {
@@ -167,22 +198,30 @@ function SeverityBadge({ severity }: { severity: number | null }) {
     color: 'var(--ink-600)',
     borderColor: 'var(--ink-200)',
   }
+  const isCritical = severity >= 5
+  const long =
+    severity >= 1 && severity <= 5
+      ? severityLong(severity as 1 | 2 | 3 | 4 | 5)
+      : `Severidad ${severity}`
   return (
     <span
-      aria-label={`Severidad ${severity}`}
+      aria-label={long}
+      title={long}
       className="inline-flex items-center justify-center"
       style={{
-        minWidth: 28,
+        minWidth: isCritical ? 36 : 28,
         height: 22,
-        padding: '0 6px',
+        padding: isCritical ? '0 8px' : '0 6px',
         borderRadius: 6,
         fontSize: 11,
         fontWeight: 700,
         border: '1px solid',
         fontVariantNumeric: 'tabular-nums',
+        gap: 4,
         ...style,
       }}
     >
+      {isCritical && <span aria-hidden="true" style={{ fontSize: 10 }}>⚠</span>}
       {severity}
     </span>
   )
@@ -408,13 +447,18 @@ function ExpandedDetail({
                 key={i}
                 className="bg-white border border-gray-200 rounded-md px-3 py-2 text-[12px]"
               >
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="font-mono text-[11px] text-text-primary/60">
-                    {entry.admin_id_truncated ?? entry.admin_id?.slice(0, 8) ?? 'admin'}
+                {/* Mirrors the Reports.tsx pattern: the backend parser
+                    doesn't carry author info per note line, so we render
+                    only timestamp + status. Attribution lives in
+                    `audit_logs` (action='review_safety_event') if needed. */}
+                <div className="flex items-center mb-1" style={{ gap: 8 }}>
+                  <span className="text-[11px] font-semibold text-text-primary/70">
+                    {entry.status
+                      ? STATUS_LABELS[entry.status] ?? entry.status
+                      : 'Nota'}
                   </span>
-                  <span className="text-text-primary/50 tabular-nums text-[11px]">
-                    {formatDateTime(entry.at)}
-                    {entry.status ? ` · ${STATUS_LABELS[entry.status] ?? entry.status}` : ''}
+                  <span className="ml-auto text-text-primary/50 tabular-nums text-[11px]">
+                    {entry.at ? formatDateTime(entry.at) : '—'}
                   </span>
                 </div>
                 <p className="text-text-primary whitespace-pre-wrap">
@@ -446,21 +490,339 @@ function ExpandedDetail({
   )
 }
 
+type ViewMode = 'sessions' | 'events'
+
+/**
+ * Group a flat list of safety events into one entry per `session_id_truncated`.
+ * The session-centric view collapses related events (e.g. a `risk_detected`
+ * followed by the `redirect_shown` it triggered) into a single causal unit
+ * so the reviewer can read the escalation as a story instead of disjoint rows.
+ *
+ * Sort: most-recent latest-event-at first.
+ */
+interface SessionGroup {
+  sessionIdTruncated: string
+  events: SafetyEventAdminItem[]
+  maxSeverity: number
+  eventCount: number
+  unreviewedCount: number
+  earliestAt: string
+  latestAt: string
+  overallStatus: 'active' | 'reviewed' | 'resolved'
+}
+
+function groupBySession(events: SafetyEventAdminItem[]): SessionGroup[] {
+  const map = new Map<string, SafetyEventAdminItem[]>()
+  for (const ev of events) {
+    const key = ev.session_id_truncated ?? '(sin sesión)'
+    const list = map.get(key)
+    if (list) {
+      list.push(ev)
+    } else {
+      map.set(key, [ev])
+    }
+  }
+  const groups: SessionGroup[] = []
+  for (const [key, evts] of map.entries()) {
+    const sorted = [...evts].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    )
+    const severities = sorted.map((e) => e.severity ?? 0)
+    const maxSeverity = severities.reduce((m, s) => Math.max(m, s), 0)
+    const unreviewedCount = sorted.filter((e) => e.status === 'active').length
+    const anyActive = sorted.some((e) => e.status === 'active')
+    const anyReviewed = sorted.some((e) => e.status === 'reviewed')
+    const overallStatus: SessionGroup['overallStatus'] = anyActive
+      ? 'active'
+      : anyReviewed
+        ? 'reviewed'
+        : 'resolved'
+    groups.push({
+      sessionIdTruncated: key,
+      events: sorted,
+      maxSeverity,
+      eventCount: sorted.length,
+      unreviewedCount,
+      earliestAt: sorted[0].created_at,
+      latestAt: sorted[sorted.length - 1].created_at,
+      overallStatus,
+    })
+  }
+  // Most-recent activity first
+  return groups.sort(
+    (a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime(),
+  )
+}
+
+// -----------------------------------------------------------------------
+// SessionGroupCard — collapsible card per chat, showing the timeline of
+// safety events for that session. This is the triage-friendly view: a
+// reviewer reads the escalation as a story (risk → redirect_shown) rather
+// than as disjoint rows.
+// -----------------------------------------------------------------------
+
+function SessionGroupCard({
+  group,
+  onEventUpdated,
+}: {
+  group: SessionGroup
+  onEventUpdated: (updated: SafetyEventAdminItem | null) => void
+}) {
+  // Collapsed by default — the session row already surfaces severity max,
+  // event count and unreviewed count, which is enough for triage scanning.
+  // The reviewer expands only the sessions they want to act on.
+  const [expanded, setExpanded] = useState(false)
+
+  const statusStyle = STATUS_CHIP_STYLES[group.overallStatus]
+  const statusLabel = STATUS_LABELS[group.overallStatus]
+  const isCritical = group.maxSeverity >= 5
+
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: `1px solid ${isCritical ? 'var(--danger-200)' : 'var(--ink-200)'}`,
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        style={{
+          width: '100%',
+          padding: '14px 18px',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          textAlign: 'left',
+          fontFamily: 'var(--font-sans)',
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 12,
+            color: 'var(--ink-500)',
+            fontSize: 11,
+            transition: 'transform var(--dur-fast) var(--ease-out)',
+            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+            display: 'inline-block',
+          }}
+        >
+          ▶
+        </span>
+
+        <SeverityBadge severity={group.maxSeverity > 0 ? group.maxSeverity : null} />
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: 'var(--ink-900)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            Sesión {group.sessionIdTruncated}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--ink-500)',
+              marginTop: 2,
+            }}
+          >
+            Último evento {formatDateTime(group.latestAt)} ·{' '}
+            {group.eventCount} {group.eventCount === 1 ? 'evento' : 'eventos'}
+            {group.unreviewedCount > 0 && (
+              <>
+                {' · '}
+                <span style={{ color: 'var(--mabel-700)', fontWeight: 600 }}>
+                  {group.unreviewedCount} sin revisar
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '3px 10px',
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 600,
+            border: '1px solid',
+            ...statusStyle,
+          }}
+        >
+          {statusLabel}
+        </span>
+      </button>
+
+      {expanded && (
+        <div
+          style={{
+            borderTop: '1px solid var(--ink-100)',
+            padding: '14px 18px 18px 42px',
+            background: 'var(--ink-50)',
+          }}
+        >
+          <p
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.16em',
+              color: 'var(--ink-500)',
+              marginBottom: 10,
+            }}
+          >
+            Línea de tiempo de seguridad
+          </p>
+          <ol
+            style={{
+              listStyle: 'none',
+              padding: 0,
+              margin: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}
+          >
+            {group.events.map((ev) => (
+              <li
+                key={ev.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '140px 1fr',
+                  gap: 14,
+                  alignItems: 'start',
+                  padding: '10px 12px',
+                  background: '#fff',
+                  border: '1px solid var(--ink-200)',
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: 'var(--ink-500)',
+                    fontVariantNumeric: 'tabular-nums',
+                    paddingTop: 2,
+                  }}
+                >
+                  {formatDateTime(ev.created_at)}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <EventTypeChip eventType={ev.event_type} />
+                    <SeverityBadge severity={ev.severity} />
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: 600,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        border: '1px solid',
+                        ...STATUS_CHIP_STYLES[ev.status as EventStatus],
+                      }}
+                    >
+                      {STATUS_LABELS[ev.status] ?? ev.status}
+                    </span>
+                  </div>
+                  {ev.payload && (
+                    <SanitizedPayloadInline payload={ev.payload} />
+                  )}
+                  {ev.status === 'active' && (
+                    <ActionsForm
+                      current={ev.status}
+                      eventId={ev.id}
+                      onSuccess={onEventUpdated}
+                    />
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * One-line summary of a sanitized payload — just the keys, no JSON noise.
+ * Used inside the session timeline rows for quick scan.
+ */
+function SanitizedPayloadInline({
+  payload,
+}: {
+  payload: Record<string, unknown>
+}) {
+  const sanitized = sanitizePayload(payload)
+  if (
+    sanitized == null ||
+    typeof sanitized !== 'object' ||
+    Object.keys(sanitized as Record<string, unknown>).length === 0
+  ) {
+    return null
+  }
+  const entries = Object.entries(sanitized as Record<string, unknown>)
+  return (
+    <div
+      style={{
+        fontSize: 11.5,
+        color: 'var(--ink-600)',
+        fontFamily: 'var(--font-mono, monospace)',
+        background: 'var(--ink-50)',
+        border: '1px solid var(--ink-100)',
+        borderRadius: 6,
+        padding: '6px 8px',
+        overflow: 'auto',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {entries.map(([k, v], i) => (
+        <span key={k}>
+          {i > 0 && <span style={{ color: 'var(--ink-300)' }}> · </span>}
+          <span style={{ color: 'var(--ink-700)', fontWeight: 600 }}>{k}</span>:{' '}
+          {JSON.stringify(v)}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function SafetyEvents() {
   const addToast = useToastStore((s) => s.addToast)
 
   const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+  // Vista por defecto = "Por sesión" (triage-friendly). El admin puede
+  // cambiar a "Lista de eventos" para auditoría forensic detallada.
+  const [viewMode, setViewMode] = useState<ViewMode>('sessions')
 
   const [data, setData] = useState<SafetyEventsListResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // In session view we ask for a larger page (100) so a session's events
+  // aren't split across pages — frontend grouping needs the full chronology.
+  // In event view we honour the user's pageSize selection.
+  const effectivePageSize = viewMode === 'sessions' ? 100 : pageSize
+
   const buildParams = useCallback(() => {
     const params: Record<string, string | number> = {
       page,
-      page_size: pageSize,
+      page_size: effectivePageSize,
     }
     if (filters.event_type.trim()) params.event_type = filters.event_type.trim()
     if (filters.severity !== 'todos') params.severity = filters.severity
@@ -468,7 +830,7 @@ export default function SafetyEvents() {
     if (filters.from) params.from = filters.from
     if (filters.to) params.to = filters.to
     return params
-  }, [filters, page, pageSize])
+  }, [filters, page, effectivePageSize])
 
   const fetchEvents = useCallback(async () => {
     setLoading(true)
@@ -586,6 +948,15 @@ export default function SafetyEvents() {
 
   const total = data?.total ?? 0
 
+  // Session-grouped view of the current page of events. Memoised so React
+  // doesn't recompute on every render. The session view is triage-friendly
+  // (one row per chat, embedded timeline of safety events) while the
+  // event-list view stays for forensic auditing.
+  const sessionGroups = useMemo(
+    () => groupBySession(data?.items ?? []),
+    [data?.items],
+  )
+
   const exportParams = useMemo<Record<string, string | number | undefined>>(() => {
     const p: Record<string, string | number | undefined> = {}
     if (filters.event_type.trim()) p.event_type = filters.event_type.trim()
@@ -697,11 +1068,11 @@ export default function SafetyEvents() {
             className="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           >
             <option value="todos">Todas</option>
-            <option value="1">1 — leve</option>
-            <option value="2">2</option>
-            <option value="3">3 — media</option>
-            <option value="4">4</option>
-            <option value="5">5 — crítica</option>
+            <option value="1">1 — {SEVERITY_LABELS[1].toLowerCase()}</option>
+            <option value="2">2 — {SEVERITY_LABELS[2].toLowerCase()}</option>
+            <option value="3">3 — {SEVERITY_LABELS[3].toLowerCase()}</option>
+            <option value="4">4 — {SEVERITY_LABELS[4].toLowerCase()}</option>
+            <option value="5">5 — {SEVERITY_LABELS[5].toLowerCase()}</option>
           </select>
         </div>
 
@@ -795,33 +1166,140 @@ export default function SafetyEvents() {
         </div>
       )}
 
-      {/* Table */}
-      <DataTable<SafetyEventAdminItem>
-        columns={columns}
-        rows={data?.items ?? []}
-        loading={loading}
-        rowKey={(row) => row.id}
-        renderExpanded={(row) => (
-          <ExpandedDetail row={row} onUpdated={handleRowUpdated} />
-        )}
-        emptyMessage={
-          activeFilterCount > 0
-            ? 'No se encontraron eventos con los filtros aplicados.'
-            : 'No hay eventos de seguridad registrados todavía.'
-        }
-      />
-
-      {/* Pagination */}
-      <Pagination
-        page={data?.page ?? page}
-        pageSize={data?.page_size ?? pageSize}
-        total={total}
-        onPageChange={(p) => setPage(p)}
-        onPageSizeChange={(size) => {
-          setPageSize(size)
-          setPage(1)
+      {/* View-mode toggle: triage-friendly session view vs forensic event list */}
+      <div
+        role="tablist"
+        aria-label="Vista"
+        style={{
+          display: 'inline-flex',
+          padding: 4,
+          gap: 4,
+          background: 'var(--ink-100)',
+          borderRadius: 10,
+          marginBottom: 16,
         }}
-      />
+      >
+        {(
+          [
+            { id: 'sessions', label: 'Por sesión' },
+            { id: 'events', label: 'Lista de eventos' },
+          ] as { id: ViewMode; label: string }[]
+        ).map((opt) => {
+          const active = viewMode === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                setViewMode(opt.id)
+                setPage(1)
+              }}
+              style={{
+                padding: '6px 14px',
+                background: active ? '#fff' : 'transparent',
+                color: active ? 'var(--ink-900)' : 'var(--ink-600)',
+                border: 'none',
+                borderRadius: 7,
+                fontSize: 13,
+                fontWeight: active ? 700 : 500,
+                fontFamily: 'var(--font-sans)',
+                cursor: 'pointer',
+                boxShadow: active ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                transition: 'background var(--dur-fast) var(--ease-out)',
+              }}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {viewMode === 'sessions' ? (
+        <>
+          {loading && (data?.items ?? []).length === 0 ? (
+            <div
+              style={{
+                padding: 32,
+                textAlign: 'center',
+                color: 'var(--ink-500)',
+                fontSize: 13.5,
+              }}
+            >
+              Cargando…
+            </div>
+          ) : sessionGroups.length === 0 ? (
+            <div
+              style={{
+                padding: 32,
+                textAlign: 'center',
+                color: 'var(--ink-500)',
+                fontSize: 13.5,
+                background: '#fff',
+                border: '1px solid var(--ink-200)',
+                borderRadius: 12,
+              }}
+            >
+              {activeFilterCount > 0
+                ? 'No se encontraron sesiones con eventos según los filtros aplicados.'
+                : 'No hay sesiones con eventos de seguridad registrados todavía.'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {sessionGroups.map((group) => (
+                <SessionGroupCard
+                  key={group.sessionIdTruncated}
+                  group={group}
+                  onEventUpdated={handleRowUpdated}
+                />
+              ))}
+            </div>
+          )}
+          <p
+            style={{
+              marginTop: 14,
+              fontSize: 11.5,
+              color: 'var(--ink-400)',
+              fontStyle: 'italic',
+            }}
+          >
+            Mostrando hasta {effectivePageSize} eventos recientes agrupados por sesión.
+            Para auditoría detallada por evento individual, cambia a la vista
+            "Lista de eventos".
+          </p>
+        </>
+      ) : (
+        <>
+          {/* Table — forensic event-by-event view */}
+          <DataTable<SafetyEventAdminItem>
+            columns={columns}
+            rows={data?.items ?? []}
+            loading={loading}
+            rowKey={(row) => row.id}
+            renderExpanded={(row) => (
+              <ExpandedDetail row={row} onUpdated={handleRowUpdated} />
+            )}
+            emptyMessage={
+              activeFilterCount > 0
+                ? 'No se encontraron eventos con los filtros aplicados.'
+                : 'No hay eventos de seguridad registrados todavía.'
+            }
+          />
+
+          {/* Pagination */}
+          <Pagination
+            page={data?.page ?? page}
+            pageSize={data?.page_size ?? pageSize}
+            total={total}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(size) => {
+              setPageSize(size)
+              setPage(1)
+            }}
+          />
+        </>
+      )}
     </div>
   )
 }

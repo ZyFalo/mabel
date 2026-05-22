@@ -171,6 +171,16 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+html, body, #root {
+  /* `height: 100%` propagada por toda la cadena raíz para que cualquier
+     descendiente con `h-screen` (AdminLayout, StudentLayout) calcule
+     correctamente 100vh y no permita que el documento entero crezca.
+     Sin esto, si un Outlet renderiza contenido más alto que el viewport,
+     el `<body>` crece y el sidebar parece "salirse" porque el scroll real
+     ocurre en el document, no en el `<main>`. */
+  height: 100%;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -182,6 +192,10 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* El scroll de la app se contiene a los `<main>` internos (los layouts
+     usan flex con overflow-y-auto). Evitamos que el body funcione como
+     un scroll alternativo cuando algún descendiente excede `h-screen`. */
+  overflow: hidden;
 }
 
 button, input, select, textarea {

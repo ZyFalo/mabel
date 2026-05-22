@@ -4,27 +4,48 @@ import DataTable, { DataTableColumn } from '../../components/admin/DataTable'
 import FilterBar from '../../components/admin/FilterBar'
 import Pagination from '../../components/admin/Pagination'
 import ExportCsvButton from '../../components/admin/ExportCsvButton'
+import InfoHint from '../../components/admin/InfoHint'
 import { useToastStore } from '../../stores/toastStore'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type AuditAction =
+// Audit actions, grouped by the role of the actor that performs them.
+// Source of truth: `backend/app/services/audit_service.py::ALLOWED_ACTIONS`.
+type AdminAction =
   | 'login'
   | 'view_user'
   | 'disable_user'
+  | 'enable_user'
+  | 'update_cohort'
   | 'change_config'
+  | 'update_system_config'
   | 'review_report'
   | 'review_safety_event'
   | 'export_data'
+  | 'empathy_rate'
 
+type StudentAction =
+  | 'user_register'
+  | 'user_login'
+  | 'user_delete'
+  | 'consent_granted'
+  | 'consent_revoked'
+  | 'password_reset_requested'
+  | 'password_reset_completed'
+
+type SystemAction = 'user_login_failed'
+
+type AuditAction = AdminAction | StudentAction | SystemAction
 type ActionFilter = 'todos' | AuditAction
+type RoleFilter = 'todos' | 'admin' | 'student' | 'system'
 
 interface AuditLogItem {
   id: string
-  admin_id: string | null
-  admin_email_masked: string | null
+  actor_id: string | null
+  actor_role: 'admin' | 'student' | 'system' | string
+  actor_email_masked: string | null
   action: AuditAction | string
   target_type: string | null
   target_id: string | null
@@ -41,37 +62,85 @@ interface AuditLogsResponse {
 }
 
 interface FiltersState {
-  admin: string
+  actor: string
+  actor_role: RoleFilter
   action: ActionFilter
   from: string
   to: string
 }
 
 const DEFAULT_FILTERS: FiltersState = {
-  admin: '',
+  actor: '',
+  actor_role: 'todos',
   action: 'todos',
   from: '',
   to: '',
 }
 
+// ============================================================================
+// Labels and styling
+// ============================================================================
+
 const ACTION_LABELS: Record<string, string> = {
-  login: 'Inicio de sesión',
+  // Admin actions
+  login: 'Inicio de sesión (admin)',
   view_user: 'Ver usuario',
   disable_user: 'Deshabilitar usuario',
+  enable_user: 'Reactivar usuario',
+  update_cohort: 'Asignar cohorte',
   change_config: 'Cambio de config',
+  update_system_config: 'Actualizar config',
   review_report: 'Revisar reporte',
   review_safety_event: 'Revisar evento SOS',
   export_data: 'Exportar datos',
+  empathy_rate: 'Calificar empatía',
+  // Student-originated actions
+  user_register: 'Registro de cuenta',
+  user_login: 'Inicio de sesión (estudiante)',
+  user_delete: 'Eliminación de cuenta',
+  consent_granted: 'Consentimiento aceptado',
+  consent_revoked: 'Consentimiento revocado',
+  password_reset_requested: 'Solicitud reset contraseña',
+  password_reset_completed: 'Reset contraseña completado',
+  // System events
+  user_login_failed: 'Login fallido',
 }
 
 const ACTION_CHIP_STYLES: Record<string, React.CSSProperties> = {
+  // Admin
   login: { background: 'var(--ink-100)', color: 'var(--ink-700)', borderColor: 'var(--ink-200)' },
   view_user: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37,99,235,0.25)' },
   disable_user: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  enable_user: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  update_cohort: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37,99,235,0.25)' },
   change_config: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  update_system_config: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
   review_report: { background: 'var(--mabel-50)', color: 'var(--mabel-700)', borderColor: 'var(--mabel-200)' },
   review_safety_event: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
   export_data: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  empathy_rate: { background: 'var(--mabel-50)', color: 'var(--mabel-700)', borderColor: 'var(--mabel-200)' },
+  // Student
+  user_register: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  user_login: { background: 'var(--ink-100)', color: 'var(--ink-700)', borderColor: 'var(--ink-200)' },
+  user_delete: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  consent_granted: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  consent_revoked: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  password_reset_requested: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37,99,235,0.25)' },
+  password_reset_completed: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37,99,235,0.25)' },
+  // System
+  user_login_failed: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'Admin',
+  student: 'Estudiante',
+  system: 'Sistema',
+}
+
+const ROLE_CHIP_STYLES: Record<string, React.CSSProperties> = {
+  admin: { background: 'var(--mabel-50)', color: 'var(--mabel-700)', borderColor: 'var(--mabel-200)' },
+  student: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37,99,235,0.25)' },
+  system: { background: 'var(--ink-100)', color: 'var(--ink-600)', borderColor: 'var(--ink-200)' },
 }
 
 // ============================================================================
@@ -126,6 +195,20 @@ function truncateDetails(row: AuditLogItem): string {
   return out || '—'
 }
 
+function chipStyle(extra: React.CSSProperties): React.CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '2px 10px',
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 600,
+    border: '1px solid',
+    letterSpacing: '0.01em',
+    ...extra,
+  }
+}
+
 function ActionChip({ action }: { action: string }) {
   const label = ACTION_LABELS[action] ?? action
   const style = ACTION_CHIP_STYLES[action] ?? {
@@ -133,23 +216,17 @@ function ActionChip({ action }: { action: string }) {
     color: 'var(--ink-700)',
     borderColor: 'var(--ink-200)',
   }
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '2px 10px',
-        borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 600,
-        border: '1px solid',
-        letterSpacing: '0.01em',
-        ...style,
-      }}
-    >
-      {label}
-    </span>
-  )
+  return <span style={chipStyle(style)}>{label}</span>
+}
+
+function RoleChip({ role }: { role: string }) {
+  const label = ROLE_LABEL[role] ?? role
+  const style = ROLE_CHIP_STYLES[role] ?? {
+    background: 'var(--ink-100)',
+    color: 'var(--ink-700)',
+    borderColor: 'var(--ink-200)',
+  }
+  return <span style={chipStyle(style)}>{label}</span>
 }
 
 function ExpandedDetail({ row }: { row: AuditLogItem }) {
@@ -157,8 +234,9 @@ function ExpandedDetail({ row }: { row: AuditLogItem }) {
     const payload = {
       id: row.id,
       action: row.action,
-      admin_id: row.admin_id,
-      admin_email_masked: row.admin_email_masked,
+      actor_id: row.actor_id,
+      actor_role: row.actor_role,
+      actor_email_masked: row.actor_email_masked,
       target_type: row.target_type,
       target_id: row.target_id,
       ip: row.ip,
@@ -174,7 +252,7 @@ function ExpandedDetail({ row }: { row: AuditLogItem }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px]">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-[12px]">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/50">
             Log ID
@@ -183,11 +261,17 @@ function ExpandedDetail({ row }: { row: AuditLogItem }) {
         </div>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/50">
-            Admin
+            Actor
           </p>
           <p className="font-mono text-text-primary/80">
-            {row.admin_email_masked ?? row.admin_id?.slice(0, 8) ?? '—'}
+            {row.actor_email_masked ?? row.actor_id?.slice(0, 8) ?? '— (sistema)'}
           </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/50">
+            Rol
+          </p>
+          <RoleChip role={row.actor_role} />
         </div>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/50">
@@ -217,7 +301,9 @@ function ExpandedDetail({ row }: { row: AuditLogItem }) {
       </div>
 
       <p className="text-[11px] text-text-primary/40 italic border-t border-gray-200 pt-2">
-        Los registros de auditoría son append-only. No es posible editar ni eliminar entradas.
+        Los registros de auditoría son append-only. No es posible editar ni eliminar entradas. La
+        FK <code>actor_id ON DELETE SET NULL</code> preserva el log incluso si el usuario fue
+        eliminado.
       </p>
     </div>
   )
@@ -245,7 +331,8 @@ export default function AuditLogs() {
         page_size: pageSize,
         ...(extra ?? {}),
       }
-      if (filters.admin.trim()) params.admin_id = filters.admin.trim()
+      if (filters.actor.trim()) params.actor_id = filters.actor.trim()
+      if (filters.actor_role !== 'todos') params.actor_role = filters.actor_role
       if (filters.action !== 'todos') params.action = filters.action
       if (filters.from) params.from = filters.from
       if (filters.to) params.to = filters.to
@@ -300,14 +387,22 @@ export default function AuditLogs() {
         className: 'w-[180px]',
       },
       {
-        key: 'admin',
-        header: 'Admin',
+        key: 'actor',
+        header: 'Actor',
         accessor: (row) => (
           <span className="font-mono text-[12px] text-text-primary/80 tracking-tight">
-            {row.admin_email_masked ?? row.admin_id?.slice(0, 8) ?? '—'}
+            {row.actor_email_masked ?? row.actor_id?.slice(0, 8) ?? '— (sistema)'}
           </span>
         ),
         className: 'w-[200px]',
+      },
+      {
+        key: 'role',
+        header: 'Rol',
+        sortable: true,
+        sortValue: (row) => row.actor_role,
+        accessor: (row) => <RoleChip role={row.actor_role} />,
+        className: 'w-[110px]',
       },
       {
         key: 'action',
@@ -315,7 +410,7 @@ export default function AuditLogs() {
         sortable: true,
         sortValue: (row) => row.action,
         accessor: (row) => <ActionChip action={row.action} />,
-        className: 'w-[170px]',
+        className: 'w-[200px]',
       },
       {
         key: 'detail',
@@ -339,14 +434,16 @@ export default function AuditLogs() {
   )
 
   const activeFilterCount =
-    (filters.admin.trim() ? 1 : 0) +
+    (filters.actor.trim() ? 1 : 0) +
+    (filters.actor_role !== 'todos' ? 1 : 0) +
     (filters.action !== 'todos' ? 1 : 0) +
     (filters.from ? 1 : 0) +
     (filters.to ? 1 : 0)
 
   const exportParams = useMemo<Record<string, string | number | undefined>>(() => {
     const p: Record<string, string | number | undefined> = {}
-    if (filters.admin.trim()) p.admin_id = filters.admin.trim()
+    if (filters.actor.trim()) p.actor_id = filters.actor.trim()
+    if (filters.actor_role !== 'todos') p.actor_role = filters.actor_role
     if (filters.action !== 'todos') p.action = filters.action
     if (filters.from) p.from = filters.from
     if (filters.to) p.to = filters.to
@@ -384,19 +481,22 @@ export default function AuditLogs() {
           >
             Auditoría
           </p>
-          <h1
-            style={{
-              fontSize: 28,
-              fontWeight: 800,
-              color: 'var(--ink-900)',
-              marginTop: 6,
-              marginBottom: 0,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.15,
-            }}
-          >
-            Registro de auditoría
-          </h1>
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <h1
+              style={{
+                fontSize: 28,
+                fontWeight: 800,
+                color: 'var(--ink-900)',
+                marginTop: 6,
+                marginBottom: 0,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.15,
+              }}
+            >
+              Registro de auditoría
+            </h1>
+            <InfoHint text="Bitácora append-only de acciones con intencionalidad humana o eventos críticos: acciones de admin (gestión, exports), de estudiante (registro, consent, eliminación, reset contraseña, login) y de sistema (intentos fallidos). Los mensajes a Mabel y los safety_events viven en sus propias tablas, no aquí." />
+          </div>
           <p
             style={{
               fontSize: 13.5,
@@ -405,7 +505,8 @@ export default function AuditLogs() {
               marginBottom: 0,
             }}
           >
-            Bitácora inmutable de acciones administrativas. Append-only por diseño.
+            Bitácora inmutable. Append-only por diseño. Incluye acciones de admin, estudiante y
+            sistema.
           </p>
         </div>
         <ExportCsvButton
@@ -427,27 +528,47 @@ export default function AuditLogs() {
       >
         <div className="flex flex-col gap-1 min-w-[220px]">
           <label
-            htmlFor="filter-admin"
+            htmlFor="filter-actor"
             className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/60"
           >
-            Admin (email o ID)
+            Actor (email o ID)
           </label>
           <input
-            id="filter-admin"
+            id="filter-actor"
             type="text"
-            value={filters.admin}
-            onChange={(e) => updateFilter('admin', e.target.value)}
+            value={filters.actor}
+            onChange={(e) => updateFilter('actor', e.target.value)}
             placeholder="admin@umb o uuid"
             className="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
         </div>
 
-        <div className="flex flex-col gap-1 min-w-[180px]">
+        <div className="flex flex-col gap-1 min-w-[150px]">
+          <label
+            htmlFor="filter-role"
+            className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/60"
+          >
+            Rol
+          </label>
+          <select
+            id="filter-role"
+            value={filters.actor_role}
+            onChange={(e) => updateFilter('actor_role', e.target.value as RoleFilter)}
+            className="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+          >
+            <option value="todos">Todos</option>
+            <option value="admin">Admin</option>
+            <option value="student">Estudiante</option>
+            <option value="system">Sistema</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1 min-w-[210px]">
           <label
             htmlFor="filter-action"
             className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/60"
           >
-            Accion
+            Acción
           </label>
           <select
             id="filter-action"
@@ -456,13 +577,39 @@ export default function AuditLogs() {
             className="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           >
             <option value="todos">Todas</option>
-            <option value="login">Inicio de sesión</option>
-            <option value="view_user">Ver usuario</option>
-            <option value="disable_user">Deshabilitar usuario</option>
-            <option value="change_config">Cambio de config</option>
-            <option value="review_report">Revisar reporte</option>
-            <option value="review_safety_event">Revisar evento SOS</option>
-            <option value="export_data">Exportar datos</option>
+            <optgroup label="Admin">
+              <option value="login">{ACTION_LABELS.login}</option>
+              <option value="view_user">{ACTION_LABELS.view_user}</option>
+              <option value="disable_user">{ACTION_LABELS.disable_user}</option>
+              <option value="enable_user">{ACTION_LABELS.enable_user}</option>
+              <option value="update_cohort">{ACTION_LABELS.update_cohort}</option>
+              <option value="change_config">{ACTION_LABELS.change_config}</option>
+              <option value="update_system_config">
+                {ACTION_LABELS.update_system_config}
+              </option>
+              <option value="review_report">{ACTION_LABELS.review_report}</option>
+              <option value="review_safety_event">
+                {ACTION_LABELS.review_safety_event}
+              </option>
+              <option value="export_data">{ACTION_LABELS.export_data}</option>
+              <option value="empathy_rate">{ACTION_LABELS.empathy_rate}</option>
+            </optgroup>
+            <optgroup label="Estudiante">
+              <option value="user_register">{ACTION_LABELS.user_register}</option>
+              <option value="user_login">{ACTION_LABELS.user_login}</option>
+              <option value="user_delete">{ACTION_LABELS.user_delete}</option>
+              <option value="consent_granted">{ACTION_LABELS.consent_granted}</option>
+              <option value="consent_revoked">{ACTION_LABELS.consent_revoked}</option>
+              <option value="password_reset_requested">
+                {ACTION_LABELS.password_reset_requested}
+              </option>
+              <option value="password_reset_completed">
+                {ACTION_LABELS.password_reset_completed}
+              </option>
+            </optgroup>
+            <optgroup label="Sistema">
+              <option value="user_login_failed">{ACTION_LABELS.user_login_failed}</option>
+            </optgroup>
           </select>
         </div>
 

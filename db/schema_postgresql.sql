@@ -26,6 +26,10 @@
 --               consents_user_latest, attachments_message, message_reports_reporter)
 --   2026-02-26  Evolucion 005b: safety_events.user_id → nullable + ON DELETE SET NULL
 --               (H-35: hard DELETE en MVP, preservar eventos anonimos)
+--   2026-05-22  Evolucion 006: TIMESTAMP → TIMESTAMPTZ en todas las columnas temporales
+--               (fix asyncpg can't-subtract offset-aware/naive; alinea backend a datetime.now(UTC))
+--   2026-05-22  Evolucion 007: audit_logs.admin_id → actor_id + nueva actor_role (admin|student|system)
+--               (extiende auditoría a acciones del propio usuario: register, login, delete, consent, password reset)
 -- =============================================================
 
 -- Requisitos: PostgreSQL 16
@@ -43,10 +47,10 @@ CREATE TABLE users (
   display_name     TEXT,
   role             TEXT NOT NULL DEFAULT 'student'
                    CHECK (role IN ('student', 'admin')),
-  disabled_at      TIMESTAMP,
+  disabled_at      TIMESTAMPTZ,
   disabled_reason  TEXT,
-  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  deleted_at       TIMESTAMP,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at       TIMESTAMPTZ,
   cohort           TEXT,  -- [Evolucion 006] marcador de cohorte del estudio (piloto-fase1, dev, control, etc.)
 
   -- Si disabled_at tiene valor, disabled_reason es obligatorio
@@ -64,9 +68,9 @@ CREATE TABLE consent_versions (
   body          TEXT NOT NULL,
   status        TEXT NOT NULL DEFAULT 'draft'
                 CHECK (status IN ('draft', 'active', 'archived')),
-  published_at  TIMESTAMP,
+  published_at  TIMESTAMPTZ,
   created_by    UUID REFERENCES users(id) ON DELETE SET NULL,
-  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_consent_versions_active ON consent_versions(status)
@@ -77,8 +81,8 @@ CREATE TABLE consents (
   user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   scope               TEXT NOT NULL
                       CHECK (scope IN ('solo_uso','uso_mejora_anon')),
-  accepted_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  revoked_at          TIMESTAMP,
+  accepted_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revoked_at          TIMESTAMPTZ,
   consent_version_id  UUID NOT NULL REFERENCES consent_versions(id) ON DELETE RESTRICT,
 
   -- Un usuario solo puede tener un registro activo por version de consentimiento
@@ -107,14 +111,14 @@ CREATE TABLE preferences (
 CREATE TABLE sessions (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id              UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  started_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  ended_at             TIMESTAMP,
+  started_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ended_at             TIMESTAMPTZ,
   topic_hint           TEXT,
   meta                 JSONB,
 
   checkin_opt_in       BOOLEAN NOT NULL DEFAULT TRUE,
   checkin_payload      JSONB,
-  checkin_completed_at TIMESTAMP,
+  checkin_completed_at TIMESTAMPTZ,
 
   avatar_used          BOOLEAN NOT NULL DEFAULT FALSE
 );
@@ -139,12 +143,21 @@ CREATE TABLE messages (
   asr_latency_ms     INT,  -- [Evolucion 006] latency split: ASR (Whisper)
   llm_latency_ms     INT,  -- [Evolucion 006] latency split: LLM (Gemini)
   tts_latency_ms     INT,  -- [Evolucion 006] latency split: TTS (Piper)
-  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_messages_session_time ON messages(session_id, created_at);
 CREATE INDEX idx_messages_latency      ON messages(latency_ms)
                                        WHERE role = 'assistant' AND latency_ms IS NOT NULL;
+-- [Evolucion 008] dedupe a nivel BD del saludo automatico por sesion.
+-- StrictMode (React dev) duplica el useEffect del cliente y dos requests
+-- llegan al endpoint /sessions/:id/greeting antes de que la primera commitee.
+-- El check `if existing: return None` no es atomico; este indice unico
+-- parcial garantiza que solo UN saludo sobrevive por sesion. La segunda
+-- transaccion levanta IntegrityError, el service la maneja y retorna None.
+CREATE UNIQUE INDEX uq_messages_session_greeting ON messages(session_id)
+                                                 WHERE role = 'assistant'
+                                                   AND (meta->>'greeting')::boolean = true;
 -- [Evolucion 006] indice parcial sobre cohort
 CREATE INDEX idx_users_cohort          ON users(cohort) WHERE cohort IS NOT NULL;
 -- (Opcional - habilitar post-MVP si volumen > 100K mensajes)
@@ -166,8 +179,8 @@ CREATE TABLE message_reports (
                  CHECK (status IN ('open','triaged','resolved','dismissed')),
   severity     INT
                CHECK (severity IS NULL OR (severity >= 1 AND severity <= 5)),
-  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at   TIMESTAMP
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMPTZ
 );
 
 CREATE UNIQUE INDEX uq_message_reports_msg_user ON message_reports(message_id, reporter_id);
@@ -185,7 +198,7 @@ CREATE TABLE attachments (
   kind        TEXT NOT NULL CHECK (kind IN ('audio','image','doc')),
   path        TEXT NOT NULL,
   meta        JSONB,
-  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_attachments_message ON attachments(message_id);
@@ -198,7 +211,7 @@ CREATE TABLE safety_events (
   payload     JSONB,
   status      TEXT NOT NULL DEFAULT 'active'
               CHECK (status IN ('active', 'reviewed', 'resolved')),
-  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_safety_events_user_time ON safety_events(user_id, created_at);
@@ -213,9 +226,9 @@ CREATE TABLE password_reset_tokens (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash  TEXT NOT NULL UNIQUE,
-  expires_at  TIMESTAMP NOT NULL,
-  used_at     TIMESTAMP,
-  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  expires_at  TIMESTAMPTZ NOT NULL,
+  used_at     TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_prt_user_created   ON password_reset_tokens(user_id, created_at DESC);
@@ -228,20 +241,23 @@ CREATE INDEX idx_prt_token_active   ON password_reset_tokens(token_hash)
 
 CREATE TABLE audit_logs (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  admin_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_role   TEXT NOT NULL DEFAULT 'admin'
+               CHECK (actor_role IN ('admin', 'student', 'system')),
   action       TEXT NOT NULL,
   target_type  TEXT,
   target_id    UUID,
   detail       JSONB,
   ip_address   TEXT,
-  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Los audit_logs son INMUTABLES: no se eliminan, no se actualizan.
--- ON DELETE SET NULL preserva el log si el admin es eliminado.
+-- ON DELETE SET NULL preserva el log si el actor (admin o student) es eliminado.
 
-CREATE INDEX idx_audit_logs_admin_time  ON audit_logs(admin_id, created_at DESC);
-CREATE INDEX idx_audit_logs_action_time ON audit_logs(action, created_at DESC);
+CREATE INDEX idx_audit_logs_actor_time   ON audit_logs(actor_id, created_at DESC);
+CREATE INDEX idx_audit_logs_action_time  ON audit_logs(action, created_at DESC);
+CREATE INDEX idx_audit_logs_role_time    ON audit_logs(actor_role, created_at DESC);
 
 -- =========================
 -- 7) INVESTIGACION
@@ -256,8 +272,8 @@ CREATE TABLE survey_responses (
                   CHECK (phase IN ('pre', 'post')),
   score           NUMERIC(5,2),
   raw_data        JSONB,
-  administered_at TIMESTAMP NOT NULL,
-  imported_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  administered_at TIMESTAMPTZ NOT NULL,
+  imported_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   imported_by     UUID REFERENCES users(id) ON DELETE SET NULL,
 
   -- Un usuario solo puede tener una respuesta por instrumento y fase
@@ -281,8 +297,8 @@ CREATE TABLE system_config (
   value        JSONB NOT NULL,
   description  TEXT,
   updated_by   UUID REFERENCES users(id) ON DELETE SET NULL,
-  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =========================
@@ -297,7 +313,11 @@ CREATE TABLE empathy_ratings (
   rater_id    UUID REFERENCES users(id) ON DELETE SET NULL,
   score       INT NOT NULL CHECK (score BETWEEN 1 AND 5),
   criteria    JSONB,  -- ej: {"empathic_tone":true,"validation":true,"hallucination":false}
-  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- [Evolucion 008] timestamp de la ultima edicion del rating. NULL si el
+  -- rater nunca la edito (created_at sigue siendo el unico registro). Lo
+  -- alimenta PATCH /admin/empathy-ratings/{id} desde el panel.
+  updated_at  TIMESTAMPTZ,
   CONSTRAINT uq_empathy_ratings_message_rater UNIQUE (message_id, rater_id)
 );
 

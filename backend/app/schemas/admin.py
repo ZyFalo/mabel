@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 T = TypeVar("T")
 
@@ -37,6 +37,27 @@ class SetCohortRequest(BaseModel):
     """Payload for PATCH /admin/users/:id/cohort. None clears the cohort."""
 
     cohort: str | None = Field(default=None, max_length=64)
+
+
+class BulkCohortRequest(BaseModel):
+    """Payload for PATCH /admin/users/cohort/bulk.
+
+    `cohort=None` clears the cohort for every listed user. `user_ids` must be
+    non-empty. Backend silently skips admins (the UI does too) and reports
+    them in `skipped_admin`.
+    """
+
+    user_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    cohort: str | None = Field(default=None, max_length=64)
+
+
+class BulkCohortResponse(BaseModel):
+    """Summary returned by the bulk cohort endpoint."""
+
+    updated: int
+    unchanged: int
+    not_found: list[uuid.UUID] = []
+    skipped_admin: list[uuid.UUID] = []
 
 
 class UserAdminDetail(BaseModel):
@@ -75,17 +96,44 @@ class UserAdminDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ReportNoteEntry(BaseModel):
+    """One audited entry parsed from `message_reports.details`.
+
+    The `details` column stores newline-separated entries in the format
+    `[ISO_timestamp] <new_status>: <notes>` (see message_report_repository).
+    We parse it back into structured rows for the admin UI's note history.
+    """
+
+    at: datetime | None = None
+    status: str | None = None
+    notes: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ReportAdminItem(BaseModel):
     """Row used in #26 Reports table. Never includes message content (D-03)."""
 
     id: uuid.UUID
     message_id: uuid.UUID
+    # Full reporter UUID — needed so the admin UI can deep-link to
+    # /admin/users/<id> (justified: an admin already has access to user
+    # detail pages, this just removes a redundant lookup). The truncated
+    # form below is kept so the table cell can keep its anonymized look.
+    reporter_id: uuid.UUID
     reporter_id_truncated: str
     reason: str
     severity: int | None = None
     status: str
     created_at: datetime
     triaged_at: datetime | None = None
+    # Original free-text context entered by the reporting student at filing
+    # time. Comes from `message_reports.details` BEFORE any admin transition
+    # appends notes. Surfaced separately from `notes_history` so the admin
+    # UI does not mis-attribute the student's words as an admin note.
+    reporter_context: str | None = None
+    # Chronological notes added by admins on each status transition.
+    notes_history: list[ReportNoteEntry] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -105,11 +153,19 @@ class SafetyEventAdminItem(BaseModel):
 
 
 class AuditLogItem(BaseModel):
-    """Row used in #31 Audit logs table."""
+    """Row used in #31 Audit logs table.
+
+    Evolucion 007: `admin_id`/`admin_email_masked` renamed to `actor_id`/
+    `actor_email_masked` and `actor_role` exposed so the admin panel can
+    distinguish admin actions from student-originated ones (register,
+    consent, delete, etc.) and the rare `system` events (failed logins,
+    cronjobs).
+    """
 
     id: uuid.UUID
-    admin_id: uuid.UUID | None = None
-    admin_email_masked: str | None = None
+    actor_id: uuid.UUID | None = None
+    actor_role: str
+    actor_email_masked: str | None = None
     action: str
     target_type: str | None = None
     target_id: str | None = None
@@ -124,6 +180,49 @@ class DisableUserRequest(BaseModel):
     """Payload for PATCH /admin/users/:id/disable. Reason mandatory (audited)."""
 
     reason: str = Field(min_length=10)
+
+
+class BulkUserActionRequest(BaseModel):
+    """Payload for POST /admin/users/bulk-action.
+
+    Drives the three bulk lifecycle operations from the admin Users table:
+    `disable`, `enable`, and `delete`. The service layer enforces additional
+    invariants (admin protection, must-be-disabled-before-delete) and reports
+    skips back via :class:`BulkUserActionResponse`; this schema just enforces
+    the surface contract (size bounds + reason requirement when disabling).
+    """
+
+    user_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    action: Literal["disable", "enable", "delete"]
+    reason: str | None = Field(default=None, min_length=10, max_length=500)
+
+    @model_validator(mode="after")
+    def _require_reason_for_disable(self) -> "BulkUserActionRequest":
+        # `disable` is audited per-target with the supplied reason; allowing
+        # an empty reason here would let an admin bypass the same constraint
+        # the single-user `/disable` endpoint enforces (DisableUserRequest).
+        if self.action == "disable" and (self.reason is None or not self.reason.strip()):
+            raise ValueError(
+                "reason es requerido para action='disable' (min 10 caracteres)"
+            )
+        return self
+
+
+class BulkUserActionResponse(BaseModel):
+    """Summary returned by POST /admin/users/bulk-action.
+
+    `applied` counts users that effectively received the action; the three
+    `skipped_*` lists give the UI enough context to render a per-row reason
+    for non-application. `skipped_must_disable_first` is only populated when
+    `action='delete'` (it is empty otherwise).
+    """
+
+    action: Literal["disable", "enable", "delete"]
+    applied: int
+    skipped_admin: list[uuid.UUID] = []
+    skipped_already_state: list[uuid.UUID] = []
+    skipped_must_disable_first: list[uuid.UUID] = []
+    not_found: list[uuid.UUID] = []
 
 
 class ReportStatusUpdate(BaseModel):
@@ -218,6 +317,21 @@ class EmpathyQueueItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EmpathyQueueResponse(BaseModel):
+    """Wrapper returned by GET /admin/empathy-ratings/queue.
+
+    `items` is bounded by `limit`; `total_pending` is the unbounded count of
+    assistant messages the active rater still has to evaluate. The UI uses
+    the gap between the two to render an honest "mostrando N de M" counter
+    and hide the "Cargar más" button when N >= M.
+    """
+
+    items: list[EmpathyQueueItem]
+    total_pending: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EmpathyRatingItem(BaseModel):
     """Persisted rating returned by POST /admin/empathy-ratings."""
 
@@ -227,5 +341,56 @@ class EmpathyRatingItem(BaseModel):
     score: int
     criteria: dict | None = None
     created_at: datetime
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmpathyRatingUpdate(BaseModel):
+    """Payload for PATCH /admin/empathy-ratings/{rating_id}.
+
+    Both fields are optional — the rater can change score, criteria, or both.
+    """
+
+    score: int | None = Field(default=None, ge=1, le=5)
+    criteria: dict | None = None
+
+
+class EmpathyRatedItem(BaseModel):
+    """Item rendered by the 'Calificadas' tab of the empathy ratings UI.
+
+    Bundles the rating itself with the message + preceding context (same shape
+    as `EmpathyQueueItem`) plus the rater's identity and an `is_mine` flag so
+    the UI can grey-out edits on other raters' ratings.
+    """
+
+    # Rating
+    rating_id: uuid.UUID
+    score: int
+    criteria: dict | None = None
+    created_at: datetime
+    updated_at: datetime | None = None
+
+    # Rater
+    rater_id: uuid.UUID | None = None
+    rater_email_masked: str | None = None
+    is_mine: bool
+
+    # Message context (same as EmpathyQueueItem)
+    message_id: uuid.UUID
+    session_id: uuid.UUID
+    content: str
+    message_created_at: datetime
+    session_started_at: datetime | None = None
+    preceding_user_message: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmpathyRatedResponse(BaseModel):
+    """Wrapper for GET /admin/empathy-ratings/rated."""
+
+    items: list[EmpathyRatedItem]
+    total: int
 
     model_config = ConfigDict(from_attributes=True)

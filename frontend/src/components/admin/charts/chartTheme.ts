@@ -67,12 +67,33 @@ export const TOOLTIP_ITEM_STYLE: React.CSSProperties = {
 }
 
 /**
- * Format an ISO date string (YYYY-MM-DD) to "dd MMM" in Spanish,
+ * Format an ISO date string ("YYYY-MM-DD") to "dd MMM" in Spanish,
  * resilient to invalid input.
+ *
+ * Timezone trap: `new Date("YYYY-MM-DD")` is parsed as UTC midnight by
+ * the JS spec. Rendering that in a browser at -05:00 (Bogotá) shifts
+ * the day BACKWARDS — so a row labelled "2026-05-22" by the backend
+ * would show as "21 may" in the chart axis (off-by-one). This bug
+ * surfaced when the dashboard's "Activaciones de guardrails" chart
+ * displayed today's 5 events under "21 de may" instead of "22 de may".
+ *
+ * Fix: split the ISO date into components and construct the Date in
+ * the *local* timezone (the no-arg `Date` constructor honours local TZ
+ * for Y/M/D inputs). Date-only strings without a time component are
+ * always treated as a local calendar day from now on.
  */
 export function formatDateTick(value: string | number): string {
   if (typeof value !== 'string') return String(value)
-  const d = new Date(value)
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  let d: Date
+  if (dateOnlyMatch) {
+    const y = Number(dateOnlyMatch[1])
+    const m = Number(dateOnlyMatch[2]) - 1
+    const day = Number(dateOnlyMatch[3])
+    d = new Date(y, m, day)
+  } else {
+    d = new Date(value)
+  }
   if (Number.isNaN(d.getTime())) return value
   return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 }

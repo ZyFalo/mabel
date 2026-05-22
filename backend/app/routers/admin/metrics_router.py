@@ -123,7 +123,8 @@ async def export_metrics_csv(
     # Audit log BEFORE streaming (so it persists even if client disconnects mid-stream).
     await audit_log_action(
         db,
-        admin_id=current_user.id,
+        actor_id=current_user.id,
+        actor_role="admin",
         action="export_data",
         target_type="metrics",
         target_id=None,

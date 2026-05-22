@@ -20,6 +20,7 @@ class GeminiAdapter:
         messages: list[dict],
         system_prompt: str,
         config: dict | None = None,
+        usage_sink: dict | None = None,
     ) -> AsyncGenerator[str, None]:
         generation_config = {}
         if config:
@@ -55,6 +56,19 @@ class GeminiAdapter:
             )
 
             async for chunk in response:
+                # Gemini emits `usage_metadata` on chunks; the final chunk
+                # carries the cumulative prompt/candidate token counts. We
+                # overwrite on each chunk so the LAST observed value wins
+                # (cumulative, not delta).
+                if usage_sink is not None:
+                    usage_meta = getattr(chunk, "usage_metadata", None)
+                    if usage_meta is not None:
+                        prompt_count = getattr(usage_meta, "prompt_token_count", None)
+                        candidates_count = getattr(usage_meta, "candidates_token_count", None)
+                        if prompt_count is not None:
+                            usage_sink["prompt_tokens"] = int(prompt_count)
+                        if candidates_count is not None:
+                            usage_sink["completion_tokens"] = int(candidates_count)
                 if chunk.text:
                     yield chunk.text
 

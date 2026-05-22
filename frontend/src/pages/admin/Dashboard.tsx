@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiClient from '../../api/client'
+import InfoHint from '../../components/admin/InfoHint'
 import MetricCard from '../../components/admin/MetricCard'
 import BarChartWrapper from '../../components/admin/charts/BarChartWrapper'
 import DonutChartWrapper from '../../components/admin/charts/DonutChartWrapper'
@@ -48,9 +49,72 @@ interface SafetyEventMini {
   id: string
   created_at: string
   event_type: string
-  severity: string | number
+  severity: string | number | null
   status: string
   user_id_truncated?: string | null
+  session_id_truncated?: string | null
+}
+
+/**
+ * Session-grouped projection of the recent safety events array. Used by the
+ * "Últimas 5 sesiones con safety events" widget on the dashboard so the
+ * reviewer sees triage-friendly units (one row per chat) instead of a flat
+ * event list with built-in duplication (risk_detected + redirect_shown
+ * paired for every detection).
+ */
+interface SafetyEventSessionGroup {
+  sessionIdTruncated: string
+  events: SafetyEventMini[]
+  maxSeverity: number
+  eventCount: number
+  latestAt: string
+  overallStatus: 'active' | 'reviewed' | 'resolved'
+}
+
+function groupRecentEventsBySession(
+  events: SafetyEventMini[],
+  topN: number,
+): SafetyEventSessionGroup[] {
+  const map = new Map<string, SafetyEventMini[]>()
+  for (const ev of events) {
+    const key = ev.session_id_truncated ?? '(sin sesión)'
+    const list = map.get(key)
+    if (list) {
+      list.push(ev)
+    } else {
+      map.set(key, [ev])
+    }
+  }
+  const groups: SafetyEventSessionGroup[] = []
+  for (const [key, evts] of map.entries()) {
+    const sorted = [...evts].sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
+    const severities = sorted.map((e) => {
+      const s = typeof e.severity === 'number' ? e.severity : Number(e.severity)
+      return Number.isFinite(s) ? s : 0
+    })
+    const maxSeverity = severities.reduce((m, s) => Math.max(m, s), 0)
+    const anyActive = sorted.some((e) => e.status === 'active')
+    const anyReviewed = sorted.some((e) => e.status === 'reviewed')
+    const overallStatus: SafetyEventSessionGroup['overallStatus'] = anyActive
+      ? 'active'
+      : anyReviewed
+        ? 'reviewed'
+        : 'resolved'
+    groups.push({
+      sessionIdTruncated: key,
+      events: sorted,
+      maxSeverity,
+      eventCount: sorted.length,
+      latestAt: sorted[0].created_at,
+      overallStatus,
+    })
+  }
+  return groups
+    .sort((a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime())
+    .slice(0, topN)
 }
 
 interface DashboardResponse {
@@ -115,18 +179,31 @@ function pickKpis(d: DashboardResponse): DashboardKpis {
   }
 }
 
+// Severity chips — keys are the numeric severity from the backend
+// (computed by guardrails_service: 1-5 scale). Severity 5 is solid red
+// + white text + bold so it can't be mistaken for the lighter "Activo"
+// status pill in the next column. Mirrors the SafetyEvents page convention.
 const SEVERITY_CHIP: Record<string, React.CSSProperties> = {
-  low: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
-  medium: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
-  high: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
-  critical: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  '1': { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  '2': { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37, 99, 235, 0.25)' },
+  '3': { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  '4': { background: 'rgba(234, 88, 12, 0.10)', color: '#C2410C', borderColor: 'rgba(234, 88, 12, 0.30)' },
+  '5': {
+    background: 'var(--danger-700)',
+    color: '#fff',
+    borderColor: 'var(--danger-700)',
+    fontWeight: 800,
+  },
 }
 
 const STATUS_CHIP: Record<string, React.CSSProperties> = {
+  active: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  reviewed: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  resolved: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  // Legacy keys kept for backward-compat with older event statuses
   open: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
   reviewing: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
   triaged: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
-  resolved: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
   closed: { background: 'var(--ink-100)', color: 'var(--ink-600)', borderColor: 'var(--ink-200)' },
   dismissed: { background: 'var(--ink-100)', color: 'var(--ink-600)', borderColor: 'var(--ink-200)' },
 }
@@ -250,6 +327,12 @@ export default function Dashboard() {
   const safetyTotal = safetyByType.reduce((acc, d) => acc + d.value, 0)
 
   const lastEvents = data?.last_5_safety_events ?? []
+  // Group the recent flat events into sessions so the widget reflects
+  // distinct incidents rather than the noisy 1:1 pre/post-filter pair.
+  const recentSessions = useMemo(
+    () => groupRecentEventsBySession(lastEvents, 5),
+    [lastEvents],
+  )
 
   return (
     <div
@@ -415,11 +498,13 @@ export default function Dashboard() {
               : undefined
           }
           hint="Registrados en la plataforma"
+          info="Total acumulado de usuarios con cuenta en Mabel IA. Incluye estudiantes activos y admins. No descuenta usuarios eliminados (hard DELETE)."
         />
         <MetricCard
           label="Sesiones hoy"
           value={loading && !kpis ? '—' : (kpis?.sessions_today ?? 0).toLocaleString('es-CO')}
           hint="Iniciadas en la fecha actual"
+          info="Cuántas sesiones se iniciaron desde las 00:00 de hoy (zona local del servidor)."
         />
         <MetricCard
           label="Safety events 24h"
@@ -427,6 +512,7 @@ export default function Dashboard() {
           threshold={kpis && kpis.safety_events_24h > 0 ? 'red' : 'green'}
           hint="Toca para ver detalle"
           onClick={() => navigate('/admin/safety-events')}
+          info="Total de eventos de seguridad (risk_detected, redirect_shown, user_report) registrados en las últimas 24 horas. Clic para ir al detalle."
         />
         <MetricCard
           label="Reportes pendientes"
@@ -434,6 +520,7 @@ export default function Dashboard() {
           threshold={kpis && kpis.reports_pending > 0 ? 'red' : 'green'}
           hint="Triaje en cola"
           onClick={() => navigate('/admin/reports')}
+          info="Reportes en estado 'open' que aún no han sido triados por ningún admin. Clic para abrir el triaje."
         />
         <MetricCard
           label="Latencia promedio"
@@ -444,17 +531,20 @@ export default function Dashboard() {
           }
           threshold={latencyThreshold(kpis?.latency_avg_ms)}
           hint="Objetivo: <= 20 s"
+          info="Media simple de latency_ms para mensajes del asistente en el rango. El umbral 20 s es el criterio operativo del estudio. Para detalle por percentiles ver Métricas → Técnicas."
         />
         <MetricCard
           label="SUS promedio"
           value={kpis?.sus_avg == null ? '—' : kpis.sus_avg.toFixed(1)}
           threshold={susThreshold(kpis?.sus_avg)}
           hint="Objetivo: >= 70"
+          info="System Usability Scale agregada de todas las respuestas SUS. 70 es 'aceptable' en la literatura; 80+ es 'bueno'. Vacío hasta que se ingesten respuestas del piloto."
         />
         <MetricCard
           label="Nuevos esta semana"
           value={loading && !kpis ? '—' : (kpis?.users_new_this_week ?? 0).toLocaleString('es-CO')}
           hint="Altas en los últimos 7 días"
+          info="Usuarios con created_at dentro de la última semana (7 días rolling). Indica el ritmo de adopción."
         />
       </section>
 
@@ -463,7 +553,11 @@ export default function Dashboard() {
         className="grid grid-cols-1 lg:grid-cols-2"
         style={{ gap: 16, marginBottom: 16 }}
       >
-        <ChartCard title="Sesiones por día" subtitle="Últimos 30 días">
+        <ChartCard
+          title="Sesiones por día"
+          subtitle="Últimos 30 días"
+          info="Cuántas sesiones se iniciaron cada día en los últimos 30 días. Útil para detectar tendencias de adopción o caídas inusuales."
+        >
           <LineChartWrapper
             data={sessionsSeries.map((p) => ({ date: p.date, sesiones: p.value }))}
             lines={[{ key: 'sesiones', label: 'Sesiones', color: CHART_COLORS.primary }]}
@@ -472,7 +566,11 @@ export default function Dashboard() {
           />
         </ChartCard>
 
-        <ChartCard title="Distribución de ánimo" subtitle="Check-ins de los últimos 30 días">
+        <ChartCard
+          title="Distribución de ánimo"
+          subtitle="Check-ins de los últimos 30 días"
+          info="Cuántos estudiantes reportaron cada rango de ánimo (escala 0-10) en sus check-ins recientes. Permite ver si predomina malestar o bienestar agregado."
+        >
           <BarChartWrapper
             data={moodData}
             bars={[{ key: 'count', label: 'Estudiantes', color: CHART_COLORS.primary }]}
@@ -482,7 +580,11 @@ export default function Dashboard() {
           />
         </ChartCard>
 
-        <ChartCard title="Latencia por día" subtitle="Promedio en ms · umbral 20 s">
+        <ChartCard
+          title="Latencia por día"
+          subtitle="Promedio en ms · umbral 20 s"
+          info="Latencia promedio diaria de los mensajes del asistente. La línea roja punteada marca el umbral operativo de 20 s; cruces sostenidos pueden indicar degradación del LLM o del backend."
+        >
           <MetricLineWithReference
             data={latencySeries.map((p) => ({ date: p.date, latencia: p.value }))}
             lines={[{ key: 'latencia', label: 'Latencia (ms)', color: CHART_COLORS.accent }]}
@@ -494,7 +596,11 @@ export default function Dashboard() {
           />
         </ChartCard>
 
-        <ChartCard title="Activaciones de guardrails" subtitle="Últimos 14 días">
+        <ChartCard
+          title="Activaciones de guardrails"
+          subtitle="Últimos 14 días"
+          info="Conteo diario de eventos risk_detected (palabra clave de riesgo encontrada en input/output). Picos sostenidos pueden indicar palabras clave demasiado amplias o cohorte en período de mayor estrés."
+        >
           <BarChartWrapper
             data={guardrailsData}
             bars={[{ key: 'count', label: 'Activaciones', color: CHART_COLORS.warning }]}
@@ -514,7 +620,13 @@ export default function Dashboard() {
         <div className="lg:col-span-2">
           <ChartCard
             title="Safety events por tipo"
-            subtitle="Distribución de los últimos 30 días"
+            subtitle={
+              // Heads-up to the reviewer that each risk_detected naturally
+              // pairs with a redirect_shown (the SOS panel that triggered
+              // FROM it), so the bar ratio is structural, not statistical.
+              'Últimos 30 días · cada risk_detected suele venir acompañado de su redirect_shown'
+            }
+            info="Distribución de los tipos de safety events en los últimos 30 días. risk_detected ≈ redirect_shown por diseño (cada detección dispara el panel SOS); user_report son reportes manuales del estudiante."
           >
             <DonutChartWrapper
               data={safetyByType}
@@ -567,7 +679,7 @@ export default function Dashboard() {
                     marginBottom: 0,
                   }}
                 >
-                  Últimos 5 safety events
+                  Últimas 5 sesiones con safety events
                 </h3>
               </div>
               <button
@@ -591,7 +703,7 @@ export default function Dashboard() {
                 Ver todos →
               </button>
             </div>
-            {lastEvents.length === 0 ? (
+            {recentSessions.length === 0 ? (
               <div
                 style={{
                   padding: '40px 16px',
@@ -601,44 +713,51 @@ export default function Dashboard() {
                   fontStyle: 'italic',
                 }}
               >
-                Sin eventos recientes
+                Sin sesiones con eventos recientes
               </div>
             ) : (
               <table className="w-full" style={{ fontSize: 13, borderCollapse: 'collapse' }}>
                 <thead style={{ background: 'var(--ink-50)' }}>
                   <tr>
-                    {['Fecha', 'Tipo', 'Severidad', 'Estado'].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: 'left',
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: 'var(--ink-500)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.14em',
-                          padding: '10px 16px',
-                          borderBottom: '1px solid var(--ink-200)',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
+                    {['Último evento', 'Sesión', 'Severidad máx', 'Eventos', 'Estado'].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          style={{
+                            textAlign: 'left',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: 'var(--ink-500)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.14em',
+                            padding: '10px 16px',
+                            borderBottom: '1px solid var(--ink-200)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ),
+                    )}
                     <th style={{ width: 48, borderBottom: '1px solid var(--ink-200)' }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {lastEvents.map((ev) => {
-                    const sevKey = String(ev.severity).toLowerCase()
-                    const statusKey = String(ev.status).toLowerCase()
+                  {recentSessions.map((s) => {
+                    const sevLabel = s.maxSeverity > 0 ? String(s.maxSeverity) : '—'
+                    const sevKey = String(s.maxSeverity)
+                    const statusKey = String(s.overallStatus).toLowerCase()
                     return (
                       <tr
-                        key={ev.id}
+                        key={s.sessionIdTruncated}
                         onClick={() => navigate('/admin/safety-events')}
-                        style={{ cursor: 'pointer', transition: 'background var(--dur-fast) var(--ease-out)' }}
+                        style={{
+                          cursor: 'pointer',
+                          transition: 'background var(--dur-fast) var(--ease-out)',
+                        }}
                         onMouseEnter={(e) => {
-                          ;(e.currentTarget as HTMLElement).style.background = 'rgba(244, 237, 236, 0.55)'
+                          ;(e.currentTarget as HTMLElement).style.background =
+                            'rgba(244, 237, 236, 0.55)'
                         }}
                         onMouseLeave={(e) => {
                           ;(e.currentTarget as HTMLElement).style.background = 'transparent'
@@ -652,22 +771,34 @@ export default function Dashboard() {
                             borderBottom: '1px solid var(--ink-100)',
                           }}
                         >
-                          {formatDateTime(ev.created_at)}
+                          {formatDateTime(s.latestAt)}
                         </td>
                         <td
                           style={{
                             padding: '10px 16px',
                             color: 'var(--ink-900)',
+                            fontFamily: 'var(--font-mono, monospace)',
+                            fontSize: 12,
                             borderBottom: '1px solid var(--ink-100)',
                           }}
                         >
-                          {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
+                          {s.sessionIdTruncated}
                         </td>
                         <td style={{ padding: '10px 16px', borderBottom: '1px solid var(--ink-100)' }}>
-                          <Chip label={String(ev.severity)} style={SEVERITY_CHIP[sevKey]} />
+                          <Chip label={sevLabel} style={SEVERITY_CHIP[sevKey] ?? {}} />
+                        </td>
+                        <td
+                          style={{
+                            padding: '10px 16px',
+                            color: 'var(--ink-700)',
+                            fontVariantNumeric: 'tabular-nums',
+                            borderBottom: '1px solid var(--ink-100)',
+                          }}
+                        >
+                          {s.eventCount}
                         </td>
                         <td style={{ padding: '10px 16px', borderBottom: '1px solid var(--ink-100)' }}>
-                          <Chip label={ev.status} style={STATUS_CHIP[statusKey]} />
+                          <Chip label={s.overallStatus} style={STATUS_CHIP[statusKey]} />
                         </td>
                         <td
                           style={{
@@ -695,10 +826,13 @@ export default function Dashboard() {
 function ChartCard({
   title,
   subtitle,
+  info,
   children,
 }: {
   title: string
   subtitle?: string
+  /** Optional contextual help surfaced as a hover tooltip next to the title. */
+  info?: string
   children: React.ReactNode
 }) {
   return (
@@ -712,17 +846,20 @@ function ChartCard({
       }}
     >
       <div style={{ marginBottom: 14 }}>
-        <h3
-          style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: 'var(--ink-900)',
-            margin: 0,
-            letterSpacing: '-0.005em',
-          }}
-        >
-          {title}
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <h3
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--ink-900)',
+              margin: 0,
+              letterSpacing: '-0.005em',
+            }}
+          >
+            {title}
+          </h3>
+          {info && <InfoHint text={info} />}
+        </div>
         {subtitle && (
           <p
             style={{

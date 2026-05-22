@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -19,7 +19,11 @@ router = APIRouter(tags=["consent"])
 
 
 def _get_consent_service(db: AsyncSession = Depends(get_db)) -> ConsentService:
-    return ConsentService(ConsentRepository(db), ConsentVersionRepository(db))
+    return ConsentService(ConsentRepository(db), ConsentVersionRepository(db), db=db)
+
+
+def _client_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
 
 
 @router.get("/consent-versions/active", response_model=ConsentVersionResponse)
@@ -43,6 +47,7 @@ async def get_active_consent_version(
 )
 async def accept_consent(
     request: AcceptConsentRequest,
+    http_request: Request,
     current_user: User = Depends(require_role("student")),
     service: ConsentService = Depends(_get_consent_service),
 ):
@@ -51,6 +56,7 @@ async def accept_consent(
             user_id=current_user.id,
             consent_version_id=request.consent_version_id,
             scope=request.scope.value,
+            ip=_client_ip(http_request),
         )
     except ValueError as e:
         msg = str(e)
@@ -70,6 +76,7 @@ async def accept_consent(
 @router.patch("/consents/current", response_model=ConsentResponse)
 async def patch_consent(
     request: PatchConsentRequest,
+    http_request: Request,
     current_user: User = Depends(require_role("student")),
     service: ConsentService = Depends(_get_consent_service),
 ):
@@ -78,6 +85,7 @@ async def patch_consent(
             user_id=current_user.id,
             action=request.action.value,
             scope=request.scope.value if request.scope else None,
+            ip=_client_ip(http_request),
         )
     except ValueError as e:
         msg = str(e)

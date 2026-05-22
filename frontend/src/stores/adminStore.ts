@@ -23,10 +23,20 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     try {
       const res = await apiClient.get('/admin/dashboard')
       const data = res.data ?? {}
+      // `activeSafetyEvents` MUST reflect events with `status='active'` so
+      // the sidebar badge actually represents pending triage work. The
+      // previous mapping used `safety_events_24h` which hid older
+      // unreviewed events from the admin's attention. The backend now
+      // provides `safety_events_active`; we fall back to the 24h count
+      // only if the new field is missing (e.g. against an older backend).
       set({
         pendingReports: typeof data.reports_pending === 'number' ? data.reports_pending : get().pendingReports,
         activeSafetyEvents:
-          typeof data.safety_events_24h === 'number' ? data.safety_events_24h : get().activeSafetyEvents,
+          typeof data.safety_events_active === 'number'
+            ? data.safety_events_active
+            : typeof data.safety_events_24h === 'number'
+              ? data.safety_events_24h
+              : get().activeSafetyEvents,
       })
     } catch {
       // Silenced — preserve previous counts on error

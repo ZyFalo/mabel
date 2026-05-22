@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
+import { SEVERITY_LABELS } from '../../utils/severity'
 
 // ============================================================================
 // Types
@@ -854,11 +855,11 @@ function GuardrailsSection({
             aria-label="Umbral de severidad"
           />
           <div className="flex items-center justify-between text-[11px] text-text-primary/50 mt-1 tabular-nums">
-            <span>1 — leve</span>
-            <span>2</span>
-            <span>3 — media</span>
-            <span>4</span>
-            <span>5 — critica</span>
+            <span>1 — {SEVERITY_LABELS[1].toLowerCase()}</span>
+            <span>2 — {SEVERITY_LABELS[2].toLowerCase()}</span>
+            <span>3 — {SEVERITY_LABELS[3].toLowerCase()}</span>
+            <span>4 — {SEVERITY_LABELS[4].toLowerCase()}</span>
+            <span>5 — {SEVERITY_LABELS[5].toLowerCase()}</span>
           </div>
           <div className="flex items-center justify-end mt-4">
             <SaveButton

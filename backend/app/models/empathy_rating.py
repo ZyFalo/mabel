@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,5 +29,11 @@ class EmpathyRating(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     criteria: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        nullable=False, server_default=text("CURRENT_TIMESTAMP")
+        DateTime(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP")
+    )
+    # [Evolución 008] Set by PATCH /admin/empathy-ratings/{id} when the rater
+    # edits an existing rating. NULL means "never edited"; created_at remains
+    # the single source for the original timestamp.
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )

@@ -30,7 +30,13 @@ SEED_DATA = [
     },
     {
         "key": "sos_severity_threshold",
-        "value": "3",
+        # Default 4 — only severity-4 (3+ non-critical keyword matches in a
+        # single message) and severity-5 (any CRITICAL_KEYWORD match) trigger
+        # the automatic SOS panel. Threshold 3 was perceived as invasive
+        # because a single "estoy triste, solo, ansioso" (3 non-critical
+        # hits) would force the SOS overlay; 4 lets the conversation breathe.
+        # Critical-ideation keywords still ALWAYS hit (severity=5 forced).
+        "value": "4",
         "description": "Umbral de severidad para activacion automatica de SOS (1-5)",
     },
     {

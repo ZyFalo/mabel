@@ -307,7 +307,8 @@ class AdminUsersService:
         # Audit log + commit so the access is recorded atomically (D-12).
         await audit_log_action(
             self.db,
-            admin_id=admin_id,
+            actor_id=admin_id,
+            actor_role="admin",
             action="view_user",
             target_type="user",
             target_id=user.id,
@@ -342,7 +343,8 @@ class AdminUsersService:
         # Audit log INSIDE the same transaction (D-12).
         await audit_log_action(
             self.db,
-            admin_id=admin_id,
+            actor_id=admin_id,
+            actor_role="admin",
             action="disable_user",
             target_type="user",
             target_id=user.id,
@@ -353,6 +355,253 @@ class AdminUsersService:
         await self.db.commit()
         await self.db.refresh(user)
         return user
+
+    # ----- enable -----------------------------------------------------------
+
+    async def enable_user(
+        self,
+        user_id: uuid.UUID,
+        admin_id: uuid.UUID,
+        ip: str | None = None,
+    ) -> User:
+        """Re-enable a previously disabled user.
+
+        Reverse of `disable_user`. Clears `disabled_at` and `disabled_reason`
+        so the CHECK constraint `chk_users_disabled_reason` (which requires
+        a reason whenever disabled_at is set) stays satisfied. Writes its
+        own audit_log row so the timeline of disable/enable cycles is
+        preserved.
+        """
+        result = await self.db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise ValueError("USER_NOT_FOUND")
+        if user.disabled_at is None:
+            raise ValueError("ALREADY_ENABLED")
+
+        previous_reason = user.disabled_reason
+        user.disabled_at = None
+        user.disabled_reason = None
+
+        await audit_log_action(
+            self.db,
+            actor_id=admin_id,
+            actor_role="admin",
+            action="enable_user",
+            target_type="user",
+            target_id=user.id,
+            details={"previous_reason": previous_reason},
+            ip=ip,
+        )
+
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
+    # ----- delete -----------------------------------------------------------
+
+    async def delete_user(
+        self,
+        user_id: uuid.UUID,
+        admin_id: uuid.UUID,
+        ip: str | None = None,
+    ) -> None:
+        """Hard-delete a previously disabled user.
+
+        Guardrails:
+        - 404 if the user does not exist.
+        - 403 (`CANNOT_DELETE_ADMIN`) for admin accounts.
+        - 409 (`USER_NOT_DISABLED`) if `disabled_at IS NULL` — deletion is
+          gated on a prior disable so the operator never skips the
+          deshabilitar/eliminar two-step flow used by the admin UI.
+
+        The audit log is written BEFORE the DELETE so the row survives even
+        if the DELETE fails (the surrounding commit is atomic). The FK
+        `audit_logs.actor_id` is ON DELETE SET NULL (admin survives anyway),
+        and `audit_logs.target_id` is a plain UUID column with no FK so it
+        keeps the deleted user's id forever (Evo 005b pattern).
+        """
+        result = await self.db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise ValueError("USER_NOT_FOUND")
+        if user.role == "admin":
+            raise ValueError("CANNOT_DELETE_ADMIN")
+        if user.disabled_at is None:
+            raise ValueError("USER_NOT_DISABLED")
+
+        # Snapshot identity BEFORE the row disappears.
+        email_masked = mask_email(user.email)
+        was_disabled_at = user.disabled_at
+        disabled_reason = user.disabled_reason
+
+        # Audit FIRST so the log row is guaranteed even if delete blows up
+        # mid-transaction (the commit is atomic — rollback nukes both).
+        await audit_log_action(
+            self.db,
+            actor_id=admin_id,
+            actor_role="admin",
+            action="delete_user",
+            target_type="user",
+            target_id=user.id,
+            details={
+                "email_masked": email_masked,
+                "was_disabled_at": was_disabled_at.isoformat()
+                if was_disabled_at
+                else None,
+                "disabled_reason": disabled_reason,
+            },
+            ip=ip,
+        )
+        await self.db.flush()
+        await self.db.delete(user)
+        await self.db.commit()
+
+    # ----- bulk action ------------------------------------------------------
+
+    async def bulk_action(
+        self,
+        user_ids: list[uuid.UUID],
+        action: str,  # "disable" | "enable" | "delete"
+        reason: str | None,
+        admin_id: uuid.UUID,
+        ip: str | None = None,
+    ) -> dict:
+        """Apply the same lifecycle action to many users in one transaction.
+
+        All audit rows + state changes happen inside a single atomic commit:
+        if anything raises mid-loop the whole batch is rolled back. Skips are
+        bucketed per the API contract so the UI can render row-level reasons:
+        - `skipped_admin`: admin role (never touched, regardless of action).
+        - `skipped_already_state`: user already in the requested state
+          (disable on already-disabled, enable on already-enabled). Empty
+          for the `delete` action.
+        - `skipped_must_disable_first`: active users when action='delete'.
+          The contract is intentional: deletion is a two-step flow (disable
+          THEN delete) so an active user cannot be removed in one click.
+        - `not_found`: ids that did not resolve to any row.
+        """
+        if not user_ids:
+            return {
+                "action": action,
+                "applied": 0,
+                "skipped_admin": [],
+                "skipped_already_state": [],
+                "skipped_must_disable_first": [],
+                "not_found": [],
+            }
+
+        result = await self.db.execute(select(User).where(User.id.in_(user_ids)))
+        found: dict[uuid.UUID, User] = {u.id: u for u in result.scalars().all()}
+
+        not_found = [uid for uid in user_ids if uid not in found]
+        skipped_admin: list[uuid.UUID] = []
+        skipped_already_state: list[uuid.UUID] = []
+        skipped_must_disable_first: list[uuid.UUID] = []
+        applied = 0
+        # Match the file's existing style (`disable_user` uses the same).
+        now = datetime.now(timezone.utc)  # noqa: UP017
+
+        # Two passes: gather state changes + audit rows first so any
+        # validation error short-circuits before we issue DELETEs, then
+        # execute the deletes. This keeps the transaction atomic AND keeps
+        # the audit-before-delete ordering required for the delete action.
+        users_to_delete: list[User] = []
+
+        for uid in user_ids:
+            user = found.get(uid)
+            if user is None:
+                continue
+            if user.role == "admin":
+                skipped_admin.append(uid)
+                continue
+
+            if action == "disable":
+                if user.disabled_at is not None:
+                    skipped_already_state.append(uid)
+                    continue
+                user.disabled_at = now
+                # Pydantic guarantees `reason` is non-None + min_length=10
+                # when action='disable', but we still narrow for the type
+                # checker and the CHECK constraint chk_users_disabled_reason.
+                user.disabled_reason = reason or ""
+                await audit_log_action(
+                    self.db,
+                    actor_id=admin_id,
+                    actor_role="admin",
+                    action="disable_user",
+                    target_type="user",
+                    target_id=user.id,
+                    details={"reason": reason, "bulk": True},
+                    ip=ip,
+                )
+                applied += 1
+
+            elif action == "enable":
+                if user.disabled_at is None:
+                    skipped_already_state.append(uid)
+                    continue
+                previous_reason = user.disabled_reason
+                user.disabled_at = None
+                user.disabled_reason = None
+                await audit_log_action(
+                    self.db,
+                    actor_id=admin_id,
+                    actor_role="admin",
+                    action="enable_user",
+                    target_type="user",
+                    target_id=user.id,
+                    details={"previous_reason": previous_reason, "bulk": True},
+                    ip=ip,
+                )
+                applied += 1
+
+            elif action == "delete":
+                if user.disabled_at is None:
+                    # Two-step gate: caller must disable first.
+                    skipped_must_disable_first.append(uid)
+                    continue
+                # Snapshot BEFORE we queue the delete so the audit row has a
+                # stable copy of the identity even if the DELETE fails.
+                email_masked = mask_email(user.email)
+                was_disabled_at = user.disabled_at
+                disabled_reason = user.disabled_reason
+                await audit_log_action(
+                    self.db,
+                    actor_id=admin_id,
+                    actor_role="admin",
+                    action="delete_user",
+                    target_type="user",
+                    target_id=user.id,
+                    details={
+                        "email_masked": email_masked,
+                        "was_disabled_at": was_disabled_at.isoformat()
+                        if was_disabled_at
+                        else None,
+                        "disabled_reason": disabled_reason,
+                        "bulk": True,
+                    },
+                    ip=ip,
+                )
+                users_to_delete.append(user)
+                applied += 1
+
+        # Flush audit rows + state changes, THEN issue deletes so the audit
+        # rows are guaranteed to be in the same atomic commit as the deletes.
+        await self.db.flush()
+        for u in users_to_delete:
+            await self.db.delete(u)
+
+        await self.db.commit()
+
+        return {
+            "action": action,
+            "applied": applied,
+            "skipped_admin": skipped_admin,
+            "skipped_already_state": skipped_already_state,
+            "skipped_must_disable_first": skipped_must_disable_first,
+            "not_found": not_found,
+        }
 
     # ----- cohort assignment ------------------------------------------------
 
@@ -375,7 +624,8 @@ class AdminUsersService:
 
         await audit_log_action(
             self.db,
-            admin_id=admin_id,
+            actor_id=admin_id,
+            actor_role="admin",
             action="change_config",
             target_type="user_cohort",
             target_id=user.id,
@@ -386,3 +636,75 @@ class AdminUsersService:
         await self.db.commit()
         await self.db.refresh(user)
         return user
+
+    async def set_cohort_bulk(
+        self,
+        user_ids: list[uuid.UUID],
+        cohort: str | None,
+        admin_id: uuid.UUID,
+        ip: str | None = None,
+    ) -> dict:
+        """Assign or clear cohort for multiple users in a single transaction.
+
+        Each user gets an individual `audit_logs` row (per D-12) so the
+        change is traceable per-target. Missing users go into `not_found`;
+        admins are silently skipped (the UI hides them from selection but we
+        guard server-side too) and reported in `skipped_admin`.
+
+        Returns:
+            {
+              updated: int,         # number of users whose cohort changed
+              unchanged: int,       # cohort was already equal to target
+              not_found: [uuid],
+              skipped_admin: [uuid],
+            }
+        """
+        if not user_ids:
+            return {
+                "updated": 0,
+                "unchanged": 0,
+                "not_found": [],
+                "skipped_admin": [],
+            }
+
+        result = await self.db.execute(select(User).where(User.id.in_(user_ids)))
+        found: dict[uuid.UUID, User] = {u.id: u for u in result.scalars().all()}
+
+        not_found = [uid for uid in user_ids if uid not in found]
+        skipped_admin: list[uuid.UUID] = []
+        updated = 0
+        unchanged = 0
+
+        for uid in user_ids:
+            user = found.get(uid)
+            if user is None:
+                continue
+            if user.role == "admin":
+                # The UI prevents this — never let an admin be tagged as a
+                # study participant. Server-side guard for robustness.
+                skipped_admin.append(uid)
+                continue
+            old_cohort = user.cohort
+            if old_cohort == cohort:
+                unchanged += 1
+                continue
+            user.cohort = cohort
+            await audit_log_action(
+                self.db,
+                actor_id=admin_id,
+                actor_role="admin",
+                action="update_cohort",
+                target_type="user_cohort",
+                target_id=user.id,
+                details={"old": old_cohort, "new": cohort, "bulk": True},
+                ip=ip,
+            )
+            updated += 1
+
+        await self.db.commit()
+        return {
+            "updated": updated,
+            "unchanged": unchanged,
+            "not_found": not_found,
+            "skipped_admin": skipped_admin,
+        }

@@ -122,7 +122,8 @@ async def patch_admin_config(
 
     await audit_log_action(
         db,
-        admin_id=current_user.id,
+        actor_id=current_user.id,
+        actor_role="admin",
         action="change_config",
         target_type="system_config",
         target_id=None,
@@ -165,7 +166,8 @@ async def create_admin_consent_version(
 
     await audit_log_action(
         db,
-        admin_id=current_user.id,
+        actor_id=current_user.id,
+        actor_role="admin",
         action="change_config",
         target_type="consent_version",
         target_id=row.id,
@@ -211,7 +213,8 @@ async def publish_admin_consent_version(
 
     await audit_log_action(
         db,
-        admin_id=current_user.id,
+        actor_id=current_user.id,
+        actor_role="admin",
         action="change_config",
         target_type="consent_version",
         target_id=row.id,
@@ -239,7 +242,8 @@ async def test_admin_gemini(
     # Audit only metadata — never the prompt or response.
     await audit_log_action(
         db,
-        admin_id=current_user.id,
+        actor_id=current_user.id,
+        actor_role="admin",
         action="change_config",
         target_type="gemini_test",
         target_id=None,

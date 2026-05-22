@@ -1,3 +1,5 @@
+import InfoHint from './InfoHint'
+
 interface MetricCardProps {
   label: string
   value: string | number
@@ -5,6 +7,12 @@ interface MetricCardProps {
   trend?: 'up' | 'down' | 'neutral'
   badge?: string
   hint?: string
+  /**
+   * Optional one-line explanation surfaced as a hover tooltip via the
+   * `i` icon next to the label. Use it to describe what the metric
+   * measures, how it's calculated, or why it matters operationally.
+   */
+  info?: string
   onClick?: () => void
 }
 
@@ -55,6 +63,7 @@ export default function MetricCard({
   trend,
   badge,
   hint,
+  info,
   onClick,
 }: MetricCardProps) {
   const dotColor = threshold ? THRESHOLD_DOT[threshold] : null
@@ -97,20 +106,23 @@ export default function MetricCard({
       }
     >
       <div className="flex items-start justify-between" style={{ gap: 8 }}>
-        <p
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            color: 'var(--ink-500)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.14em',
-            margin: 0,
-            lineHeight: 1.4,
-          }}
-          className="truncate"
-        >
-          {label}
-        </p>
+        <div className="flex items-center" style={{ gap: 6, minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: 'var(--ink-500)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.14em',
+              margin: 0,
+              lineHeight: 1.4,
+            }}
+            className="truncate"
+          >
+            {label}
+          </p>
+          {info && <InfoHint text={info} />}
+        </div>
         {badge && (
           <span
             style={{

@@ -92,6 +92,35 @@ class EmpathyRatingRepository:
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
+    async def count_unrated_messages(
+        self,
+        rater_id: uuid.UUID,
+        cohort: str | None = None,
+    ) -> int:
+        """Return the TOTAL number of assistant messages this rater has yet
+        to evaluate (no limit). Backs the "Cola pendiente (N)" counter so
+        the UI can show progress honestly (e.g. "mostrando 12 de 12").
+        """
+        not_rated = ~select(EmpathyRating.id).where(
+            EmpathyRating.message_id == Message.id,
+            EmpathyRating.rater_id == rater_id,
+        ).exists()
+
+        stmt = select(func.count(Message.id)).where(
+            Message.role == "assistant", not_rated
+        )
+
+        if cohort is not None:
+            stmt = (
+                stmt.select_from(Message)
+                .join(SessionModel, Message.session_id == SessionModel.id)
+                .join(User, SessionModel.user_id == User.id)
+                .where(User.cohort == cohort)
+            )
+
+        result = await self.db.execute(stmt)
+        return int(result.scalar() or 0)
+
     # ----------------------------------------------------------------- filter
     async def list_by_filters(
         self,
@@ -111,6 +140,13 @@ class EmpathyRatingRepository:
             stmt = stmt.where(EmpathyRating.rater_id == rater_id)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_by_id(self, rating_id: uuid.UUID) -> EmpathyRating | None:
+        """Fetch a single rating by primary key (used by PATCH ownership check)."""
+        result = await self.db.execute(
+            select(EmpathyRating).where(EmpathyRating.id == rating_id)
+        )
+        return result.scalar_one_or_none()
 
     # -------------------------------------------------------------------- stats
     async def stats(self, cohort: str | None = None) -> dict:

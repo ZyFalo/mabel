@@ -38,6 +38,7 @@ class OpenAICompatAdapter:
         messages: list[dict],
         system_prompt: str,
         config: dict | None = None,
+        usage_sink: dict | None = None,
     ) -> AsyncGenerator[str, None]:
         # OpenAI expects the system prompt as the first message with role "system".
         # Empty system_prompt is omitted so providers that disallow it don't 400.
@@ -52,6 +53,12 @@ class OpenAICompatAdapter:
             "model": self._model,
             "messages": full_messages,
             "stream": True,
+            # `include_usage` makes the provider emit a terminal chunk with
+            # empty `choices` and a populated `usage` block. Without this flag,
+            # streaming responses NEVER expose token counts, which is why the
+            # `messages.tokens_prompt/completion` columns were 0/28 populated.
+            # Both OpenAI and Gemini's OpenAI-compat endpoint honor this option.
+            "stream_options": {"include_usage": True},
         }
         if config:
             if "temperature" in config:
@@ -64,6 +71,18 @@ class OpenAICompatAdapter:
         try:
             stream = await self._client.chat.completions.create(**kwargs)
             async for chunk in stream:
+                # The terminal usage chunk has empty `choices` but populated
+                # `usage`. We must check usage BEFORE the early-continue on
+                # empty choices, otherwise we'd silently drop it.
+                if usage_sink is not None:
+                    usage = getattr(chunk, "usage", None)
+                    if usage is not None:
+                        prompt_tokens = getattr(usage, "prompt_tokens", None)
+                        completion_tokens = getattr(usage, "completion_tokens", None)
+                        if prompt_tokens is not None:
+                            usage_sink["prompt_tokens"] = int(prompt_tokens)
+                        if completion_tokens is not None:
+                            usage_sink["completion_tokens"] = int(completion_tokens)
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta

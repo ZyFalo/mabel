@@ -14,6 +14,7 @@ from app.models.preference import Preference
 from app.models.session import Session
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
+from app.services.audit_service import audit_log_action
 
 
 class AccountService:
@@ -21,9 +22,38 @@ class AccountService:
         self.user_repo = user_repo
         self.db = db
 
-    async def delete_account(self, user_id: uuid.UUID, confirmation: str) -> None:
+    async def delete_account(
+        self,
+        user_id: uuid.UUID,
+        confirmation: str,
+        ip: str | None = None,
+    ) -> None:
         if confirmation != "ELIMINAR":
             raise ValueError("INVALID_CONFIRMATION")
+
+        # Snapshot the email BEFORE the row disappears so the audit log
+        # preserves enough context for the admin panel timeline. The FK
+        # `audit_logs.actor_id` is ON DELETE SET NULL, so the log survives
+        # the user's hard deletion (Evo 005b pattern).
+        user = await self.user_repo.get_by_id(user_id)
+        if user is None:
+            raise ValueError("USER_NOT_FOUND")
+        email_snapshot = user.email
+
+        # Write the audit log BEFORE the delete so actor_id is still a valid
+        # FK at insert time; once we commit, the user_repo.delete cascade
+        # nulls the audit_logs.actor_id automatically.
+        await audit_log_action(
+            self.db,
+            actor_id=user_id,
+            actor_role="student",
+            action="user_delete",
+            target_type="user",
+            target_id=user_id,
+            details={"email": email_snapshot},
+            ip=ip,
+        )
+
         deleted = await self.user_repo.delete(user_id)
         if not deleted:
             raise ValueError("USER_NOT_FOUND")

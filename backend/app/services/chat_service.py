@@ -2,7 +2,7 @@ import hashlib
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 
@@ -75,7 +75,7 @@ class ChatService:
         session = await self.session_repo.update(
             session,
             checkin_payload=checkin_payload,
-            checkin_completed_at=datetime.utcnow(),
+            checkin_completed_at=datetime.now(UTC),
         )
         await self.session_repo.db.commit()
         return session
@@ -85,13 +85,11 @@ class ChatService:
         if session.ended_at is not None:
             raise ValueError("SESSION_ENDED")
 
-        session = await self.session_repo.update(session, ended_at=datetime.utcnow())
+        session = await self.session_repo.update(session, ended_at=datetime.now(UTC))
         await self.session_repo.db.commit()
         return session
 
-    async def send_message(
-        self, session_id: uuid.UUID, user_id: uuid.UUID, content: str
-    ) -> AsyncGenerator[str, None]:
+    async def send_message(self, session_id: uuid.UUID, user_id: uuid.UUID, content: str) -> AsyncGenerator[str, None]:
         session = await self.get_session(session_id, user_id)
         if session.ended_at is not None:
             raise ValueError("SESSION_ENDED")
@@ -125,9 +123,7 @@ class ChatService:
 
         # Build context window
         if save_history:
-            context_messages = await self.message_repo.get_recent_context(
-                session_id, settings.CONTEXT_WINDOW_SIZE
-            )
+            context_messages = await self.message_repo.get_recent_context(session_id, settings.CONTEXT_WINDOW_SIZE)
             messages = [{"role": m.role, "content": m.content} for m in context_messages]
         else:
             messages = [{"role": "user", "content": content}]
@@ -138,11 +134,17 @@ class ChatService:
         # Stream from LLM
         start_time = time.time()
         full_response = ""
+        # `usage_sink` is populated by the adapter from the terminal stream
+        # chunk (OpenAI `include_usage`, Gemini `usage_metadata`). Keys:
+        # `prompt_tokens`, `completion_tokens`. May remain empty if the
+        # provider doesn't expose usage — we persist whatever is available.
+        usage_sink: dict = {}
 
         try:
             async for token in self.llm.generate_stream(
                 messages=messages,
                 system_prompt=system_prompt,
+                usage_sink=usage_sink,
             ):
                 full_response += token
                 yield f'{{"token": {_json_str(token)}}}'
@@ -178,6 +180,8 @@ class ChatService:
                 # dominant component, so llm_latency_ms = latency_ms. ASR/TTS
                 # latency are attributed to their own pipeline steps when applicable.
                 llm_latency_ms=latency_ms,
+                tokens_prompt=usage_sink.get("prompt_tokens"),
+                tokens_completion=usage_sink.get("completion_tokens"),
                 safety_flags=assistant_safety_flags,
             )
             await self.message_repo.db.commit()
@@ -186,7 +190,7 @@ class ChatService:
         done_payload = f'"done": true, "message_id": {_json_str(assistant_message_id)}, "latency_ms": {latency_ms}'
         if post_risk and post_risk.get("risk_detected"):
             done_payload += ', "risk_detected": true'
-        yield f'{{{done_payload}}}'
+        yield f"{{{done_payload}}}"
 
     async def generate_greeting(self, session_id: uuid.UUID, user_id: uuid.UUID) -> dict | None:
         session = await self.get_session(session_id, user_id)
@@ -251,16 +255,17 @@ class ChatService:
             )
         else:
             greeting_instruction = (
-                "Genera un saludo breve y cálido para el estudiante. "
-                "Preséntate como Mabel IA en una sola frase."
+                "Genera un saludo breve y cálido para el estudiante. Preséntate como Mabel IA en una sola frase."
             )
 
         start_time = time.time()
         full_response = ""
+        usage_sink: dict = {}
         try:
             async for token in self.llm.generate_stream(
                 messages=[{"role": "user", "content": greeting_instruction}],
                 system_prompt=system_prompt,
+                usage_sink=usage_sink,
             ):
                 full_response += token
         except ValueError:
@@ -273,19 +278,35 @@ class ChatService:
 
         if save_history:
             content_hash = hashlib.sha256(full_response.encode()).hexdigest()
-            msg = await self.message_repo.create(
-                session_id=session_id,
-                role="assistant",
-                content=full_response,
-                content_sha256=content_hash,
-                meta={"model": settings.GEMINI_MODEL, "greeting": True},
-                latency_ms=latency_ms,
-                llm_latency_ms=latency_ms,  # Fase 8.1 D-03
-            )
-            await self.message_repo.db.commit()
+            try:
+                msg = await self.message_repo.create(
+                    session_id=session_id,
+                    role="assistant",
+                    content=full_response,
+                    content_sha256=content_hash,
+                    meta={"model": settings.GEMINI_MODEL, "greeting": True},
+                    latency_ms=latency_ms,
+                    llm_latency_ms=latency_ms,  # Fase 8.1 D-03
+                    tokens_prompt=usage_sink.get("prompt_tokens"),
+                    tokens_completion=usage_sink.get("completion_tokens"),
+                )
+                await self.message_repo.db.commit()
+            except IntegrityError:
+                # Race condition guard: the in-Python `if existing: return None`
+                # check at the top is NOT atomic w.r.t. concurrent calls. When
+                # the React client fires the greeting endpoint twice (e.g.
+                # StrictMode double-invokes the `useEffect`), both requests
+                # race past that check, both stream the LLM, and both try to
+                # INSERT. We deduplicate at the DB level via the partial
+                # UNIQUE INDEX `uq_messages_session_greeting` (added 2026-05-22):
+                # the second INSERT raises IntegrityError, we roll back and
+                # return None. The first one already saved the greeting and
+                # the client just sees a benign null on the loser race.
+                await self.message_repo.db.rollback()
+                return None
             return {"id": str(msg.id), "role": "assistant", "content": full_response, "created_at": str(msg.created_at)}
 
-        return {"id": None, "role": "assistant", "content": full_response, "created_at": datetime.utcnow().isoformat()}
+        return {"id": None, "role": "assistant", "content": full_response, "created_at": datetime.now(UTC).isoformat()}
 
     async def list_messages(self, session_id: uuid.UUID, user_id: uuid.UUID):
         await self.get_session(session_id, user_id)

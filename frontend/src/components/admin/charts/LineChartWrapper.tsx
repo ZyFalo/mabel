@@ -129,19 +129,32 @@ export default function LineChartWrapper({
             }
           />
         )}
-        {lines.map((line, idx) => (
-          <Line
-            key={line.key}
-            type="monotone"
-            dataKey={line.key}
-            name={line.label ?? line.key}
-            stroke={line.color ?? CHART_PALETTE[idx % CHART_PALETTE.length]}
-            strokeWidth={2}
-            dot={{ r: 2.5, strokeWidth: 0 }}
-            activeDot={{ r: 5, strokeWidth: 2, stroke: '#FFFFFF' }}
-            isAnimationActive={false}
-          />
-        ))}
+        {lines.map((line, idx) => {
+          // When there is only a single data point Recharts cannot draw a
+          // line (needs >= 2 points). The default small dot (r=2.5) is
+          // often invisible against the grid. Force a larger filled marker
+          // so the value still surfaces visually instead of looking like
+          // an empty chart.
+          const singlePoint = data.length === 1
+          const color = line.color ?? CHART_PALETTE[idx % CHART_PALETTE.length]
+          return (
+            <Line
+              key={line.key}
+              type="monotone"
+              dataKey={line.key}
+              name={line.label ?? line.key}
+              stroke={color}
+              strokeWidth={2}
+              dot={
+                singlePoint
+                  ? { r: 6, fill: color, stroke: '#FFFFFF', strokeWidth: 2 }
+                  : { r: 2.5, strokeWidth: 0 }
+              }
+              activeDot={{ r: 5, strokeWidth: 2, stroke: '#FFFFFF' }}
+              isAnimationActive={false}
+            />
+          )
+        })}
       </LineChart>
     </ResponsiveContainer>
   )

@@ -6,26 +6,98 @@ Business rules:
 - D-08: CSV exports anonymize id-like columns via `sha256(value)[:16]`.
 - D-12: action + audit log committed atomically; on error nothing persists.
 - State machine for reports:
-    open      -> triaged
+    open      -> triaged | dismissed
     triaged   -> resolved | dismissed
     Anything else SHALL raise INVALID_TRANSITION (409).
+
+    Rationale: trivial reports (spam, duplicates, false positives) can be
+    dismissed without requiring an explicit triage step — that reduces
+    friction without sacrificing rigor, because RESOLVING (which implies
+    a corrective action was taken) still demands prior triage.
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.message_report import MessageReport
 from app.repositories.message_report_repository import MessageReportRepository
-from app.schemas.admin import ReportAdminItem
+from app.schemas.admin import ReportAdminItem, ReportNoteEntry
 from app.services.audit_service import audit_log_action
 
+# Matches one note entry as written by message_report_repository.update_status:
+#   `[2026-05-22T18:30:00Z] resolved: short text`
+# Group 1 = timestamp, group 2 = new_status, group 3 = note body.
+_NOTE_ENTRY_RE = re.compile(
+    r"^\[(?P<at>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\]\s+"
+    r"(?P<status>open|triaged|resolved|dismissed):\s*(?P<notes>.*)$",
+)
+
+
+def _split_details(details: str | None) -> tuple[str | None, list[ReportNoteEntry]]:
+    """Split the `details` blob into (reporter_context, admin_notes_history).
+
+    Convention used by `message_report_repository.update_status`:
+      - The reporter's original free-text context (if any) is written by
+        `report_service.report_message` BEFORE any admin touches the row,
+        so it lives as plain text WITHOUT the `[timestamp] status:` prefix.
+      - Each admin transition APPENDS a line in the form
+        `[ISO_timestamp] <new_status>: <notes>`.
+
+    Therefore: lines matching the admin pattern → `notes_history`. Any
+    remaining non-matching lines → joined back into `reporter_context`.
+    This prevents the admin UI from mis-attributing the student's words
+    as an admin note (which the previous unified parser caused).
+    """
+    if not details:
+        return None, []
+    reporter_lines: list[str] = []
+    admin_entries: list[ReportNoteEntry] = []
+    for raw_line in details.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            continue
+        match = _NOTE_ENTRY_RE.match(line)
+        if match:
+            try:
+                ts = datetime.strptime(match.group("at"), "%Y-%m-%dT%H:%M:%SZ")
+            except ValueError:
+                ts = None
+            admin_entries.append(
+                ReportNoteEntry(
+                    at=ts,
+                    status=match.group("status"),
+                    notes=match.group("notes") or None,
+                )
+            )
+        else:
+            reporter_lines.append(line)
+    reporter_context = "\n".join(reporter_lines) if reporter_lines else None
+    return reporter_context, admin_entries
+
+
+def _derive_triaged_at(report: MessageReport) -> datetime | None:
+    """Approximate `triaged_at` from `updated_at`.
+
+    The table has no dedicated `triaged_at` column. We treat `updated_at` as
+    the triage timestamp ONLY when the report went through triage — i.e. its
+    current status is `triaged` or `resolved`. Reports dismissed straight from
+    `open` (allowed by the state machine since the open→dismissed shortcut)
+    never went through triage, so we must NOT report `updated_at` as
+    `triaged_at` for them — that would inflate the "tiempo promedio hasta
+    triaje" indicator.
+    """
+    if report.status in ("triaged", "resolved"):
+        return report.updated_at
+    return None
+
 _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
-    "open": {"triaged"},
+    "open": {"triaged", "dismissed"},
     "triaged": {"resolved", "dismissed"},
     "resolved": set(),
     "dismissed": set(),
@@ -43,16 +115,19 @@ def _truncate_id(value: uuid.UUID | None, length: int = 8) -> str:
 
 
 def _to_item(report: MessageReport) -> ReportAdminItem:
-    triaged_at = report.updated_at if report.status != "open" else None
+    reporter_context, notes_history = _split_details(report.details)
     return ReportAdminItem(
         id=report.id,
         message_id=report.message_id,
+        reporter_id=report.reporter_id,
         reporter_id_truncated=_truncate_id(report.reporter_id, 8),
         reason=report.reason,
         severity=report.severity,
         status=report.status,
         created_at=report.created_at,
-        triaged_at=triaged_at,
+        triaged_at=_derive_triaged_at(report),
+        reporter_context=reporter_context,
+        notes_history=notes_history,
     )
 
 
@@ -108,7 +183,8 @@ class AdminReportsService:
 
         await audit_log_action(
             self.db,
-            admin_id=admin_id,
+            actor_id=admin_id,
+            actor_role="admin",
             action="review_report",
             target_type="message_report",
             target_id=updated.id,
@@ -152,7 +228,8 @@ class AdminReportsService:
 
         await audit_log_action(
             self.db,
-            admin_id=admin_id,
+            actor_id=admin_id,
+            actor_role="admin",
             action="export_data",
             target_type="report",
             target_id=None,
@@ -183,7 +260,7 @@ class AdminReportsService:
             "triaged_at",
         ]
         for r in reports:
-            triaged_at = r.updated_at if r.status != "open" else None
+            triaged_at = _derive_triaged_at(r)
             yield [
                 str(r.id),
                 _hash16(r.reporter_id),

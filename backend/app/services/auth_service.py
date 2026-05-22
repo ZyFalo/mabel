@@ -16,6 +16,7 @@ from app.schemas.auth import (
     TokenValidationResponse,
     UserResponse,
 )
+from app.services.audit_service import audit_log_action
 
 
 JWT_ALGORITHM = "HS256"
@@ -59,7 +60,23 @@ class AuthService:
     def decode_jwt(token: str) -> dict:
         return jwt.decode(token, settings.JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
-    async def register(self, email: str, password: str, display_name: str) -> UserResponse:
+    async def register(
+        self,
+        email: str,
+        password: str,
+        display_name: str,
+        ip: str | None = None,
+    ) -> UserResponse:
+        """Create a new student account ATOMICALLY with its audit entry.
+
+        Per D-12 the user_repo.create() no longer commits — it only flushes
+        so the new user_id is available for the audit row. We then emit
+        `user_register` against `self.user_repo.db` and commit ONCE. If the
+        audit raises (e.g. ALLOWED_ACTIONS regression, transient DB error),
+        the user creation rolls back too and the endpoint returns 5xx
+        without orphaning a row in `users` without its matching audit
+        trail in `audit_logs`.
+        """
         existing = await self.user_repo.get_by_email(email)
         if existing:
             raise ValueError("DUPLICATE_EMAIL")
@@ -68,6 +85,18 @@ class AuthService:
         user = await self.user_repo.create(
             email=email, hashed_password=hashed, display_name=display_name
         )
+        await audit_log_action(
+            self.user_repo.db,
+            actor_id=user.id,
+            actor_role="student",
+            action="user_register",
+            target_type="user",
+            target_id=user.id,
+            details={"email": email},
+            ip=ip,
+        )
+        await self.user_repo.db.commit()
+        await self.user_repo.db.refresh(user)
         return UserResponse.model_validate(user)
 
     async def login(
@@ -90,12 +119,29 @@ class AuthService:
             user=UserResponse.model_validate(user),
         )
 
-    async def forgot_password(self, email: str) -> ForgotPasswordResponse:
+    async def forgot_password(
+        self, email: str
+    ) -> tuple[ForgotPasswordResponse, uuid.UUID | None]:
+        """Return (anti-enumeration response, real_user_id_or_None).
+
+        The user_id is returned ONLY so the caller can write an audit log
+        with the matching `actor_id`. The HTTP response is identical
+        regardless of whether the email exists (D-03 / anti-enumeration).
+        """
         user = await self.user_repo.get_by_email(email)
 
-        if not user or user.deleted_at is not None:
-            return ForgotPasswordResponse(
-                message="Si el email esta registrado, recibiras instrucciones"
+        # We treat deleted AND disabled accounts as "non-existent" for the
+        # reset flow. Issuing a working reset_link for a disabled account
+        # would let the user reset their password but still be blocked at
+        # login (DISABLED: error), which is confusing and useless. It also
+        # weakens anti-enumeration: an attacker that sees `reset_link`
+        # present learns the email belongs to a real (disabled) account.
+        if user is None or user.deleted_at is not None or user.disabled_at is not None:
+            return (
+                ForgotPasswordResponse(
+                    message="Si el email esta registrado, recibiras instrucciones"
+                ),
+                None,
             )
 
         raw_token = os.urandom(32).hex()
@@ -108,9 +154,12 @@ class AuthService:
 
         reset_link = f"/reset-password/{raw_token}"
 
-        return ForgotPasswordResponse(
-            message="Si el email esta registrado, recibiras instrucciones",
-            reset_link=reset_link,
+        return (
+            ForgotPasswordResponse(
+                message="Si el email esta registrado, recibiras instrucciones",
+                reset_link=reset_link,
+            ),
+            user.id,
         )
 
     async def validate_reset_token(self, raw_token: str) -> TokenValidationResponse:
@@ -125,7 +174,12 @@ class AuthService:
 
         return TokenValidationResponse(valid=True)
 
-    async def reset_password(self, request: ResetPasswordRequest) -> None:
+    async def reset_password(self, request: ResetPasswordRequest) -> uuid.UUID:
+        """Reset password and return the user_id whose password was changed.
+
+        Returning the id lets the router emit a `password_reset_completed`
+        audit log entry without an extra lookup.
+        """
         token_hash = hashlib.sha256(request.token.encode()).hexdigest()
         record = await self.password_reset_repo.get_by_token_hash(token_hash)
 
@@ -138,3 +192,4 @@ class AuthService:
         hashed = self.hash_password(request.new_password)
         await self.user_repo.update_password(record.user_id, hashed)
         await self.password_reset_repo.mark_used(record.id)
+        return record.user_id

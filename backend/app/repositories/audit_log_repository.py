@@ -13,8 +13,9 @@ class AuditLogRepository:
 
     async def create(
         self,
-        admin_id: uuid.UUID | None,
+        actor_id: uuid.UUID | None,
         action: str,
+        actor_role: str = "admin",
         target_type: str | None = None,
         target_id: uuid.UUID | None = None,
         details: dict | None = None,
@@ -22,7 +23,8 @@ class AuditLogRepository:
     ) -> AuditLog:
         """Insert an audit_logs row. Does NOT commit (per D-12)."""
         log = AuditLog(
-            admin_id=admin_id,
+            actor_id=actor_id,
+            actor_role=actor_role,
             action=action,
             target_type=target_type,
             target_id=target_id,
@@ -36,7 +38,8 @@ class AuditLogRepository:
 
     async def list_with_filters(
         self,
-        admin_id: uuid.UUID | None = None,
+        actor_id: uuid.UUID | None = None,
+        actor_role: str | None = None,
         action: str | None = None,
         from_date: datetime | None = None,
         to_date: datetime | None = None,
@@ -50,9 +53,12 @@ class AuditLogRepository:
         stmt = select(AuditLog)
         count_stmt = select(func.count()).select_from(AuditLog)
 
-        if admin_id is not None:
-            stmt = stmt.where(AuditLog.admin_id == admin_id)
-            count_stmt = count_stmt.where(AuditLog.admin_id == admin_id)
+        if actor_id is not None:
+            stmt = stmt.where(AuditLog.actor_id == actor_id)
+            count_stmt = count_stmt.where(AuditLog.actor_id == actor_id)
+        if actor_role is not None:
+            stmt = stmt.where(AuditLog.actor_role == actor_role)
+            count_stmt = count_stmt.where(AuditLog.actor_role == actor_role)
         if action is not None:
             stmt = stmt.where(AuditLog.action == action)
             count_stmt = count_stmt.where(AuditLog.action == action)

@@ -13,18 +13,60 @@ const SECTION_LABELS: Record<string, string> = {
   '/admin/logs': 'Logs',
 }
 
-function getSectionLabel(pathname: string): string {
-  // Exact matches first
-  if (SECTION_LABELS[pathname]) return SECTION_LABELS[pathname]
-  // Prefix matches (e.g. /admin/users/:id → Usuarios)
-  if (pathname.startsWith('/admin/users/')) return 'Usuarios'
-  if (pathname.startsWith('/admin/safety-events')) return 'Safety events'
-  if (pathname.startsWith('/admin/reports')) return 'Reportes'
-  if (pathname.startsWith('/admin/metrics')) return 'Métricas'
-  if (pathname.startsWith('/admin/empathy-ratings')) return 'Calificación de empatía'
-  if (pathname.startsWith('/admin/config')) return 'Configuración'
-  if (pathname.startsWith('/admin/logs')) return 'Logs'
-  return 'Dashboard'
+interface Crumb {
+  label: string
+  /** When set, the crumb renders as a link to this path. The last crumb
+   * (current view) leaves `to` undefined so it renders as plain text. */
+  to?: string
+}
+
+/**
+ * Build the breadcrumb trail for the current admin route.
+ *
+ * Designed to read naturally: "Panel administrativo › Usuarios › Detalle
+ * del usuario". The first crumb (Panel administrativo) is rendered by the
+ * header outside this function; we return only the trail from the section
+ * onwards. Intermediate crumbs are clickable to the parent list view; the
+ * last one is plain text representing the current page.
+ */
+function getBreadcrumb(pathname: string): Crumb[] {
+  // Exact root pages
+  if (SECTION_LABELS[pathname]) {
+    return [{ label: SECTION_LABELS[pathname] }]
+  }
+
+  // Detail / nested routes per section
+  if (pathname.startsWith('/admin/users/')) {
+    return [
+      { label: 'Usuarios', to: '/admin/users' },
+      { label: 'Detalle del usuario' },
+    ]
+  }
+  if (pathname.startsWith('/admin/safety-events/')) {
+    return [
+      { label: 'Safety events', to: '/admin/safety-events' },
+      { label: 'Detalle del evento' },
+    ]
+  }
+  if (pathname.startsWith('/admin/reports/')) {
+    return [
+      { label: 'Reportes', to: '/admin/reports' },
+      { label: 'Detalle del reporte' },
+    ]
+  }
+
+  // Section-prefix fallbacks (e.g. /admin/metrics?tab=usage stays as
+  // "Métricas"; tab is a query param, not a path segment).
+  if (pathname.startsWith('/admin/safety-events')) return [{ label: 'Safety events' }]
+  if (pathname.startsWith('/admin/reports')) return [{ label: 'Reportes' }]
+  if (pathname.startsWith('/admin/metrics')) return [{ label: 'Métricas' }]
+  if (pathname.startsWith('/admin/empathy-ratings')) {
+    return [{ label: 'Calificación de empatía' }]
+  }
+  if (pathname.startsWith('/admin/config')) return [{ label: 'Configuración' }]
+  if (pathname.startsWith('/admin/logs')) return [{ label: 'Logs' }]
+
+  return [{ label: 'Dashboard' }]
 }
 
 function getInitials(name?: string | null, email?: string | null): string {
@@ -46,7 +88,7 @@ export default function AdminHeader() {
 
   if (!user) return null
 
-  const section = getSectionLabel(location.pathname)
+  const trail = getBreadcrumb(location.pathname)
   const initials = getInitials(user.display_name, user.email)
   const displayName = user.display_name || (user.email ? user.email.split('@')[0] : 'Admin')
 
@@ -83,28 +125,62 @@ export default function AdminHeader() {
         >
           Panel administrativo
         </button>
-        <span
-          aria-hidden
-          style={{
-            color: 'var(--ink-400)',
-            fontSize: 14,
-            lineHeight: 1,
-            margin: '0 4px',
-          }}
-        >
-          ›
-        </span>
-        <span
-          style={{
-            fontSize: 14,
-            color: 'var(--ink-900)',
-            fontWeight: 600,
-            fontFamily: 'var(--font-sans)',
-          }}
-          className="truncate"
-        >
-          {section}
-        </span>
+        {trail.map((crumb, idx) => {
+          const isLast = idx === trail.length - 1
+          return (
+            <span key={`${crumb.label}-${idx}`} className="flex items-center">
+              <span
+                aria-hidden
+                style={{
+                  color: 'var(--ink-400)',
+                  fontSize: 14,
+                  lineHeight: 1,
+                  margin: '0 4px',
+                }}
+              >
+                ›
+              </span>
+              {isLast || !crumb.to ? (
+                <span
+                  aria-current={isLast ? 'page' : undefined}
+                  style={{
+                    fontSize: 14,
+                    color: 'var(--ink-900)',
+                    fontWeight: 600,
+                    fontFamily: 'var(--font-sans)',
+                  }}
+                  className="truncate"
+                >
+                  {crumb.label}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate(crumb.to!)}
+                  className="truncate"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    color: 'var(--ink-500)',
+                    fontWeight: 500,
+                    letterSpacing: '0.01em',
+                    padding: '4px 0',
+                  }}
+                  onMouseEnter={(e) => {
+                    ;(e.currentTarget as HTMLElement).style.color = 'var(--mabel-700)'
+                  }}
+                  onMouseLeave={(e) => {
+                    ;(e.currentTarget as HTMLElement).style.color = 'var(--ink-500)'
+                  }}
+                >
+                  {crumb.label}
+                </button>
+              )}
+            </span>
+          )
+        })}
       </nav>
 
       {/* Right: user pill */}

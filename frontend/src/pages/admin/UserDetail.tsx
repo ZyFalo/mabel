@@ -1,7 +1,9 @@
 import { ReactNode, useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import apiClient from '../../api/client'
+import BulkActionModal from '../../components/admin/BulkActionModal'
 import DisableUserModal from '../../components/admin/DisableUserModal'
+import EnableUserModal from '../../components/admin/EnableUserModal'
 import { useToastStore } from '../../stores/toastStore'
 
 // Backend (UserAdminDetail) returns a FLAT shape. We adapt these into the
@@ -400,6 +402,11 @@ export default function UserDetail() {
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [disableOpen, setDisableOpen] = useState(false)
+  const [enableOpen, setEnableOpen] = useState(false)
+  // Re-uses BulkActionModal in single-user mode for the hard-delete flow.
+  // The modal already handles the "CONFIRMAR" gate and shows a clear
+  // impact summary; passing a one-element array keeps the same UX path.
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const fetchUser = useCallback(async () => {
     if (!id) return
@@ -572,6 +579,69 @@ export default function UserDetail() {
             >
               Deshabilitar cuenta
             </button>
+          )}
+
+          {/* Disabled-only actions: reactivar + eliminar permanentemente.
+              Admins quedan fuera (no se pueden deshabilitar para empezar,
+              así que tampoco caen aquí). */}
+          {user && isDisabled && !isAdminRole && (
+            <div className="flex items-center" style={{ gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setEnableOpen(true)}
+                className="inline-flex items-center"
+                style={{
+                  gap: 8,
+                  padding: '10px 18px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--white)',
+                  background: 'var(--success-600)',
+                  borderRadius: 9999,
+                  border: '1px solid var(--success-600)',
+                  cursor: 'pointer',
+                  transition:
+                    'background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
+                }}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.background = 'var(--success-700)'
+                  ;(e.currentTarget as HTMLElement).style.boxShadow =
+                    '0 0 0 4px rgba(5, 150, 105, 0.18)'
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.background = 'var(--success-600)'
+                  ;(e.currentTarget as HTMLElement).style.boxShadow = 'none'
+                }}
+              >
+                Reactivar cuenta
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="inline-flex items-center"
+                style={{
+                  gap: 8,
+                  padding: '10px 18px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--danger-700)',
+                  background: 'transparent',
+                  borderRadius: 9999,
+                  border: '1px solid var(--danger-300, rgba(220, 38, 38, 0.35))',
+                  cursor: 'pointer',
+                  transition:
+                    'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
+                }}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.background = 'var(--danger-50)'
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                }}
+              >
+                Eliminar permanentemente
+              </button>
+            </div>
           )}
         </div>
       </section>
@@ -816,6 +886,47 @@ export default function UserDetail() {
           onDisabled={() => {
             setDisableOpen(false)
             navigate('/admin/users')
+          }}
+        />
+      )}
+
+      {/* Enable modal */}
+      {user && enableOpen && (
+        <EnableUserModal
+          open={enableOpen}
+          userId={user.id}
+          userLabel={user.display_name?.trim() || user.email_masked}
+          previousReason={user.disabled_reason}
+          onClose={() => setEnableOpen(false)}
+          onEnabled={() => {
+            setEnableOpen(false)
+            fetchUser()
+          }}
+        />
+      )}
+
+      {/* Delete (permanent) modal — reuses BulkActionModal with N=1 */}
+      {user && deleteOpen && (
+        <BulkActionModal
+          open={deleteOpen}
+          action="delete"
+          selected={[
+            {
+              id: user.id,
+              email_masked: user.email_masked,
+              display_name: user.display_name,
+              role: user.role,
+              disabled_at: user.disabled_at,
+            },
+          ]}
+          onClose={() => setDeleteOpen(false)}
+          onApplied={(res) => {
+            setDeleteOpen(false)
+            if (res.applied > 0) {
+              navigate('/admin/users')
+            } else {
+              fetchUser()
+            }
           }}
         />
       )}
