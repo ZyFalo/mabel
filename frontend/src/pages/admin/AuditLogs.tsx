@@ -55,7 +55,7 @@ const DEFAULT_FILTERS: FiltersState = {
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  login: 'Inicio de sesion',
+  login: 'Inicio de sesión',
   view_user: 'Ver usuario',
   disable_user: 'Deshabilitar usuario',
   change_config: 'Cambio de config',
@@ -64,14 +64,14 @@ const ACTION_LABELS: Record<string, string> = {
   export_data: 'Exportar datos',
 }
 
-const ACTION_CHIP_CLASSES: Record<string, string> = {
-  login: 'bg-gray-100 text-text-primary/70 border-gray-300',
-  view_user: 'bg-accent/10 text-accent border-accent/30',
-  disable_user: 'bg-danger/10 text-danger border-danger/30',
-  change_config: 'bg-warning/10 text-warning border-warning/30',
-  review_report: 'bg-primary/10 text-primary border-primary/30',
-  review_safety_event: 'bg-danger/10 text-danger border-danger/30',
-  export_data: 'bg-success/10 text-success border-success/30',
+const ACTION_CHIP_STYLES: Record<string, React.CSSProperties> = {
+  login: { background: 'var(--ink-100)', color: 'var(--ink-700)', borderColor: 'var(--ink-200)' },
+  view_user: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37,99,235,0.25)' },
+  disable_user: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  change_config: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  review_report: { background: 'var(--mabel-50)', color: 'var(--mabel-700)', borderColor: 'var(--mabel-200)' },
+  review_safety_event: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  export_data: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
 }
 
 // ============================================================================
@@ -128,14 +128,24 @@ function truncateDetails(row: AuditLogItem): string {
 
 function ActionChip({ action }: { action: string }) {
   const label = ACTION_LABELS[action] ?? action
-  const cls =
-    ACTION_CHIP_CLASSES[action] ?? 'bg-gray-100 text-text-primary/70 border-gray-300'
+  const style = ACTION_CHIP_STYLES[action] ?? {
+    background: 'var(--ink-100)',
+    color: 'var(--ink-700)',
+    borderColor: 'var(--ink-200)',
+  }
   return (
     <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border tracking-wide',
-        cls,
-      ].join(' ')}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '2px 10px',
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 600,
+        border: '1px solid',
+        letterSpacing: '0.01em',
+        ...style,
+      }}
     >
       {label}
     </span>
@@ -207,7 +217,7 @@ function ExpandedDetail({ row }: { row: AuditLogItem }) {
       </div>
 
       <p className="text-[11px] text-text-primary/40 italic border-t border-gray-200 pt-2">
-        Los registros de auditoria son append-only. No es posible editar ni eliminar entradas.
+        Los registros de auditoría son append-only. No es posible editar ni eliminar entradas.
       </p>
     </div>
   )
@@ -254,7 +264,7 @@ export default function AuditLogs() {
       setData(res.data)
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } }
-      setErrorMsg(e?.response?.data?.detail ?? 'No se pudo cargar el registro de auditoria.')
+      setErrorMsg(e?.response?.data?.detail ?? 'No se pudo cargar el registro de auditoría.')
       setData(null)
     } finally {
       setLoading(false)
@@ -301,7 +311,7 @@ export default function AuditLogs() {
       },
       {
         key: 'action',
-        header: 'Accion',
+        header: 'Acción',
         sortable: true,
         sortValue: (row) => row.action,
         accessor: (row) => <ActionChip action={row.action} />,
@@ -346,18 +356,56 @@ export default function AuditLogs() {
   const total = data?.total ?? 0
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
+    <div
+      className="fade-in"
+      style={{
+        padding: 32,
+        maxWidth: 1440,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
       {/* Header */}
-      <header className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+      <header
+        className="flex items-end justify-between flex-wrap"
+        style={{ gap: 16, marginBottom: 24 }}
+      >
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
-            Auditoria
+          <p
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.18em',
+              color: 'var(--mabel-700)',
+              opacity: 0.85,
+              margin: 0,
+            }}
+          >
+            Auditoría
           </p>
-          <h1 className="text-2xl font-semibold text-text-primary mt-1">
-            Registro de auditoria
+          <h1
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: 'var(--ink-900)',
+              marginTop: 6,
+              marginBottom: 0,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+            }}
+          >
+            Registro de auditoría
           </h1>
-          <p className="text-sm text-text-primary/60 mt-1">
-            Bitacora inmutable de acciones administrativas. Append-only por diseno.
+          <p
+            style={{
+              fontSize: 13.5,
+              color: 'var(--ink-500)',
+              marginTop: 6,
+              marginBottom: 0,
+            }}
+          >
+            Bitácora inmutable de acciones administrativas. Append-only por diseño.
           </p>
         </div>
         <ExportCsvButton
@@ -408,7 +456,7 @@ export default function AuditLogs() {
             className="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           >
             <option value="todos">Todas</option>
-            <option value="login">Inicio de sesion</option>
+            <option value="login">Inicio de sesión</option>
             <option value="view_user">Ver usuario</option>
             <option value="disable_user">Deshabilitar usuario</option>
             <option value="change_config">Cambio de config</option>
@@ -455,13 +503,33 @@ export default function AuditLogs() {
       {errorMsg && (
         <div
           role="alert"
-          className="mb-4 border border-danger/30 bg-danger/5 rounded-lg px-4 py-3 text-sm text-danger flex items-center justify-between"
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--danger-200)',
+            background: 'var(--danger-50)',
+            borderRadius: 'var(--r-lg)',
+            padding: '12px 16px',
+            fontSize: 13,
+            color: 'var(--danger-700)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
         >
           <span>{errorMsg}</span>
           <button
             type="button"
             onClick={fetchLogs}
-            className="text-xs font-semibold underline hover:no-underline"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--danger-700)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
           >
             Reintentar
           </button>
@@ -478,7 +546,7 @@ export default function AuditLogs() {
         emptyMessage={
           activeFilterCount > 0
             ? 'No se encontraron registros con los filtros aplicados.'
-            : 'No hay registros de auditoria todavia.'
+            : 'No hay registros de auditoría todavía.'
         }
       />
 

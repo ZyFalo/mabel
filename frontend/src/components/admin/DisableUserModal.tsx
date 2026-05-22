@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AlertTriangle, X } from 'lucide-react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
 
@@ -45,7 +46,7 @@ export default function DisableUserModal({
       await apiClient.patch(`/admin/users/${userId}/disable`, { reason: trimmed })
       addToast({
         type: 'success',
-        message: 'Cuenta deshabilitada correctamente',
+        message: 'Cuenta deshabilitada correctamente.',
       })
       onDisabled()
       onClose()
@@ -60,7 +61,7 @@ export default function DisableUserModal({
       } else if (status === 409) {
         setError(detail ?? 'La cuenta ya se encuentra deshabilitada.')
       } else {
-        setError(detail ?? 'No fue posible deshabilitar la cuenta. Intenta nuevamente.')
+        setError(detail ?? 'No fue posible deshabilitar la cuenta. Inténtalo nuevamente.')
       }
       setSubmitting(false)
     }
@@ -72,45 +73,150 @@ export default function DisableUserModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ padding: 16, fontFamily: 'var(--font-sans)' }}
+    >
+      {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-accent/60 backdrop-blur-[2px]"
+        className="absolute inset-0 fade-in"
+        style={{
+          background: 'rgba(26, 17, 16, 0.45)',
+          backdropFilter: 'blur(2px)',
+        }}
         onClick={handleClose}
         aria-hidden="true"
       />
 
+      {/* Modal card */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="disable-user-title"
-        className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden"
+        className="relative scale-in"
+        style={{
+          background: 'var(--white)',
+          borderRadius: 'var(--r-xl)',
+          boxShadow: 'var(--shadow-xl)',
+          width: '100%',
+          maxWidth: 480,
+          overflow: 'hidden',
+        }}
       >
-        {/* Header strip */}
-        <div className="border-l-4 border-danger px-6 pt-5 pb-4 bg-danger/5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-danger/80">
-            Accion administrativa
-          </p>
-          <h2
-            id="disable-user-title"
-            className="text-lg font-semibold text-text-primary mt-1"
+        {/* Header band */}
+        <div
+          style={{
+            background: 'var(--danger-50)',
+            borderBottom: '1px solid var(--danger-200)',
+            padding: '18px 22px 16px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <div className="flex items-start" style={{ gap: 12 }}>
+            <span
+              aria-hidden
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'var(--danger-200)',
+                color: 'var(--danger-700)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <AlertTriangle size={18} strokeWidth={2.2} />
+            </span>
+            <div>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: 'var(--danger-700)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.16em',
+                  margin: 0,
+                  opacity: 0.85,
+                }}
+              >
+                Acción administrativa
+              </p>
+              <h2
+                id="disable-user-title"
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: 'var(--danger-700)',
+                  margin: 0,
+                  marginTop: 4,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                Deshabilitar usuario
+              </h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={submitting}
+            aria-label="Cerrar"
+            style={{
+              width: 28,
+              height: 28,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 8,
+              color: 'var(--danger-700)',
+              background: 'transparent',
+              border: 'none',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.4 : 0.8,
+              flexShrink: 0,
+              transition: 'background var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => {
+              if (submitting) return
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(220, 38, 38, 0.12)'
+              ;(e.currentTarget as HTMLElement).style.opacity = '1'
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+              ;(e.currentTarget as HTMLElement).style.opacity = submitting ? '0.4' : '0.8'
+            }}
           >
-            Deshabilitar cuenta de usuario
-          </h2>
+            <X size={16} />
+          </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-text-primary/70 leading-relaxed">
-            La cuenta no podra iniciar sesion hasta ser rehabilitada. Esta accion queda registrada
-            en el log de auditoria. Indica una razon clara y verificable.
+        {/* Body */}
+        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ fontSize: 13.5, color: 'var(--ink-600)', margin: 0, lineHeight: 1.55 }}>
+            La cuenta no podrá iniciar sesión hasta que un administrador la rehabilite. Esta acción
+            queda registrada en el log de auditoría. Indica una razón clara y verificable.
           </p>
 
           <div>
             <label
               htmlFor="disable-reason"
-              className="block text-xs font-semibold uppercase tracking-wider text-text-primary/70 mb-1.5"
+              style={{
+                display: 'block',
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.14em',
+                color: 'var(--ink-600)',
+                marginBottom: 6,
+              }}
             >
-              Razon de la deshabilitacion
-              <span className="text-danger ml-1">*</span>
+              Razón de la deshabilitación
+              <span style={{ color: 'var(--danger-600)', marginLeft: 4 }}>*</span>
             </label>
             <textarea
               id="disable-reason"
@@ -119,29 +225,58 @@ export default function DisableUserModal({
                 setReason(e.target.value.slice(0, MAX_REASON_LENGTH))
                 if (error) setError(null)
               }}
-              placeholder="Ej.: Incumplimiento de los terminos de uso del servicio (uso inapropiado del chat reportado el 2026-05-18)."
+              placeholder="Ej.: Incumplimiento de los términos de uso del servicio (uso inapropiado del chat reportado el 2026-05-18)."
               rows={4}
               disabled={submitting}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+              style={{
+                width: '100%',
+                border: '1px solid var(--ink-200)',
+                borderRadius: 'var(--r-md)',
+                padding: '10px 12px',
+                fontSize: 13.5,
+                color: 'var(--ink-900)',
+                background: submitting ? 'var(--ink-50)' : 'var(--white)',
+                resize: 'none',
+                fontFamily: 'var(--font-sans)',
+                outline: 'none',
+                transition: 'border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'var(--mabel-600)'
+                e.currentTarget.style.boxShadow = 'var(--ring-mabel)'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'var(--ink-200)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
             />
-            <div className="flex items-center justify-between mt-1.5">
+            <div className="flex items-center justify-between" style={{ marginTop: 6 }}>
               <p
-                className={[
-                  'text-xs',
-                  trimmed.length === 0
-                    ? 'text-text-primary/40'
-                    : trimmed.length < MIN_REASON_LENGTH
-                      ? 'text-warning'
-                      : 'text-success',
-                ].join(' ')}
+                style={{
+                  fontSize: 11,
+                  margin: 0,
+                  color:
+                    trimmed.length === 0
+                      ? 'var(--ink-400)'
+                      : trimmed.length < MIN_REASON_LENGTH
+                        ? 'var(--warn-700)'
+                        : 'var(--success-700)',
+                }}
               >
                 {trimmed.length === 0
-                  ? `Minimo ${MIN_REASON_LENGTH} caracteres`
+                  ? `Mínimo ${MIN_REASON_LENGTH} caracteres`
                   : trimmed.length < MIN_REASON_LENGTH
                     ? `Faltan ${MIN_REASON_LENGTH - trimmed.length} caracteres`
-                    : 'Razon valida'}
+                    : 'Razón válida'}
               </p>
-              <p className="text-xs text-text-primary/40 tabular-nums">
+              <p
+                style={{
+                  fontSize: 11,
+                  margin: 0,
+                  color: 'var(--ink-400)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
                 {reason.length}/{MAX_REASON_LENGTH}
               </p>
             </div>
@@ -150,19 +285,57 @@ export default function DisableUserModal({
           {error && (
             <div
               role="alert"
-              className="border border-danger/30 bg-danger/5 rounded-lg px-3 py-2.5 text-sm text-danger"
+              style={{
+                border: '1px solid var(--danger-200)',
+                background: 'var(--danger-50)',
+                color: 'var(--danger-700)',
+                borderRadius: 'var(--r-md)',
+                padding: '10px 12px',
+                fontSize: 13,
+              }}
             >
               {error}
             </div>
           )}
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-2">
+        {/* Footer */}
+        <div
+          style={{
+            padding: '14px 22px',
+            background: 'var(--ink-50)',
+            borderTop: '1px solid var(--ink-100)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 8,
+          }}
+        >
           <button
             type="button"
             onClick={handleClose}
             disabled={submitting}
-            className="px-4 py-2 text-sm font-medium text-text-primary/70 hover:text-text-primary hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--ink-600)',
+              background: 'transparent',
+              borderRadius: 9999,
+              border: 'none',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.5 : 1,
+              transition: 'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => {
+              if (submitting) return
+              ;(e.currentTarget as HTMLElement).style.background = 'var(--ink-100)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--ink-900)'
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--ink-600)'
+            }}
           >
             Cancelar
           </button>
@@ -170,18 +343,51 @@ export default function DisableUserModal({
             type="button"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="px-4 py-2 text-sm font-semibold text-white bg-danger rounded-lg hover:bg-danger/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
+            className="inline-flex items-center"
+            style={{
+              gap: 8,
+              padding: '8px 18px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--white)',
+              background: 'var(--danger-600)',
+              borderRadius: 9999,
+              border: '1px solid var(--danger-600)',
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+              opacity: canSubmit ? 1 : 0.5,
+              transition: 'background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => {
+              if (!canSubmit) return
+              ;(e.currentTarget as HTMLElement).style.background = 'var(--danger-700)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--danger-700)'
+              ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--ring-danger)'
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLElement).style.background = 'var(--danger-600)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--danger-600)'
+              ;(e.currentTarget as HTMLElement).style.boxShadow = 'none'
+            }}
           >
             {submitting && (
               <span
-                className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin"
-                aria-hidden="true"
+                aria-hidden
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255,255,255,0.4)',
+                  borderTopColor: 'var(--white)',
+                  animation: 'spin 0.7s linear infinite',
+                }}
               />
             )}
-            {submitting ? 'Deshabilitando...' : 'Deshabilitar cuenta'}
+            <span>{submitting ? 'Deshabilitando…' : 'Deshabilitar cuenta'}</span>
           </button>
         </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

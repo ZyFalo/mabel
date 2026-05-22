@@ -11,7 +11,7 @@ function getPasswordStrength(pw: string): { label: string; varName: string; pct:
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^a-zA-Z0-9]/.test(pw)) score++
-  if (score <= 1) return { label: 'Debil', varName: 'var(--danger-600)', pct: 25 }
+  if (score <= 1) return { label: 'Débil', varName: 'var(--danger-600)', pct: 25 }
   if (score === 2) return { label: 'Regular', varName: 'var(--warn-600)', pct: 50 }
   if (score === 3) return { label: 'Buena', varName: 'var(--warn-600)', pct: 75 }
   return { label: 'Fuerte', varName: 'var(--success-600)', pct: 100 }
@@ -28,14 +28,14 @@ export default function Register() {
 
   function validate(): Record<string, string> {
     const e: Record<string, string> = {}
-    if (form.display_name.trim().length < 2) e.display_name = 'Minimo 2 caracteres'
+    if (form.display_name.trim().length < 2) e.display_name = 'Mínimo 2 caracteres'
     if (!/^[a-zA-Z0-9._%+-]+@est\.umb\.edu\.co$/.test(form.email))
       e.email = 'Debe ser un email @est.umb.edu.co'
-    if (form.password.length < 8) e.password = 'Minimo 8 caracteres'
-    else if (!/[A-Z]/.test(form.password)) e.password = 'Debe tener al menos 1 mayuscula'
-    else if (!/[0-9]/.test(form.password)) e.password = 'Debe tener al menos 1 numero'
-    else if (!/[^a-zA-Z0-9]/.test(form.password)) e.password = 'Debe tener al menos 1 caracter especial'
-    if (form.password !== form.confirm) e.confirm = 'Las contrasenas no coinciden'
+    if (form.password.length < 8) e.password = 'Mínimo 8 caracteres'
+    else if (!/[A-Z]/.test(form.password)) e.password = 'Debe tener al menos 1 mayúscula'
+    else if (!/[0-9]/.test(form.password)) e.password = 'Debe tener al menos 1 número'
+    else if (!/[^a-zA-Z0-9]/.test(form.password)) e.password = 'Debe tener al menos 1 carácter especial'
+    if (form.password !== form.confirm) e.confirm = 'Las contraseñas no coinciden'
     return e
   }
 
@@ -55,7 +55,7 @@ export default function Register() {
       navigate('/login', { state: { toast: 'Cuenta creada exitosamente' } })
     } catch (err: any) {
       const detail = err.response?.data?.detail
-      if (err.response?.status === 409) setToast(detail || 'Este email ya esta registrado')
+      if (err.response?.status === 409) setToast(detail || 'Este email ya está registrado')
       else setToast(detail || 'Error al registrar')
     } finally {
       setLoading(false)
@@ -79,7 +79,7 @@ export default function Register() {
             Empieza tu<br />camino con Mabel.
           </h1>
           <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
-            Registrate y comienza tu experiencia con tu companera de apoyo psicoeducativo disponible
+            Regístrate y comienza tu experiencia con tu compañera de apoyo psicoeducativo disponible
             24/7.
           </p>
         </div>
@@ -99,7 +99,7 @@ export default function Register() {
           Crear cuenta
         </h2>
         <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 24px' }}>
-          Unete a Mabel y empieza tu camino de bienestar.
+          Únete a Mabel y empieza tu camino de bienestar.
         </p>
 
         {toast && (
@@ -136,7 +136,7 @@ export default function Register() {
               value={form.display_name}
               onChange={(v) => setForm({ ...form, display_name: v })}
               type="text"
-              placeholder="Ej: Maria Gonzalez"
+              placeholder="Ej: María González"
               prefix={<User size={16} />}
               error={errors.display_name}
               ariaLabel="Nombre completo"
@@ -163,7 +163,7 @@ export default function Register() {
               placeholder="tu.nombre@est.umb.edu.co"
               prefix={<Mail size={16} />}
               error={errors.email}
-              ariaLabel="Correo electronico"
+              ariaLabel="Correo electrónico"
             />
           </div>
 
@@ -178,16 +178,16 @@ export default function Register() {
                 marginBottom: 6,
               }}
             >
-              Contrasena
+              Contraseña
             </label>
             <Input
               value={form.password}
               onChange={(v) => setForm({ ...form, password: v })}
               type="password"
-              placeholder="Minimo 8 caracteres"
+              placeholder="Mínimo 8 caracteres"
               prefix={<Lock size={16} />}
               error={errors.password}
-              ariaLabel="Contrasena"
+              ariaLabel="Contraseña"
             />
             {form.password && (
               <div style={{ marginTop: 8 }}>
@@ -226,16 +226,16 @@ export default function Register() {
                 marginBottom: 6,
               }}
             >
-              Confirmar contrasena
+              Confirmar contraseña
             </label>
             <Input
               value={form.confirm}
               onChange={(v) => setForm({ ...form, confirm: v })}
               type="password"
-              placeholder="Repite tu contrasena"
+              placeholder="Repite tu contraseña"
               prefix={<Lock size={16} />}
               error={errors.confirm}
-              ariaLabel="Confirmar contrasena"
+              ariaLabel="Confirmar contraseña"
             />
           </div>
 
@@ -282,12 +282,12 @@ export default function Register() {
             color: 'var(--ink-600)',
           }}
         >
-          Ya tienes cuenta?{' '}
+          ¿Ya tienes cuenta?{' '}
           <Link
             to="/login"
             style={{ color: 'var(--mabel-600)', fontWeight: 600, textDecoration: 'none' }}
           >
-            Iniciar sesion
+            Iniciar sesión
           </Link>
         </div>
       </div>

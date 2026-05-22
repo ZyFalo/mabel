@@ -223,3 +223,16 @@ button, input, select, textarea {
   .fade-in  { animation: fadeIn 0.2s var(--ease-out); }
   .scale-in { animation: scaleIn 0.22s var(--ease-out); }
 }
+
+/* ============================================================
+   Responsive — reserve left space when the global floating hamburger
+   is rendered (mobile + sidebar drawer closed). The hamburger lives
+   at `fixed top:12 left:12` with ~40px width, so headers/breadcrumbs
+   that begin at x=0 need 60px of left padding to avoid being covered
+   by it.
+   ============================================================ */
+@media (max-width: 767px) {
+  .mobile-fab-safe-left {
+    padding-left: 60px !important;
+  }
+}

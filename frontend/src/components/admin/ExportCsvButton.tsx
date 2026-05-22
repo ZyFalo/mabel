@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Download } from 'lucide-react'
 import apiClient from '../../api/client'
 
 interface ExportCsvButtonProps {
@@ -12,7 +13,6 @@ interface ExportCsvButtonProps {
 }
 
 function deriveFilename(url: string): string {
-  // Strip query/extension, take last segment
   const cleanPath = url.split('?')[0].replace(/\.csv$/i, '')
   const segments = cleanPath.split('/').filter(Boolean)
   const last = segments[segments.length - 1] || 'export'
@@ -38,7 +38,7 @@ export default function ExportCsvButton({
   params,
   filename,
   label = 'Exportar CSV',
-  variant = 'secondary',
+  variant = 'primary',
   disabled,
   onError,
 }: ExportCsvButtonProps) {
@@ -61,37 +61,70 @@ export default function ExportCsvButton({
       document.body.removeChild(anchor)
       window.URL.revokeObjectURL(blobUrl)
     } catch {
-      onError?.('No se pudo exportar el CSV')
+      onError?.('No se pudo exportar el CSV.')
     } finally {
       setLoading(false)
     }
   }
 
-  const classes =
-    variant === 'primary'
-      ? 'bg-primary text-white hover:bg-primary/90'
-      : 'bg-white border border-gray-300 text-text-primary hover:bg-gray-50'
+  const isPrimary = variant === 'primary'
+
+  const baseStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '8px 14px',
+    borderRadius: 9999,
+    fontSize: 12.5,
+    fontWeight: 600,
+    fontFamily: 'var(--font-sans)',
+    cursor: 'pointer',
+    transition:
+      'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
+    border: '1px solid transparent',
+    opacity: disabled || loading ? 0.55 : 1,
+  } as const
+
+  const variantStyle: React.CSSProperties = isPrimary
+    ? {
+        background: 'var(--ink-900)',
+        color: 'var(--white)',
+        borderColor: 'var(--ink-900)',
+      }
+    : {
+        background: 'var(--white)',
+        color: 'var(--ink-700)',
+        borderColor: 'var(--ink-200)',
+      }
 
   return (
     <button
       type="button"
       onClick={handleClick}
       disabled={disabled || loading}
-      className={[
-        'inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-        classes,
-      ].join(' ')}
+      style={{ ...baseStyle, ...variantStyle }}
+      onMouseEnter={(e) => {
+        if (disabled || loading) return
+        if (isPrimary) {
+          ;(e.currentTarget as HTMLElement).style.background = 'var(--ink-700)'
+          ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--ink-700)'
+        } else {
+          ;(e.currentTarget as HTMLElement).style.background = 'var(--ink-50)'
+          ;(e.currentTarget as HTMLElement).style.color = 'var(--mabel-700)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (isPrimary) {
+          ;(e.currentTarget as HTMLElement).style.background = 'var(--ink-900)'
+          ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--ink-900)'
+        } else {
+          ;(e.currentTarget as HTMLElement).style.background = 'var(--white)'
+          ;(e.currentTarget as HTMLElement).style.color = 'var(--ink-700)'
+        }
+      }}
     >
-      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path
-          d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M3 13h10"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      {loading ? 'Exportando...' : label}
+      <Download size={14} aria-hidden="true" />
+      <span>{loading ? 'Exportando…' : label}</span>
     </button>
   )
 }

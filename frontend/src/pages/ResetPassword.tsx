@@ -11,7 +11,7 @@ function getPasswordStrength(pw: string) {
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^a-zA-Z0-9]/.test(pw)) score++
-  if (score <= 1) return { label: 'Debil', varName: 'var(--danger-600)', pct: 25 }
+  if (score <= 1) return { label: 'Débil', varName: 'var(--danger-600)', pct: 25 }
   if (score === 2) return { label: 'Regular', varName: 'var(--warn-600)', pct: 50 }
   if (score === 3) return { label: 'Buena', varName: 'var(--warn-600)', pct: 75 }
   return { label: 'Fuerte', varName: 'var(--success-600)', pct: 100 }
@@ -42,16 +42,16 @@ export default function ResetPassword() {
   async function handleSubmit(ev: FormEvent) {
     ev.preventDefault()
     if (form.password !== form.confirm) {
-      setError('Las contrasenas no coinciden')
+      setError('Las contraseñas no coinciden')
       return
     }
     setLoading(true)
     setError('')
     try {
       await apiClient.post('/auth/reset-password', { token, new_password: form.password })
-      navigate('/login', { state: { toast: 'Contrasena actualizada' } })
+      navigate('/login', { state: { toast: 'Contraseña actualizada' } })
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error al cambiar contrasena')
+      setError(err.response?.data?.detail || 'Error al cambiar contraseña')
     } finally {
       setLoading(false)
     }
@@ -97,7 +97,7 @@ export default function ResetPassword() {
                 fontFamily: 'var(--font-sans)',
               }}
             >
-              Enlace no valido.
+              Enlace no válido.
             </h1>
             <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
               Solicita un nuevo enlace y te enviaremos las instrucciones a tu correo.
@@ -132,7 +132,7 @@ export default function ResetPassword() {
               letterSpacing: '-0.015em',
             }}
           >
-            Enlace invalido
+            Enlace inválido
           </h2>
           <p
             style={{
@@ -144,7 +144,7 @@ export default function ResetPassword() {
           >
             {reason === 'expired'
               ? 'Este enlace ha expirado. Solicita uno nuevo.'
-              : 'Este enlace no es valido o ya fue utilizado.'}
+              : 'Este enlace no es válido o ya fue utilizado.'}
           </p>
           <Link
             to="/forgot-password"
@@ -184,10 +184,10 @@ export default function ResetPassword() {
               fontFamily: 'var(--font-sans)',
             }}
           >
-            Crea una nueva<br />contrasena.
+            Crea una nueva<br />contraseña.
           </h1>
           <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
-            Elige una contrasena fuerte para mantener tu cuenta segura.
+            Elige una contraseña fuerte para mantener tu cuenta segura.
           </p>
         </div>
       }
@@ -203,10 +203,10 @@ export default function ResetPassword() {
             fontFamily: 'var(--font-sans)',
           }}
         >
-          Nueva contrasena
+          Nueva contraseña
         </h2>
         <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 24px' }}>
-          Elige una contrasena fuerte para tu cuenta.
+          Elige una contraseña fuerte para tu cuenta.
         </p>
 
         {error && (
@@ -236,15 +236,15 @@ export default function ResetPassword() {
                 marginBottom: 6,
               }}
             >
-              Nueva contrasena
+              Nueva contraseña
             </label>
             <Input
               value={form.password}
               onChange={(v) => setForm({ ...form, password: v })}
               type="password"
-              placeholder="Minimo 8 caracteres"
+              placeholder="Mínimo 8 caracteres"
               prefix={<Lock size={16} />}
-              ariaLabel="Nueva contrasena"
+              ariaLabel="Nueva contraseña"
             />
             {form.password && (
               <div style={{ marginTop: 8 }}>
@@ -281,15 +281,15 @@ export default function ResetPassword() {
                 marginBottom: 6,
               }}
             >
-              Confirmar contrasena
+              Confirmar contraseña
             </label>
             <Input
               value={form.confirm}
               onChange={(v) => setForm({ ...form, confirm: v })}
               type="password"
-              placeholder="Repite la nueva contrasena"
+              placeholder="Repite la nueva contraseña"
               prefix={<Lock size={16} />}
-              ariaLabel="Confirmar contrasena"
+              ariaLabel="Confirmar contraseña"
             />
           </div>
           <button
@@ -322,7 +322,7 @@ export default function ResetPassword() {
               if (!loading) e.currentTarget.style.background = 'var(--mabel-600)'
             }}
           >
-            {loading ? 'Cambiando...' : 'Cambiar contrasena'}
+            {loading ? 'Cambiando...' : 'Cambiar contraseña'}
             {!loading && <ArrowRight size={15} strokeWidth={2.25} />}
           </button>
         </form>

@@ -34,7 +34,6 @@ import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
 import SessionDetail from './pages/SessionDetail'
 import SessionEnd from './pages/SessionEnd'
-import Settings from './pages/Settings'
 import { useAuthStore } from './stores/authStore'
 
 function SessionExpiredHandler() {
@@ -94,7 +93,11 @@ export default function App() {
               {/* All other student routes: require preferences (OnboardingGuard) */}
               <Route element={<OnboardingGuard />}>
                 <Route path="/home" element={<Home />} />
-                <Route path="/settings" element={<Settings />} />
+                {/* /settings is no longer a route — Settings is a global
+                    modal opened via Outlet context `openSettings(tab?)`.
+                    Legacy URLs redirect to /home so bookmarked /settings
+                    deeplinks at least land somewhere usable. */}
+                <Route path="/settings" element={<Navigate to="/home" replace />} />
                 <Route path="/session/:id/checkin" element={<CheckIn />} />
                 <Route path="/session/:id/chat" element={<Chat />} />
                 <Route path="/session/:id/end" element={<SessionEnd />} />

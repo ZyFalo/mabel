@@ -51,14 +51,14 @@ const CONSENT_LABELS: Record<string, string> = {
   ok: 'Vigente',
   no_consent: 'Sin consentimiento',
   revoked: 'Revocado',
-  new_version_required: 'Nueva version requerida',
+  new_version_required: 'Nueva versión requerida',
 }
 
-const CONSENT_CHIP_CLASSES: Record<string, string> = {
-  ok: 'bg-success/10 text-success border-success/30',
-  no_consent: 'bg-gray-100 text-text-primary/60 border-gray-300',
-  revoked: 'bg-danger/10 text-danger border-danger/30',
-  new_version_required: 'bg-warning/10 text-warning border-warning/30',
+const CONSENT_CHIP_STYLES: Record<string, React.CSSProperties> = {
+  ok: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  no_consent: { background: 'var(--ink-100)', color: 'var(--ink-600)', borderColor: 'var(--ink-200)' },
+  revoked: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  new_version_required: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -99,13 +99,24 @@ function truncateId(id: string): string {
 
 function ConsentChip({ status }: { status: string }) {
   const label = CONSENT_LABELS[status] ?? status
-  const cls = CONSENT_CHIP_CLASSES[status] ?? 'bg-gray-100 text-text-primary/60 border-gray-300'
+  const style = CONSENT_CHIP_STYLES[status] ?? {
+    background: 'var(--ink-100)',
+    color: 'var(--ink-600)',
+    borderColor: 'var(--ink-200)',
+  }
   return (
     <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border tracking-wide',
-        cls,
-      ].join(' ')}
+      className="inline-flex items-center"
+      style={{
+        padding: '2px 9px',
+        borderRadius: 9999,
+        fontSize: 11,
+        fontWeight: 600,
+        border: '1px solid',
+        letterSpacing: '0.02em',
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
     >
       {label}
     </span>
@@ -115,15 +126,48 @@ function ConsentChip({ status }: { status: string }) {
 function StatusBadge({ disabled }: { disabled: boolean }) {
   if (disabled) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] text-text-primary/50">
-        <span className="w-1.5 h-1.5 rounded-full bg-text-primary/30" />
+      <span
+        className="inline-flex items-center"
+        style={{
+          gap: 6,
+          fontSize: 11.5,
+          color: 'var(--ink-500)',
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: 'var(--ink-300)',
+            display: 'inline-block',
+          }}
+        />
         Deshabilitada
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] text-success">
-      <span className="w-1.5 h-1.5 rounded-full bg-success" />
+    <span
+      className="inline-flex items-center"
+      style={{
+        gap: 6,
+        fontSize: 11.5,
+        color: 'var(--success-700)',
+        fontWeight: 600,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: 'var(--success-600)',
+          display: 'inline-block',
+        }}
+      />
       Activa
     </span>
   )
@@ -217,11 +261,24 @@ export default function Users() {
         sortValue: (row) => row.cohort ?? '',
         accessor: (row) =>
           row.cohort ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent/8 text-accent border border-accent/20 text-[11px] font-medium font-mono tracking-tight">
+            <span
+              className="inline-flex items-center"
+              style={{
+                padding: '2px 8px',
+                borderRadius: 6,
+                background: 'var(--ink-100)',
+                color: 'var(--ink-700)',
+                border: '1px solid var(--ink-200)',
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                letterSpacing: '-0.01em',
+              }}
+            >
               {row.cohort}
             </span>
           ) : (
-            <span className="text-[11px] text-text-primary/30">—</span>
+            <span style={{ fontSize: 11, color: 'var(--ink-300)' }}>—</span>
           ),
         className: 'w-[140px]',
       },
@@ -239,7 +296,7 @@ export default function Users() {
       },
       {
         key: 'last_session',
-        header: 'Ultimo acceso',
+        header: 'Último acceso',
         sortable: true,
         sortValue: (row) => row.last_session_at ?? '',
         accessor: (row) => (
@@ -293,7 +350,25 @@ export default function Users() {
                 e.stopPropagation()
                 setDisableTarget(row)
               }}
-              className="text-xs font-medium text-danger border border-danger/30 hover:bg-danger/5 px-2.5 py-1 rounded-md transition-colors"
+              style={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: 'var(--danger-700)',
+                background: 'transparent',
+                border: '1px solid var(--danger-200)',
+                padding: '4px 12px',
+                borderRadius: 9999,
+                cursor: 'pointer',
+                transition: 'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
+              }}
+              onMouseEnter={(e) => {
+                ;(e.currentTarget as HTMLElement).style.background = 'var(--danger-50)'
+                ;(e.currentTarget as HTMLElement).style.color = 'var(--danger-700)'
+              }}
+              onMouseLeave={(e) => {
+                ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                ;(e.currentTarget as HTMLElement).style.color = 'var(--danger-700)'
+              }}
             >
               Deshabilitar
             </button>
@@ -316,27 +391,92 @@ export default function Users() {
   const total = data?.total ?? 0
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
+    <div
+      className="fade-in"
+      style={{
+        padding: 32,
+        maxWidth: 1440,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
       {/* Header */}
-      <header className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+      <header
+        className="flex items-end justify-between flex-wrap"
+        style={{ gap: 16, marginBottom: 24 }}
+      >
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
-            Gestion administrativa
+          <p
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.18em',
+              color: 'var(--mabel-700)',
+              opacity: 0.85,
+              margin: 0,
+            }}
+          >
+            Gestión administrativa
           </p>
-          <h1 className="text-2xl font-semibold text-text-primary mt-1">Usuarios</h1>
-          <p className="text-sm text-text-primary/60 mt-1">
+          <h1
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: 'var(--ink-900)',
+              marginTop: 6,
+              marginBottom: 0,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+            }}
+          >
+            Usuarios
+          </h1>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: 'var(--ink-500)',
+              marginTop: 6,
+              marginBottom: 0,
+            }}
+          >
             Consulta y administra las cuentas de estudiantes registradas en Mabel IA.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/40">
-              Total
-            </p>
-            <p className="text-xl font-semibold text-text-primary tabular-nums">
-              {loading ? '…' : total.toLocaleString('es-CO')}
-            </p>
-          </div>
+        <div
+          style={{
+            background: 'var(--white)',
+            border: '1px solid var(--ink-200)',
+            borderRadius: 'var(--r-lg)',
+            padding: '10px 18px',
+            textAlign: 'right',
+          }}
+        >
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.14em',
+              color: 'var(--ink-500)',
+              margin: 0,
+            }}
+          >
+            Total
+          </p>
+          <p
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: 'var(--ink-900)',
+              fontVariantNumeric: 'tabular-nums',
+              margin: 0,
+              marginTop: 2,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {loading ? '…' : total.toLocaleString('es-CO')}
+          </p>
         </div>
       </header>
 
@@ -402,7 +542,7 @@ export default function Users() {
             <option value="ok">Vigente</option>
             <option value="no_consent">Sin consentimiento</option>
             <option value="revoked">Revocado</option>
-            <option value="new_version_required">Nueva version requerida</option>
+            <option value="new_version_required">Nueva versión requerida</option>
           </select>
         </div>
 
@@ -460,13 +600,33 @@ export default function Users() {
       {errorMsg && (
         <div
           role="alert"
-          className="mb-4 border border-danger/30 bg-danger/5 rounded-lg px-4 py-3 text-sm text-danger flex items-center justify-between"
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--danger-200)',
+            background: 'var(--danger-50)',
+            borderRadius: 'var(--r-lg)',
+            padding: '12px 16px',
+            fontSize: 13,
+            color: 'var(--danger-700)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
         >
           <span>{errorMsg}</span>
           <button
             type="button"
             onClick={fetchUsers}
-            className="text-xs font-semibold underline hover:no-underline"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--danger-700)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
           >
             Reintentar
           </button>
@@ -483,7 +643,7 @@ export default function Users() {
         emptyMessage={
           activeFilterCount > 0
             ? 'No se encontraron usuarios con los filtros aplicados.'
-            : 'Aun no hay usuarios registrados.'
+            : 'Aún no hay usuarios registrados.'
         }
       />
 

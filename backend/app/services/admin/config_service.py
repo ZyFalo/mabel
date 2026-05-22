@@ -155,26 +155,37 @@ class AdminConfigService:
         await self.db.refresh(target)
         return target
 
-    # --- Gemini ping ---
+    # --- LLM ping (provider-agnostic) ---
 
     async def gemini_ping(self) -> dict:
-        """Lightweight liveness check against the Gemini adapter.
+        """Lightweight liveness check against the active LLM provider.
 
-        Privacy: only metadata (latency, model, error class) is returned — the
-        prompt `"ping"` and the response text are NOT persisted or logged.
+        Despite the legacy name (`gemini_ping`), this now resolves the
+        configured provider via the factory — Gemini OpenAI-compat, native
+        Gemini, OpenAI, or a self-hosted model. The Admin Config UI label
+        still reads "Probar conexión" so no UX impact.
+
+        Privacy: only metadata (latency, model, error class) is returned —
+        the prompt `"ping"` and the response text are NOT persisted or logged.
         """
-        model = settings.GEMINI_MODEL
+        # Report the model that the active provider will actually use, not
+        # the legacy GEMINI_MODEL setting.
+        from app.services.llm import get_llm_provider
+
+        provider_kind = (settings.LLM_PROVIDER or "openai_compat").lower()
+        model = settings.GEMINI_MODEL if provider_kind == "gemini_native" else settings.LLM_MODEL
         start = _time.monotonic()
         try:
-            # Local import to avoid loading the SDK at module import time.
-            from app.services.llm.gemini_adapter import GeminiAdapter
-
-            adapter = GeminiAdapter()
+            adapter = get_llm_provider()
             collected_any = False
+            # NOTE: gemini-2.5-* family burns ~50-200 reasoning tokens before
+            # producing output. Cap at 256 so the ping reliably emits >=1 token
+            # without bleeding latency. For lite/1.5 models this is overkill
+            # but harmless.
             async for _chunk in adapter.generate_stream(
                 messages=[{"role": "user", "content": "ping"}],
                 system_prompt="",
-                config={"max_output_tokens": 8, "temperature": 0.0},
+                config={"max_output_tokens": 256, "temperature": 0.0},
             ):
                 collected_any = True
                 # We only need to confirm the stream produces *something*.

@@ -9,6 +9,16 @@ _env_file = Path(__file__).resolve().parents[3] / ".env"
 class Settings(BaseSettings):
     DATABASE_URL: str
     JWT_SECRET: str
+    # --- LLM provider selection (OpenAI-compatible by default) -----------
+    # `openai_compat` works for: Gemini OpenAI-compat endpoint, OpenAI,
+    # vLLM/Ollama, OpenRouter, or any service exposing /v1/chat/completions.
+    # `gemini_native` keeps the legacy `google-generativeai` SDK as fallback.
+    LLM_PROVIDER: str = "openai_compat"
+    LLM_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "gemini-2.5-flash"
+    LLM_TIMEOUT_MS: int = 30000
+    # --- Legacy Gemini-native config (kept for the fallback adapter) -----
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
     GEMINI_TIMEOUT_MS: int = 30000
@@ -22,6 +32,25 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def effective_llm_api_key(self) -> str:
+        """
+        Resolve the LLM API key with fallback to GEMINI_API_KEY.
+
+        Why this exists: legacy .env files only define GEMINI_API_KEY (the
+        repo lived on Gemini-native for months before the OpenAI-compat
+        migration). Without this fallback, anyone pulling the new branch
+        without updating their .env would boot AsyncOpenAI with api_key=''
+        and every chat request would 401.
+
+        Preference order: LLM_API_KEY → GEMINI_API_KEY → empty.
+        Consumers should always read this property, NEVER `LLM_API_KEY`
+        directly.
+        """
+        if self.LLM_API_KEY:
+            return self.LLM_API_KEY
+        return self.GEMINI_API_KEY
 
     model_config = {"env_file": str(_env_file), "env_file_encoding": "utf-8"}
 

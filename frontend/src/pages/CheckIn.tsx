@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import SosButton from '../components/ui/SosButton'
+import type { StudentOutletContext } from '../types/studentOutlet'
 import apiClient from '../api/client'
 import { useToastStore } from '../stores/toastStore'
 
@@ -10,7 +12,15 @@ const MOOD_LABELS = ['Muy mal', '', '', '', '', 'Neutral', '', '', '', '', 'Exce
 export default function CheckIn() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { openCrisis } = useOutletContext<StudentOutletContext>()
   const addToast = useToastStore((s) => s.addToast)
+  // Forward the pendingMessage (if any) so Chat.tsx can send it as the
+  // user's first message after the check-in is recorded.
+  const forwardState = (location.state as { pendingMessage?: string } | null)
+    ?.pendingMessage
+    ? { pendingMessage: (location.state as { pendingMessage: string }).pendingMessage }
+    : undefined
 
   const [mood, setMood] = useState<number | null>(null)
   const [sleep, setSleep] = useState('')
@@ -28,7 +38,7 @@ export default function CheckIn() {
       if (note.trim()) payload.note = note.trim()
 
       await apiClient.patch(`/sessions/${id}`, { checkin_payload: payload })
-      navigate(`/session/${id}/chat`)
+      navigate(`/session/${id}/chat`, { state: forwardState })
     } catch {
       addToast({ type: 'error', message: 'Error al guardar check-in' })
     } finally {
@@ -38,7 +48,8 @@ export default function CheckIn() {
 
   return (
     <div className="max-w-md mx-auto py-8 px-4">
-      <h1 className="text-xl font-bold text-text-primary mb-1">Como te sientes hoy?</h1>
+      <SosButton variant="floating" onClick={openCrisis} />
+      <h1 className="text-xl font-bold text-text-primary mb-1">¿Cómo te sientes hoy?</h1>
       <p className="text-sm text-text-primary/60 mb-6">
         Un breve check-in antes de comenzar. Es completamente opcional.
       </p>
@@ -128,7 +139,7 @@ export default function CheckIn() {
           {submitting ? 'Guardando...' : 'Continuar'}
         </button>
         <button
-          onClick={() => navigate(`/session/${id}/chat`)}
+          onClick={() => navigate(`/session/${id}/chat`, { state: forwardState })}
           className="px-4 py-2.5 text-sm text-text-primary/60 hover:text-text-primary transition-colors"
         >
           Omitir

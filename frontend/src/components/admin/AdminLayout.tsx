@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
-import Header from '../layout/Header'
+import AdminHeader from './AdminHeader'
 import AdminSidebar from './AdminSidebar'
 import { useAdminStore } from '../../stores/adminStore'
 
@@ -16,11 +16,21 @@ export default function AdminLayout() {
   }, [startPolling, stopPolling])
 
   return (
-    <div className="h-screen flex flex-col">
-      <Header />
-      <div className="flex flex-1 overflow-hidden">
-        <AdminSidebar />
-        <main className="flex-1 overflow-y-auto bg-bg-main">
+    <div
+      className="h-screen flex"
+      style={{
+        background: 'var(--ink-50)',
+        fontFamily: 'var(--font-sans)',
+        color: 'var(--ink-900)',
+      }}
+    >
+      <AdminSidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <AdminHeader />
+        <main
+          className="flex-1 overflow-y-auto"
+          style={{ background: 'var(--ink-50)' }}
+        >
           <Outlet />
         </main>
       </div>

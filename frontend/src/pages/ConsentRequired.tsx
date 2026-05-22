@@ -63,17 +63,17 @@ export default function ConsentRequired() {
     no_consent: {
       title: 'Antes de empezar,\nun paso importante.',
       subtitle:
-        'Para continuar necesitas revisar y aceptar el consentimiento informado segun la Ley 1581/2012.',
+        'Para continuar necesitas revisar y aceptar el consentimiento informado según la Ley 1581/2012.',
     },
     revoked: {
       title: 'Consentimiento\nrevocado.',
       subtitle:
-        'Tu acceso esta temporalmente bloqueado. Puedes re-aceptar el consentimiento cuando quieras.',
+        'Tu acceso está temporalmente bloqueado. Puedes re-aceptar el consentimiento cuando quieras.',
     },
     new_version_required: {
-      title: 'Hay una nueva\nversion.',
+      title: 'Hay una nueva\nversión.',
       subtitle:
-        'Hemos actualizado el consentimiento informado. Revisalo para continuar usando Mabel.',
+        'Hemos actualizado el consentimiento informado. Revísalo para continuar usando Mabel.',
     },
   }
   const hero =
@@ -207,7 +207,7 @@ export default function ConsentRequired() {
                 lineHeight: 1.55,
               }}
             >
-              Tu consentimiento ha sido revocado y el acceso esta temporalmente bloqueado.
+              Tu consentimiento ha sido revocado y el acceso está temporalmente bloqueado.
             </p>
             <p
               style={{
@@ -265,7 +265,7 @@ export default function ConsentRequired() {
                   fontFamily: 'var(--font-sans)',
                 }}
               >
-                Cerrar sesion
+                Cerrar sesión
               </button>
             </div>
           </>
@@ -300,7 +300,7 @@ export default function ConsentRequired() {
                 letterSpacing: '-0.015em',
               }}
             >
-              Nueva version del consentimiento
+              Nueva versión del consentimiento
             </h2>
             <p
               style={{
@@ -310,7 +310,7 @@ export default function ConsentRequired() {
                 lineHeight: 1.55,
               }}
             >
-              Hay una nueva version del consentimiento informado que debes aceptar para continuar.
+              Hay una nueva versión del consentimiento informado que debes aceptar para continuar.
             </p>
             {data.new_version && (
               <p
@@ -320,7 +320,7 @@ export default function ConsentRequired() {
                   margin: '0 0 22px',
                 }}
               >
-                Nueva version:{' '}
+                Nueva versión:{' '}
                 <span style={{ fontWeight: 600, color: 'var(--mabel-600)' }}>{data.new_version}</span>
               </p>
             )}
@@ -352,7 +352,7 @@ export default function ConsentRequired() {
                   fontFamily: 'var(--font-sans)',
                 }}
               >
-                Revisar nueva version
+                Revisar nueva versión
                 <ArrowRight size={15} strokeWidth={2.25} />
               </Link>
               <button
@@ -370,7 +370,7 @@ export default function ConsentRequired() {
                   fontFamily: 'var(--font-sans)',
                 }}
               >
-                Cerrar sesion
+                Cerrar sesión
               </button>
             </div>
           </>

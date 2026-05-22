@@ -43,11 +43,11 @@ const EMPTY_CRITERIA: CriteriaState = {
 }
 
 const CRITERIA_LABELS: Array<{ key: keyof CriteriaState; label: string }> = [
-  { key: 'empathic_tone', label: 'Tono empatico' },
-  { key: 'emotional_validation', label: 'Validacion emocional' },
+  { key: 'empathic_tone', label: 'Tono empático' },
+  { key: 'emotional_validation', label: 'Validación emocional' },
   { key: 'no_hallucinations', label: 'Sin alucinaciones' },
   { key: 'constructive_suggestion', label: 'Sugerencia constructiva' },
-  { key: 'no_clinical_diagnosis', label: 'Sin diagnostico clinico' },
+  { key: 'no_clinical_diagnosis', label: 'Sin diagnóstico clínico' },
 ]
 
 const DEFAULT_COHORT = 'piloto-fase1'
@@ -104,20 +104,20 @@ function RatingCard({
         score,
         criteria,
       })
-      addToast({ type: 'success', message: 'Calificacion registrada.' })
+      addToast({ type: 'success', message: 'Calificación registrada.' })
       onSubmitted()
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } } }
       if (e?.response?.status === 409) {
         addToast({
           type: 'warning',
-          message: 'Este mensaje ya tenia una calificacion previa.',
+          message: 'Este mensaje ya tenía una calificación previa.',
         })
         onAlreadyRated()
       } else {
         addToast({
           type: 'error',
-          message: e?.response?.data?.detail ?? 'No se pudo registrar la calificacion.',
+          message: e?.response?.data?.detail ?? 'No se pudo registrar la calificación.',
         })
       }
     } finally {
@@ -134,7 +134,7 @@ function RatingCard({
             msg #{item.message_id.slice(0, 8)}
           </span>
           {' · '}
-          <span>Sesion {formatDateTime(item.session_started_at)}</span>
+          <span>Sesión {formatDateTime(item.session_started_at)}</span>
         </div>
         <div className="text-[11px] text-text-primary/45">
           Mensaje: {formatDateTime(item.created_at)}
@@ -159,8 +159,25 @@ function RatingCard({
           <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45 mb-2">
             Respuesta del asistente
           </p>
-          <div className="bg-accent/3 border border-accent/15 rounded-md px-4 py-3 max-h-[260px] overflow-y-auto">
-            <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
+          <div
+            style={{
+              background: 'var(--mabel-50)',
+              border: '1px solid var(--mabel-200)',
+              borderRadius: 'var(--r-md)',
+              padding: '12px 16px',
+              maxHeight: 260,
+              overflowY: 'auto',
+            }}
+          >
+            <p
+              style={{
+                fontSize: 14,
+                color: 'var(--ink-900)',
+                lineHeight: 1.55,
+                whiteSpace: 'pre-wrap',
+                margin: 0,
+              }}
+            >
               {item.content}
             </p>
           </div>
@@ -170,11 +187,11 @@ function RatingCard({
       {/* Scoring */}
       <div className="px-5 py-4 border-t border-gray-100">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/45 mb-2">
-          Puntaje de empatia (1 a 5)
+          Puntaje de empatía (1 a 5)
         </p>
         <div
           role="radiogroup"
-          aria-label="Puntaje de empatia"
+          aria-label="Puntaje de empatía"
           className="flex items-center gap-2"
         >
           {[1, 2, 3, 4, 5].map((n) => {
@@ -321,7 +338,7 @@ export default function EmpathyRatings() {
       setStats(res.data)
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } }
-      setStatsError(e?.response?.data?.detail ?? 'No se pudieron cargar las estadisticas.')
+      setStatsError(e?.response?.data?.detail ?? 'No se pudieron cargar las estadísticas.')
       setStats(null)
     } finally {
       setStatsLoading(false)
@@ -386,18 +403,53 @@ export default function EmpathyRatings() {
   }, [stats])
 
   return (
-    <div className="p-6 max-w-[1100px] mx-auto">
+    <div
+      className="fade-in"
+      style={{
+        padding: 32,
+        maxWidth: 1200,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
       {/* Header */}
-      <header className="mb-5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
+      <header style={{ marginBottom: 24 }}>
+        <p
+          style={{
+            fontSize: 10.5,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.18em',
+            color: 'var(--mabel-700)',
+            opacity: 0.85,
+            margin: 0,
+          }}
+        >
           Calidad de respuestas
         </p>
-        <h1 className="text-2xl font-semibold text-text-primary mt-1">
-          Calificacion de empatia
+        <h1
+          style={{
+            fontSize: 28,
+            fontWeight: 800,
+            color: 'var(--ink-900)',
+            marginTop: 6,
+            marginBottom: 0,
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15,
+          }}
+        >
+          Calificación de empatía
         </h1>
-        <p className="text-sm text-text-primary/60 mt-1">
-          Califica las respuestas del asistente para alimentar la metrica de empatia &gt;= 4/5.
-          Cada mensaje se evalua una sola vez por administrador.
+        <p
+          style={{
+            fontSize: 13.5,
+            color: 'var(--ink-500)',
+            marginTop: 6,
+            marginBottom: 0,
+          }}
+        >
+          Califica las respuestas del asistente para alimentar la métrica de empatía &gt;= 4/5.
+          Cada mensaje se evalúa una sola vez por administrador.
         </p>
       </header>
 
@@ -472,7 +524,12 @@ export default function EmpathyRatings() {
           {cohort ? (
             <>
               Cohorte:{' '}
-              <span className="font-medium text-accent font-mono">{cohort}</span>
+              <span
+                className="font-mono font-medium"
+                style={{ color: 'var(--mabel-700)' }}
+              >
+                {cohort}
+              </span>
             </>
           ) : (
             'Sin filtro de cohorte'
@@ -481,7 +538,7 @@ export default function EmpathyRatings() {
       </section>
 
       {/* Stats panel */}
-      <section aria-label="Estadisticas globales" className="mb-6">
+      <section aria-label="Estadísticas globales" className="mb-6">
         {statsError ? (
           <div
             role="alert"
@@ -531,7 +588,7 @@ export default function EmpathyRatings() {
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h2 className="text-sm font-semibold text-text-primary mb-3">
-                Distribucion de puntajes
+                Distribución de puntajes
               </h2>
               <BarChartWrapper
                 data={(stats?.distribution ?? []).map((b) => ({
@@ -566,7 +623,7 @@ export default function EmpathyRatings() {
             disabled={queueLoading}
             className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-white border border-gray-300 text-text-primary hover:bg-gray-50 disabled:opacity-50"
           >
-            {queueLoading ? 'Cargando…' : 'Cargar mas'}
+            {queueLoading ? 'Cargando…' : 'Cargar más'}
           </button>
         </div>
 
@@ -587,7 +644,7 @@ export default function EmpathyRatings() {
               No hay mensajes pendientes de calificar
             </p>
             <p className="text-[12px] text-text-primary/45 mt-1">
-              Vuelve a intentarlo mas tarde o cambia el filtro de cohorte.
+              Vuelve a intentarlo más tarde o cambia el filtro de cohorte.
             </p>
           </div>
         ) : (

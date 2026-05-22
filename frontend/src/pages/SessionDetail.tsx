@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { ArrowLeft, Calendar, Clock, Hourglass, MessageCircle, Smile, Moon, Target, Sparkles } from 'lucide-react'
 import { useChatStore } from '../stores/chatStore'
 import { SkeletonChat } from '../components/ui/Skeleton'
+import Markdown from '../components/ui/Markdown'
+import UmbAvatar from '../components/ui/UmbAvatar'
+import SosButton from '../components/ui/SosButton'
+import type { StudentOutletContext } from '../types/studentOutlet'
 
 function formatDateTime(dateStr: string) {
   return new Date(dateStr).toLocaleString('es-CO', {
@@ -17,23 +22,40 @@ function formatDuration(start: string, end: string) {
   const ms = new Date(end).getTime() - new Date(start).getTime()
   const minutes = Math.round(ms / 60000)
   if (minutes < 1) return 'Menos de 1 min'
-  return `${minutes} min`
+  if (minutes < 60) return `${minutes} min`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
 }
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 }
 
+const FOCUS_LABELS: Record<string, string> = {
+  Academico: 'Académico',
+  Social: 'Social',
+  Familiar: 'Familiar',
+  Salud: 'Salud',
+  Economico: 'Económico',
+  Otro: 'Otro',
+}
+
+function AssistantAvatar() {
+  return <UmbAvatar size={32} style={{ marginTop: 2 }} />
+}
+
+interface SessionData {
+  started_at: string
+  ended_at: string | null
+  checkin_payload?: { mood?: number; sleep?: number; focus?: string; note?: string } | null
+}
+
 export default function SessionDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { openCrisis } = useOutletContext<StudentOutletContext>()
   const { loadSession, messages, loadMessages, isLoadingMessages } = useChatStore()
-
-  interface SessionData {
-    started_at: string
-    ended_at: string | null
-    checkin_payload?: { mood?: number; sleep?: number; focus?: string; note?: string } | null
-  }
 
   const [session, setSession] = useState<SessionData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -55,99 +77,318 @@ export default function SessionDetail() {
 
   if (loading || !session) {
     return (
-      <div className="max-w-2xl mx-auto py-8 px-4">
+      <div
+        className="fade-in"
+        style={{
+          padding: 32,
+          maxWidth: 880,
+          margin: '0 auto',
+          fontFamily: 'var(--font-sans)',
+        }}
+      >
         <SkeletonChat />
       </div>
     )
   }
 
   const checkin = session.checkin_payload
+  const hasCheckin = checkin && Object.values(checkin).some((v) => v !== undefined && v !== null && v !== '')
 
   return (
-    <div className="max-w-2xl mx-auto py-6 px-4">
+    <div
+      className="fade-in mobile-fab-safe-left"
+      style={{
+        padding: 32,
+        maxWidth: 880,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
+      <SosButton variant="floating" onClick={openCrisis} />
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1 text-sm text-text-primary/40 mb-4">
-        <button onClick={() => navigate('/home')} className="hover:text-text-primary">Home</button>
-        <span>&gt;</span>
-        <span className="text-text-primary/60">
-          Sesion {formatDateTime(session.started_at as string)}
+      <nav
+        aria-label="Ruta"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 12.5,
+          color: 'var(--ink-500)',
+          marginBottom: 12,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => navigate('/home')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--ink-500)',
+            padding: 0,
+            fontSize: 12.5,
+            fontFamily: 'var(--font-sans)',
+            transition: 'color var(--dur-fast) var(--ease-out)',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--mabel-700)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-500)')}
+        >
+          Inicio
+        </button>
+        <span style={{ color: 'var(--ink-300)' }}>›</span>
+        <span style={{ color: 'var(--ink-700)' }}>
+          Sesión del {formatDateTime(session.started_at)}
         </span>
       </nav>
 
-      {/* Metadata */}
-      <div className="bg-gray-50 rounded-xl p-4 mb-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-          <div>
-            <p className="text-text-primary/40 text-xs">Inicio</p>
-            <p className="text-text-primary">{formatDateTime(session.started_at as string)}</p>
-          </div>
-          <div>
-            <p className="text-text-primary/40 text-xs">Fin</p>
-            <p className="text-text-primary">{formatDateTime(session.ended_at as string)}</p>
-          </div>
-          <div>
-            <p className="text-text-primary/40 text-xs">Duracion</p>
-            <p className="text-text-primary">
-              {formatDuration(session.started_at as string, session.ended_at as string)}
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Eyebrow + title */}
+      <header style={{ marginBottom: 22 }}>
+        <p
+          style={{
+            fontSize: 10.5,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.18em',
+            color: 'var(--mabel-700)',
+            opacity: 0.85,
+            margin: 0,
+          }}
+        >
+          Sesión finalizada
+        </p>
+        <h1
+          style={{
+            fontSize: 26,
+            fontWeight: 800,
+            color: 'var(--ink-900)',
+            marginTop: 6,
+            marginBottom: 0,
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15,
+          }}
+        >
+          Detalle de la conversación
+        </h1>
+      </header>
 
-      {/* Check-in data */}
-      {checkin && (
-        <div className="bg-blue-50 rounded-xl p-4 mb-4">
-          <h3 className="text-sm font-semibold text-text-primary mb-2">Check-in</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-            {checkin.mood !== undefined && (
-              <div>
-                <p className="text-text-primary/40 text-xs">Animo</p>
-                <p className="text-text-primary font-medium">{checkin.mood}/10</p>
-              </div>
+      {/* Metadata cards */}
+      <section
+        aria-label="Datos de la sesión"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gap: 12,
+          marginBottom: 18,
+        }}
+      >
+        <MetaCard
+          icon={<Calendar size={14} />}
+          label="Inicio"
+          value={formatDateTime(session.started_at)}
+        />
+        <MetaCard
+          icon={<Clock size={14} />}
+          label="Fin"
+          value={session.ended_at ? formatDateTime(session.ended_at) : '—'}
+        />
+        <MetaCard
+          icon={<Hourglass size={14} />}
+          label="Duración"
+          value={
+            session.ended_at
+              ? formatDuration(session.started_at, session.ended_at)
+              : '—'
+          }
+        />
+      </section>
+
+      {/* Check-in card */}
+      {hasCheckin && (
+        <section
+          aria-label="Check-in inicial"
+          style={{
+            background: 'var(--mabel-50)',
+            border: '1px solid var(--mabel-200)',
+            borderRadius: 14,
+            padding: '14px 16px',
+            marginBottom: 22,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 10,
+              color: 'var(--mabel-800)',
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            <Sparkles size={14} color="var(--mabel-700)" />
+            Contexto inicial
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: 10,
+            }}
+          >
+            {checkin?.mood !== undefined && (
+              <CheckinChip icon={<Smile size={14} />} label="Ánimo" value={`${checkin.mood}/10`} />
             )}
-            {checkin.sleep !== undefined && (
-              <div>
-                <p className="text-text-primary/40 text-xs">Sueno</p>
-                <p className="text-text-primary">{checkin.sleep}h</p>
-              </div>
+            {checkin?.sleep !== undefined && (
+              <CheckinChip icon={<Moon size={14} />} label="Sueño" value={`${checkin.sleep} h`} />
             )}
-            {checkin.focus && (
-              <div>
-                <p className="text-text-primary/40 text-xs">Foco</p>
-                <p className="text-text-primary">{checkin.focus}</p>
-              </div>
-            )}
-            {checkin.note && (
-              <div className="col-span-full">
-                <p className="text-text-primary/40 text-xs">Notas</p>
-                <p className="text-text-primary text-sm">{checkin.note}</p>
-              </div>
+            {checkin?.focus && (
+              <CheckinChip
+                icon={<Target size={14} />}
+                label="Enfoque"
+                value={FOCUS_LABELS[checkin.focus] ?? checkin.focus}
+              />
             )}
           </div>
-        </div>
+          {checkin?.note && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: '10px 12px',
+                background: '#fff',
+                border: '1px solid var(--mabel-100)',
+                borderRadius: 10,
+                fontSize: 12.5,
+                color: 'var(--ink-700)',
+                lineHeight: 1.5,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              <strong style={{ fontWeight: 700, color: 'var(--ink-900)' }}>Nota:</strong>{' '}
+              {checkin.note}
+            </div>
+          )}
+        </section>
       )}
 
       {/* Conversation */}
-      <h3 className="text-sm font-semibold text-text-primary mb-3">Conversacion</h3>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.16em',
+          color: 'var(--ink-500)',
+          marginBottom: 12,
+        }}
+      >
+        <MessageCircle size={12} />
+        Conversación
+      </div>
+
       {isLoadingMessages ? (
         <SkeletonChat />
       ) : messages.length === 0 ? (
-        <p className="text-sm text-text-primary/40">No hay mensajes en esta sesion.</p>
+        <div
+          style={{
+            background: '#fff',
+            border: '1px dashed var(--ink-200)',
+            borderRadius: 14,
+            padding: '28px 24px',
+            textAlign: 'center',
+            color: 'var(--ink-500)',
+            fontSize: 13,
+            marginBottom: 24,
+          }}
+        >
+          No hubo mensajes en esta sesión.
+        </div>
       ) : (
-        <div className="flex flex-col gap-3 mb-6">
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            marginBottom: 24,
+          }}
+        >
           {messages.map((msg) => {
             const isUser = msg.role === 'user'
-            return (
-              <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+            if (isUser) {
+              return (
                 <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
-                    isUser
-                      ? 'bg-primary/10 text-text-primary rounded-br-md'
-                      : 'bg-gray-100 text-text-primary rounded-bl-md'
-                  }`}
+                  key={msg.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                  }}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                  <span className="text-[10px] text-text-primary/40">{formatTime(msg.created_at)}</span>
+                  <div style={{ maxWidth: '78%' }}>
+                    <div
+                      style={{
+                        background: 'var(--mabel-600)',
+                        color: '#fff',
+                        borderRadius: '18px 18px 4px 18px',
+                        padding: '10px 14px',
+                        fontSize: 14,
+                        lineHeight: 1.5,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {msg.content}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--ink-400)',
+                        marginTop: 4,
+                        textAlign: 'right',
+                      }}
+                    >
+                      {formatTime(msg.created_at)}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <div
+                key={msg.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  justifyContent: 'flex-start',
+                }}
+              >
+                <AssistantAvatar />
+                <div style={{ maxWidth: '78%' }}>
+                  <div
+                    style={{
+                      background: '#fff',
+                      border: '1px solid var(--ink-200)',
+                      borderRadius: '4px 18px 18px 18px',
+                      padding: '10px 14px',
+                      fontSize: 14,
+                      lineHeight: 1.55,
+                      color: 'var(--ink-900)',
+                    }}
+                  >
+                    <Markdown text={msg.content} />
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--ink-400)',
+                      marginTop: 4,
+                    }}
+                  >
+                    {formatTime(msg.created_at)}
+                  </div>
                 </div>
               </div>
             )
@@ -156,21 +397,182 @@ export default function SessionDetail() {
       )}
 
       {/* Actions */}
-      <div className="flex gap-3 pt-4 border-t border-gray-100">
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          paddingTop: 18,
+          borderTop: '1px solid var(--ink-100)',
+        }}
+      >
         <button
+          type="button"
           onClick={() => navigate('/home')}
-          className="px-4 py-2 text-sm text-text-primary/60 hover:text-text-primary transition-colors"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '9px 14px',
+            background: '#fff',
+            color: 'var(--ink-700)',
+            border: '1px solid var(--ink-200)',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+            transition: 'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--ink-50)'
+            e.currentTarget.style.borderColor = 'var(--ink-300)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#fff'
+            e.currentTarget.style.borderColor = 'var(--ink-200)'
+          }}
         >
+          <ArrowLeft size={14} />
           Volver
         </button>
+
         <button
+          type="button"
           disabled
-          title="Disponible proximamente"
-          className="px-4 py-2 text-sm text-danger/50 cursor-not-allowed"
+          title="Próximamente"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '9px 14px',
+            background: 'transparent',
+            color: 'var(--ink-400)',
+            border: '1px solid var(--ink-200)',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'not-allowed',
+            fontFamily: 'var(--font-sans)',
+          }}
         >
-          Eliminar sesion
+          Eliminar sesión
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              padding: '1px 6px',
+              borderRadius: 999,
+              background: 'var(--ink-100)',
+              color: 'var(--ink-500)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            Próximamente
+          </span>
         </button>
       </div>
+    </div>
+  )
+}
+
+function MetaCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid var(--ink-200)',
+        borderRadius: 12,
+        padding: '12px 14px',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          color: 'var(--ink-500)',
+          fontSize: 11,
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginBottom: 4,
+        }}
+      >
+        {icon}
+        {label}
+      </div>
+      <p
+        style={{
+          fontSize: 13.5,
+          fontWeight: 600,
+          color: 'var(--ink-900)',
+          margin: 0,
+          lineHeight: 1.35,
+        }}
+      >
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function CheckinChip({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid var(--mabel-100)',
+        borderRadius: 10,
+        padding: '8px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 3,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--ink-500)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        {icon}
+        {label}
+      </div>
+      <p
+        style={{
+          fontSize: 13.5,
+          fontWeight: 700,
+          color: 'var(--mabel-800)',
+          margin: 0,
+          lineHeight: 1.2,
+        }}
+      >
+        {value}
+      </p>
     </div>
   )
 }

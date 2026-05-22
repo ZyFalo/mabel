@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { Copy, Flag, MoreVertical, Lock } from 'lucide-react'
+import CheckinContextPopover from '../components/chat/CheckinContextPopover'
+import UmbAvatar from '../components/ui/UmbAvatar'
+import SosButton from '../components/ui/SosButton'
+import type { StudentOutletContext } from '../types/studentOutlet'
 import apiClient from '../api/client'
 import { useChatStore } from '../stores/chatStore'
 import { usePreferencesStore } from '../stores/preferencesStore'
@@ -41,35 +45,19 @@ async function loadReportedIds(
   return reported
 }
 
-// Small "M" avatar — used before assistant messages.
+// Assistant avatar — UMB shield used before every Mabel message.
 function AssistantAvatar() {
-  return (
-    <div
-      aria-hidden="true"
-      style={{
-        width: 32,
-        height: 32,
-        borderRadius: '50%',
-        background: 'var(--mabel-600)',
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontWeight: 700,
-        fontSize: 13,
-        flexShrink: 0,
-        marginTop: 2,
-        fontFamily: 'var(--font-sans)',
-      }}
-    >
-      M
-    </div>
-  )
+  return <UmbAvatar size={32} style={{ marginTop: 2 }} />
 }
 
 export default function Chat() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { openCrisis } = useOutletContext<StudentOutletContext>()
+  // Initial-mount guard: prevents StrictMode (dev) or any remount from
+  // firing the greeting / pending-message logic twice for the same session.
+  const initRef = useRef<string | null>(null)
   const {
     messages,
     isStreaming,
@@ -106,23 +94,122 @@ export default function Chat() {
   const { playTts, stopTts, isMuted, toggleMute } = useTts()
   const { currentWordIndex, startSubtitles, stopSubtitles } = useSubtitles()
 
-  // PRESERVED: Load session, messages, auto-greeting, draft restore.
+  /**
+   * Auto-play TTS + subtitles for the latest assistant message, respecting
+   * accessibility preferences. Called from every flow that produces an
+   * assistant reply (handleSend, handleMicToggle, and the init effect's
+   * pendingMessage branch). Centralising this avoids the bug where the
+   * landing-composer flow used to render Mabel's first reply silently.
+   */
+  async function playLastAssistantTtsIfEnabled(): Promise<void> {
+    if (!ttsEnabled || isMuted) return
+    const msgs = useChatStore.getState().messages
+    const lastMsg = msgs[msgs.length - 1]
+    if (!lastMsg || lastMsg.role !== 'assistant') return
+    const durationMs = await playTts(lastMsg.content, ttsVoice)
+    if (durationMs > 0 && subtitlesEnabled) {
+      setSubtitleMessageId(lastMsg.id)
+      startSubtitles(lastMsg.content, durationMs)
+    }
+  }
+
+  // Initial-mount strategy (precedence: pendingMessage > check-in greeting > nothing):
+  //
+  //   (a) If a `pendingMessage` came from Home/sidebar via router state,
+  //       send it as the user's first message. Mabel's reply IS the
+  //       opening — no separate auto-greeting.
+  //
+  //   (b) Otherwise, if the session has a completed check-in
+  //       (`checkin_completed_at`), fire the greeting endpoint. Mabel will
+  //       open by summarizing what she understood from the form (mood,
+  //       sleep, focus, note) — empathetic personalised opener.
+  //
+  //   (c) Otherwise, do nothing. Natural chat: the empty composer waits
+  //       for the user to type first. No "fantasma" greeting (ChatGPT-style).
+  //
+  // `initRef` ensures this block runs at most once per session id, even
+  // under React 18 StrictMode (which double-invokes effects in dev).
   useEffect(() => {
     if (!id) return
-    loadSession(id).catch(() => navigate('/home'))
-    loadMessages(id).then(() => {
-      const currentMsgs = useChatStore.getState().messages
-      if (currentMsgs.length === 0) {
-        apiClient
-          .post(`/sessions/${id}/greeting`)
-          .then((res) => {
-            if (res.data.greeting) {
-              loadMessages(id)
-            }
-          })
-          .catch(() => {})
+    if (initRef.current === id) return
+    initRef.current = id
+
+    const pendingMessage =
+      (location.state as { pendingMessage?: string } | null)?.pendingMessage?.trim() || ''
+    // Clear router state so a back/forward navigation doesn't replay the
+    // message. Use `navigate(..., { replace: true, state: null })` instead
+    // of `window.history.replaceState({}, '')` — the latter wipes React
+    // Router's internal `{key, usr}` history entry, which breaks features
+    // that key components by `location.key` (scroll restoration, etc.).
+    if (pendingMessage) {
+      navigate(location.pathname + location.search, {
+        replace: true,
+        state: null,
+      })
+    }
+
+    // `cancelled` ONLY guards the `navigate('/home')` call inside the catch
+    // branch. Why scoped so narrowly: under React 18 StrictMode (dev),
+    // mount 1 runs, gets unmounted (cleanup → cancelled=true), then a new
+    // mount 2 component is created. Mount 2 has a fresh closure where
+    // `cancelled=false` again, but the global `initRef` (also fresh? see
+    // below) and Zustand store are shared/persist across remounts. Side
+    // effects like `loadMessages` need to keep firing so the messages reach
+    // the visible mount; only the navigate-on-failure must be muted to
+    // avoid bouncing to /home from a stale closure.
+    let cancelled = false
+
+    const run = async () => {
+      let session
+      try {
+        session = await loadSession(id)
+      } catch (err) {
+        if (cancelled) return // unmounted before the failure surfaced
+        console.error('[Chat] loadSession failed for', id, err)
+        navigate('/home')
+        return
       }
-    })
+
+      // From here on, side effects must run regardless of cancelled —
+      // they update the global chatStore which is consumed by the live
+      // (post-remount) mount of this same Chat route.
+      await loadMessages(id)
+      const currentMsgs = useChatStore.getState().messages
+      if (currentMsgs.length > 0) return // resumed session — nothing to do
+
+      // (a) Pending message wins — Mabel's reply will be the opener.
+      if (pendingMessage) {
+        try {
+          await sendMessage(id, pendingMessage)
+          // Auto-play TTS+subtitles for the first reply, same as the
+          // typed/voice paths. Without this the landing-composer flow
+          // rendered Mabel's first reply silently for users with audio
+          // enabled.
+          await playLastAssistantTtsIfEnabled()
+        } catch (err) {
+          console.error('[Chat] sendMessage(pending) failed', err)
+        }
+        return
+      }
+
+      // (b) Check-in completed → personalised greeting that summarizes the form.
+      if (session.checkin_completed_at) {
+        try {
+          const res = await apiClient.post(`/sessions/${id}/greeting`)
+          if (res.data.greeting) {
+            await loadMessages(id)
+            await playLastAssistantTtsIfEnabled()
+          }
+        } catch (err) {
+          console.error('[Chat] greeting failed', err)
+        }
+        return
+      }
+
+      // (c) Natural chat — empty composer awaits user input.
+    }
+    void run()
+
     // Restore draft from localStorage (saved on JWT expiration)
     const draft = localStorage.getItem('mabel_draft')
     if (draft) {
@@ -130,7 +217,11 @@ export default function Chat() {
       localStorage.removeItem('mabel_draft')
       addToast({ type: 'info', message: 'Tu borrador fue recuperado' })
     }
-  }, [id, loadSession, loadMessages, navigate, addToast])
+
+    return () => {
+      cancelled = true
+    }
+  }, [id, loadSession, loadMessages, sendMessage, navigate, addToast, location.state])
 
   useEffect(() => {
     if (!isLoadingMessages && messages.length > 0) {
@@ -176,18 +267,7 @@ export default function Chat() {
     setInput('')
     try {
       await sendMessage(id, text)
-      // PRESERVED: Auto-play TTS + subtitles after assistant response.
-      if (ttsEnabled && !isMuted) {
-        const msgs = useChatStore.getState().messages
-        const lastMsg = msgs[msgs.length - 1]
-        if (lastMsg && lastMsg.role === 'assistant') {
-          const durationMs = await playTts(lastMsg.content, ttsVoice)
-          if (durationMs > 0 && subtitlesEnabled) {
-            setSubtitleMessageId(lastMsg.id)
-            startSubtitles(lastMsg.content, durationMs)
-          }
-        }
-      }
+      await playLastAssistantTtsIfEnabled()
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al enviar mensaje'
       addToast({ type: 'error', message: msg })
@@ -220,17 +300,7 @@ export default function Chat() {
         const text = res.data.text as string
         if (text && id) {
           await sendMessage(id, text)
-          if (ttsEnabled && !isMuted) {
-            const msgs = useChatStore.getState().messages
-            const lastMsg = msgs[msgs.length - 1]
-            if (lastMsg && lastMsg.role === 'assistant') {
-              const durationMs = await playTts(lastMsg.content, ttsVoice)
-              if (durationMs > 0 && subtitlesEnabled) {
-                setSubtitleMessageId(lastMsg.id)
-                startSubtitles(lastMsg.content, durationMs)
-              }
-            }
-          }
+          await playLastAssistantTtsIfEnabled()
         }
       } catch {
         addToast({ type: 'error', message: 'Error al transcribir audio' })
@@ -273,6 +343,7 @@ export default function Chat() {
     >
       {/* Session header bar */}
       <div
+        className="mobile-fab-safe-left"
         style={{
           padding: '14px 24px',
           borderBottom: '1px solid var(--ink-200)',
@@ -336,13 +407,25 @@ export default function Chat() {
           )}
         </div>
 
+        {/* Right-side controls: SOS + context popover + more menu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* SOS — crisis access pill, always visible in header */}
+          <SosButton onClick={openCrisis} />
+
+          {/* Info / contexto inicial — muestra el checkin_payload de la sesión */}
+          <CheckinContextPopover
+            payload={currentSession?.checkin_payload ?? null}
+            completedAt={currentSession?.checkin_completed_at ?? null}
+            startedAt={currentSession?.started_at ?? null}
+          />
+
         {/* More menu (Finalizar sesion lives here) */}
         <div ref={moreMenuRef} style={{ position: 'relative' }}>
           <button
             type="button"
             onClick={() => setMoreMenuOpen((v) => !v)}
-            title="Mas opciones"
-            aria-label="Mas opciones"
+            title="Más opciones"
+            aria-label="Más opciones"
             aria-expanded={moreMenuOpen}
             style={{
               width: 32,
@@ -415,10 +498,11 @@ export default function Chat() {
                   (e.currentTarget.style.background = 'transparent')
                 }
               >
-                Finalizar sesion
+                Finalizar sesión
               </button>
             </div>
           )}
+        </div>
         </div>
       </div>
 
@@ -439,25 +523,7 @@ export default function Chat() {
                 textAlign: 'center',
               }}
             >
-              <div
-                aria-hidden="true"
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  background: 'var(--mabel-600)',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: 15,
-                  marginBottom: 16,
-                  fontFamily: 'var(--font-sans)',
-                }}
-              >
-                M
-              </div>
+              <UmbAvatar size={48} style={{ marginBottom: 16 }} />
               <p
                 style={{
                   fontSize: 20,
@@ -467,10 +533,10 @@ export default function Chat() {
                   fontFamily: 'var(--font-sans)',
                 }}
               >
-                Estoy aqui, escuchandote
+                Estoy aquí, escuchándote
               </p>
               <p style={{ fontSize: 13, color: 'var(--ink-400)' }}>
-                Cuentame, como te sientes hoy?
+                Cuéntame, ¿cómo te sientes hoy?
               </p>
             </div>
           ) : (
@@ -889,7 +955,7 @@ export default function Chat() {
       {/* PRESERVED: End session modal */}
       <ConfirmModal
         open={showEndModal}
-        title="Finalizar sesion?"
+        title="¿Finalizar sesión?"
         message="Podras ver esta conversacion en tu historial."
         confirmLabel="Finalizar"
         onConfirm={handleEndSession}

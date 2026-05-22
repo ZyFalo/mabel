@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Lock } from 'lucide-react'
+import UmbAvatar from '../ui/UmbAvatar'
 
 interface AuthShellProps {
   /** Hero copy rendered in the middle of the left gradient panel. */
@@ -82,27 +83,11 @@ export default function AuthShell({ side, children, wide = false }: AuthShellPro
             gap: 14,
           }}
         >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
-              background: '#fff',
-              color: 'var(--mabel-700)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: 20,
-              fontFamily: 'var(--font-sans)',
-            }}
-          >
-            M
-          </div>
+          <UmbAvatar size={48} variant="white" />
           <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Mabel IA</div>
             <div style={{ fontSize: 12, opacity: 0.75, marginTop: 1 }}>
-              Universidad Manuela Beltran
+              Universidad Manuela Beltrán
             </div>
           </div>
         </div>
@@ -122,19 +107,20 @@ export default function AuthShell({ side, children, wide = false }: AuthShellPro
           }}
         >
           <Lock size={13} />
-          <span>Tus conversaciones son cifradas y confidenciales.</span>
+          <span>Tus conversaciones son privadas y confidenciales.</span>
         </div>
       </div>
 
-      {/* MOBILE top header (< md) */}
+      {/* MOBILE top header (< md). NOTE: `display` must be controlled via the
+          className (flex md:hidden), NOT inline — inline styles override
+          Tailwind's `md:hidden` and the header would leak into desktop. */}
       <div
-        className="md:hidden"
+        className="flex md:hidden"
         style={{
           padding: '20px 24px',
           background:
             'linear-gradient(160deg, var(--mabel-700) 0%, var(--mabel-600) 60%, var(--mabel-800) 100%)',
           color: '#fff',
-          display: 'flex',
           alignItems: 'center',
           gap: 10,
           position: 'fixed',
@@ -144,23 +130,7 @@ export default function AuthShell({ side, children, wide = false }: AuthShellPro
           zIndex: 1,
         }}
       >
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            background: '#fff',
-            color: 'var(--mabel-700)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: 14,
-            fontFamily: 'var(--font-sans)',
-          }}
-        >
-          M
-        </div>
+        <UmbAvatar size={32} variant="white" />
         <div>
           <div style={{ fontSize: 14, fontWeight: 700 }}>Mabel IA</div>
           <div style={{ fontSize: 11, opacity: 0.75 }}>UMB</div>

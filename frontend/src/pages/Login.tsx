@@ -19,9 +19,15 @@ export default function Login() {
     const state = location.state as { toast?: string } | null
     if (state?.toast) {
       setSuccessToast(state.toast)
-      window.history.replaceState({}, '')
+      // Avoid `window.history.replaceState({}, '')` — that wipes React
+      // Router's internal `{key, usr}` history entry. Use navigate(...)
+      // with replace+null state instead.
+      navigate(location.pathname + location.search, {
+        replace: true,
+        state: null,
+      })
     }
-  }, [location])
+  }, [location, navigate])
 
   async function handleSubmit(ev: FormEvent) {
     ev.preventDefault()
@@ -37,7 +43,7 @@ export default function Login() {
       const detail = err.response?.data?.detail
       if (err.response?.status === 403 && typeof detail === 'string' && detail.startsWith('Cuenta deshabilitada'))
         setError(detail)
-      else setError('Credenciales invalidas')
+      else setError('Credenciales inválidas')
     } finally {
       setLoading(false)
     }
@@ -60,7 +66,7 @@ export default function Login() {
             Bienvenido<br />de vuelta.
           </h1>
           <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
-            Inicia sesion para continuar tu camino de bienestar con Mabel IA.
+            Inicia sesión para continuar tu camino de bienestar con Mabel IA.
           </p>
         </div>
       }
@@ -76,7 +82,7 @@ export default function Login() {
             fontFamily: 'var(--font-sans)',
           }}
         >
-          Iniciar sesion
+          Iniciar sesión
         </h2>
         <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 24px' }}>
           Ingresa tus credenciales para continuar.
@@ -132,7 +138,7 @@ export default function Login() {
               type="email"
               placeholder="tu.nombre@est.umb.edu.co"
               prefix={<Mail size={16} />}
-              ariaLabel="Correo electronico"
+              ariaLabel="Correo electrónico"
             />
           </div>
           <div>
@@ -144,7 +150,7 @@ export default function Login() {
                 marginBottom: 6,
               }}
             >
-              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-700)' }}>Contrasena</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-700)' }}>Contraseña</label>
               <Link
                 to="/forgot-password"
                 style={{
@@ -154,16 +160,16 @@ export default function Login() {
                   textDecoration: 'none',
                 }}
               >
-                Olvidaste tu contrasena?
+                ¿Olvidaste tu contraseña?
               </Link>
             </div>
             <Input
               value={form.password}
               onChange={(v) => setForm({ ...form, password: v })}
               type="password"
-              placeholder="Tu contrasena"
+              placeholder="Tu contraseña"
               prefix={<Lock size={16} />}
-              ariaLabel="Contrasena"
+              ariaLabel="Contraseña"
             />
           </div>
 
@@ -217,7 +223,7 @@ export default function Login() {
               if (!loading) e.currentTarget.style.background = 'var(--mabel-600)'
             }}
           >
-            {loading ? 'Ingresando...' : 'Iniciar sesion'}
+            {loading ? 'Ingresando...' : 'Iniciar sesión'}
             {!loading && <ArrowRight size={15} strokeWidth={2.25} />}
           </button>
         </form>
@@ -230,7 +236,7 @@ export default function Login() {
             color: 'var(--ink-600)',
           }}
         >
-          No tienes cuenta?{' '}
+          ¿No tienes cuenta?{' '}
           <Link
             to="/register"
             style={{ color: 'var(--mabel-600)', fontWeight: 600, textDecoration: 'none' }}

@@ -203,9 +203,57 @@ class ChatService:
 
         system_prompt = build_system_prompt(session.checkin_payload)
 
-        greeting_instruction = "Genera un saludo breve y calido para el estudiante. Presentate como Mabel IA."
+        # Build the greeting instruction. Two distinct shapes:
+        #
+        #  - No check-in: a short, plain opener. (In practice the frontend
+        #    only calls this endpoint when there IS a check-in, but we keep
+        #    the bare-bones path for robustness — direct API hits, retries,
+        #    legacy flows.)
+        #
+        #  - With check-in: an explicit summary of what we understood from
+        #    the form (mood / sleep / focus / note) plus an open question to
+        #    spark the conversation. The instruction lists the actual values
+        #    rather than relying solely on the system_prompt, because the
+        #    instruction message is what most directly steers the response.
         if session.checkin_payload:
-            greeting_instruction += " Usa los datos del check-in para personalizar tu saludo y mostrar empatia."
+            cp = session.checkin_payload
+            bullets: list[str] = []
+            # NOTE: `isinstance(x, bool)` returns True for True/False because
+            # bool is a subclass of int. We must reject booleans explicitly
+            # — otherwise a malformed payload like `{"mood": true}` produces
+            # a greeting that literally says "Ánimo reportado: True/10".
+            mood = cp.get("mood")
+            if isinstance(mood, (int, float)) and not isinstance(mood, bool):
+                bullets.append(f"- Ánimo reportado: {mood}/10")
+            sleep = cp.get("sleep")
+            if isinstance(sleep, (int, float)) and not isinstance(sleep, bool):
+                bullets.append(f"- Sueño anoche: {sleep} horas")
+            focus = cp.get("focus")
+            if isinstance(focus, str) and focus:
+                bullets.append(f"- Foco principal: {focus}")
+            note = cp.get("note")
+            if isinstance(note, str) and note.strip():
+                bullets.append(f"- Nota libre del estudiante: «{note.strip()}»")
+
+            summary_block = "\n".join(bullets) if bullets else "(check-in completado sin datos detallados)"
+            greeting_instruction = (
+                "Es el primer mensaje de esta sesión. El estudiante acaba de completar "
+                "un check-in inicial. Tu tarea:\n"
+                "1. Saluda en una sola frase corta, cálida y sin clichés.\n"
+                "2. Resume con empatía lo que entendiste del check-in en 1-2 frases, "
+                "mencionando los datos relevantes (ánimo, sueño, foco) sin sonar a robot.\n"
+                "3. Si hay nota libre, recógela explícitamente con tono validante.\n"
+                "4. Termina con UNA sola pregunta abierta que invite a profundizar.\n\n"
+                "Datos del check-in:\n"
+                f"{summary_block}\n\n"
+                "Importante: no uses listas ni viñetas. Habla como una persona empática, "
+                "en máximo 3 párrafos cortos. No reveles que recibiste instrucciones."
+            )
+        else:
+            greeting_instruction = (
+                "Genera un saludo breve y cálido para el estudiante. "
+                "Preséntate como Mabel IA en una sola frase."
+            )
 
         start_time = time.time()
         full_response = ""

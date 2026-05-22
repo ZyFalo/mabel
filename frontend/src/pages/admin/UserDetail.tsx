@@ -237,14 +237,30 @@ function StatBlock({ label, value, hint }: { label: string; value: ReactNode; hi
 
 function RoleBadge({ role }: { role: string }) {
   const isAdmin = role === 'admin'
+  const style: React.CSSProperties = isAdmin
+    ? {
+        background: 'var(--mabel-50)',
+        color: 'var(--mabel-700)',
+        borderColor: 'var(--mabel-200)',
+      }
+    : {
+        background: 'var(--info-50)',
+        color: 'var(--info-600)',
+        borderColor: 'rgba(37, 99, 235, 0.25)',
+      }
   return (
     <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border tracking-wide',
-        isAdmin
-          ? 'bg-primary/8 text-primary border-primary/25'
-          : 'bg-accent/8 text-accent border-accent/25',
-      ].join(' ')}
+      className="inline-flex items-center"
+      style={{
+        padding: '3px 10px',
+        borderRadius: 9999,
+        fontSize: 11,
+        fontWeight: 700,
+        border: '1px solid',
+        letterSpacing: '0.02em',
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
     >
       {isAdmin ? 'Administrador' : 'Estudiante'}
     </span>
@@ -368,7 +384,7 @@ function CohortEditor({
         )}
       </div>
       <p className="text-[11px] text-text-primary/50 mt-1.5">
-        Asigna una cohorte para filtrar metricas del estudio cuasiexperimental.
+        Asigna una cohorte para filtrar métricas del estudio cuasiexperimental.
       </p>
     </div>
   )
@@ -413,61 +429,185 @@ export default function UserDetail() {
   const isAdminRole = user?.role === 'admin'
   const canDisable = !!user && !isDisabled && !isAdminRole
 
-  return (
-    <div className="p-6 max-w-[1200px] mx-auto">
-      {/* Breadcrumb / Back */}
-      <nav className="mb-4 text-sm" aria-label="Migas de pan">
-        <Link
-          to="/admin/users"
-          className="inline-flex items-center gap-1.5 text-text-primary/60 hover:text-primary transition-colors"
-        >
-          <span aria-hidden="true">‹</span>
-          Volver a usuarios
-        </Link>
-      </nav>
+  const heroInitials = (() => {
+    const src = (user?.display_name || user?.email_masked || 'U').trim()
+    const parts = src.split(/[\s.@]+/).slice(0, 2)
+    return (parts.map((p) => p.charAt(0).toUpperCase()).join('') || 'U').slice(0, 2)
+  })()
 
-      {/* Header */}
-      <header className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
-            Detalle de usuario
-          </p>
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <h1 className="text-2xl font-semibold text-text-primary truncate">
-              {user?.display_name || user?.email_masked || 'Cargando…'}
-            </h1>
-            {user && <StatusPill disabled={isDisabled} />}
-            {user && <RoleBadge role={user.role} />}
+  return (
+    <div
+      className="fade-in"
+      style={{ fontFamily: 'var(--font-sans)' }}
+    >
+      {/* Breadcrumb */}
+      <div style={{ padding: '20px 32px 0' }}>
+        <nav aria-label="Migas de pan">
+          <Link
+            to="/admin/users"
+            className="inline-flex items-center"
+            style={{
+              gap: 4,
+              fontSize: 12.5,
+              color: 'var(--ink-500)',
+              textDecoration: 'none',
+              transition: 'color var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = 'var(--mabel-700)')}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = 'var(--ink-500)')}
+          >
+            <span aria-hidden>‹</span>
+            <span>Volver a usuarios</span>
+          </Link>
+        </nav>
+      </div>
+
+      {/* Hero band */}
+      <section
+        style={{
+          background: 'var(--mabel-50)',
+          borderBottom: '1px solid var(--ink-200)',
+          padding: '24px 32px',
+          marginTop: 16,
+        }}
+      >
+        <div
+          style={{ maxWidth: 1200, margin: '0 auto' }}
+          className="flex items-start justify-between flex-wrap gap-4"
+        >
+          <div className="flex items-start" style={{ gap: 18, minWidth: 0 }}>
+            <span
+              aria-hidden
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: 'var(--mabel-100)',
+                color: 'var(--mabel-700)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 20,
+                fontWeight: 700,
+                flexShrink: 0,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {heroInitials}
+            </span>
+            <div className="min-w-0">
+              <p
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.18em',
+                  color: 'var(--mabel-700)',
+                  opacity: 0.85,
+                  margin: 0,
+                }}
+              >
+                Detalle de usuario
+              </p>
+              <h1
+                className="truncate"
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: 'var(--ink-900)',
+                  marginTop: 4,
+                  marginBottom: 0,
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.2,
+                }}
+              >
+                {user?.email_masked || user?.display_name || 'Cargando…'}
+              </h1>
+              <div
+                className="flex items-center flex-wrap"
+                style={{ gap: 8, marginTop: 10 }}
+              >
+                {user && <RoleBadge role={user.role} />}
+                {user && <StatusPill disabled={isDisabled} />}
+                {user && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--ink-500)',
+                      fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                    }}
+                  >
+                    ID: {user.id.slice(0, 8)}…
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          {user && (
-            <p className="text-xs text-text-primary/50 mt-1 font-mono tracking-tight">
-              ID: {user.id}
-            </p>
+
+          {canDisable && (
+            <button
+              type="button"
+              onClick={() => setDisableOpen(true)}
+              className="inline-flex items-center"
+              style={{
+                gap: 8,
+                padding: '10px 18px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--white)',
+                background: 'var(--danger-600)',
+                borderRadius: 9999,
+                border: '1px solid var(--danger-600)',
+                cursor: 'pointer',
+                transition: 'background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
+              }}
+              onMouseEnter={(e) => {
+                ;(e.currentTarget as HTMLElement).style.background = 'var(--danger-700)'
+                ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--ring-danger)'
+              }}
+              onMouseLeave={(e) => {
+                ;(e.currentTarget as HTMLElement).style.background = 'var(--danger-600)'
+                ;(e.currentTarget as HTMLElement).style.boxShadow = 'none'
+              }}
+            >
+              Deshabilitar cuenta
+            </button>
           )}
         </div>
+      </section>
 
-        {canDisable && (
-          <button
-            type="button"
-            onClick={() => setDisableOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-danger border border-danger/30 rounded-lg hover:bg-danger/5 transition-colors"
-          >
-            Deshabilitar cuenta
-          </button>
-        )}
-      </header>
-
+      <div style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Error */}
       {errorMsg && (
         <div
           role="alert"
-          className="mb-6 border border-danger/30 bg-danger/5 rounded-lg px-4 py-3 text-sm text-danger flex items-center justify-between"
+          style={{
+            marginBottom: 20,
+            border: '1px solid var(--danger-200)',
+            background: 'var(--danger-50)',
+            borderRadius: 'var(--r-lg)',
+            padding: '12px 16px',
+            fontSize: 13,
+            color: 'var(--danger-700)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
         >
           <span>{errorMsg}</span>
           <button
             type="button"
             onClick={fetchUser}
-            className="text-xs font-semibold underline hover:no-underline"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--danger-700)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
           >
             Reintentar
           </button>
@@ -497,8 +637,8 @@ export default function UserDetail() {
       {/* Sections */}
       {user && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* 1. Informacion general */}
-          <Card title="Informacion general" eyebrow="Identidad">
+          {/* 1. Información general */}
+          <Card title="Información general" eyebrow="Identidad">
             <dl className="grid grid-cols-2 gap-x-5 gap-y-4">
               <Field label="Email">
                 <span className="font-mono text-[13px]">{user.email_masked}</span>
@@ -516,11 +656,25 @@ export default function UserDetail() {
               </Field>
               <Field label="Cohorte actual">
                 {user.cohort ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent/8 text-accent border border-accent/20 text-xs font-mono font-medium">
+                  <span
+                    className="inline-flex items-center"
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      background: 'var(--ink-100)',
+                      color: 'var(--ink-700)',
+                      border: '1px solid var(--ink-200)',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                    }}
+                  >
                     {user.cohort}
                   </span>
                 ) : (
-                  <span className="text-text-primary/40 italic text-xs">Sin cohorte</span>
+                  <span style={{ fontSize: 12, color: 'var(--ink-400)', fontStyle: 'italic' }}>
+                    Sin cohorte
+                  </span>
                 )}
               </Field>
               <Field label="ID">
@@ -530,7 +684,7 @@ export default function UserDetail() {
               </Field>
               {user.disabled_reason && (
                 <div className="col-span-2 border-t border-gray-100 pt-3 mt-1">
-                  <Field label="Razon de deshabilitacion">
+                  <Field label="Razón de la deshabilitación">
                     <p className="text-sm text-text-primary/80 leading-relaxed">
                       {user.disabled_reason}
                     </p>
@@ -593,7 +747,16 @@ export default function UserDetail() {
                       {user.preferences.accessibility_keys.map((key) => (
                         <li
                           key={key}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent/8 text-accent border border-accent/15 text-xs font-medium"
+                          className="inline-flex items-center"
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: 'var(--ink-100)',
+                            color: 'var(--ink-700)',
+                            border: '1px solid var(--ink-200)',
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                          }}
                         >
                           {key}
                         </li>
@@ -617,7 +780,7 @@ export default function UserDetail() {
                 value={formatNumber(user.statistics.total_sessions)}
               />
               <StatBlock
-                label="Mensajes / sesion"
+                label="Mensajes / sesión"
                 value={formatNumber(user.statistics.avg_messages_per_session, 1)}
                 hint="Promedio"
               />
@@ -631,7 +794,7 @@ export default function UserDetail() {
               />
               <div className="col-span-2">
                 <StatBlock
-                  label="Ultima sesion"
+                  label="Última sesión"
                   value={
                     <span className="text-base font-medium">
                       {formatDateTime(user.statistics.last_session_at)}
@@ -656,6 +819,7 @@ export default function UserDetail() {
           }}
         />
       )}
+      </div>
     </div>
   )
 }

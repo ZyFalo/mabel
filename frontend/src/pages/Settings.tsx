@@ -1,5 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Lock,
   Eye,
@@ -35,7 +34,7 @@ import SaveBar from '../components/settings/primitives/SaveBar'
 import SettingsNavItem from '../components/settings/primitives/SettingsNavItem'
 import SectionHeader from '../components/settings/primitives/SectionHeader'
 
-type TabId = 'privacy' | 'accessibility' | 'voice' | 'account' | 'arco'
+export type TabId = 'privacy' | 'accessibility' | 'voice' | 'account' | 'arco'
 
 const VALID_TABS: ReadonlySet<TabId> = new Set([
   'privacy',
@@ -89,9 +88,16 @@ const SECTIONS: SectionDef[] = [
 // Settings — modal overlay (Cap 6.4)
 // ---------------------------------------------------------------------------
 
-export default function Settings() {
-  const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+interface SettingsProps {
+  /** Controls visibility. When false, the component returns null. */
+  open: boolean
+  /** Called when the user dismisses the modal (backdrop, Esc, or close button). */
+  onClose: () => void
+  /** Tab to open on first render. Defaults to 'privacy'. */
+  initialTab?: TabId
+}
+
+export default function Settings({ open, onClose, initialTab: initialTabProp = 'privacy' }: SettingsProps) {
   const preferences = usePreferencesStore((s) => s.preferences)
   const updatePreferences = usePreferencesStore((s) => s.updatePreferences)
   const user = useAuthStore((s) => s.user)
@@ -111,31 +117,19 @@ export default function Settings() {
   const [previewPlaying, setPreviewPlaying] = useState(false)
   const [consentScope, setConsentScope] = useState<string>('')
 
-  // Active tab — read initial from ?tab= query param (deeplink from UserMenu)
-  const initialTab = (() => {
-    const fromUrl = searchParams.get('tab')
-    return fromUrl && VALID_TABS.has(fromUrl as TabId)
-      ? (fromUrl as TabId)
-      : 'privacy'
-  })()
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab)
+  // Active tab — start with the prop value; the parent can change it
+  // between mounts via `initialTab` and we react to that.
+  const [activeTab, setActiveTab] = useState<TabId>(
+    VALID_TABS.has(initialTabProp) ? initialTabProp : 'privacy',
+  )
 
-  // Sync activeTab → URL (so refresh keeps the tab)
+  // When the parent re-opens the modal with a different `initialTab`,
+  // jump to it. (e.g. UserMenu deeplinks "account" vs "privacy".)
   useEffect(() => {
-    if (searchParams.get('tab') !== activeTab) {
-      const next = new URLSearchParams(searchParams)
-      next.set('tab', activeTab)
-      setSearchParams(next, { replace: true })
+    if (open && VALID_TABS.has(initialTabProp)) {
+      setActiveTab(initialTabProp)
     }
-  }, [activeTab, searchParams, setSearchParams])
-
-  // React to URL changes (e.g. user clicks another tab shortcut in UserMenu)
-  useEffect(() => {
-    const fromUrl = searchParams.get('tab')
-    if (fromUrl && VALID_TABS.has(fromUrl as TabId) && fromUrl !== activeTab) {
-      setActiveTab(fromUrl as TabId)
-    }
-  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, initialTabProp])
 
   // Modal states
   const [showDelete, setShowDelete] = useState(false)
@@ -161,8 +155,13 @@ export default function Settings() {
     }
   }, [preferences])
 
-  // Load consent scope (for RevokeConsentModal)
+  // Load consent scope (for RevokeConsentModal). Lazy: only fires the
+  // first time the user actually opens Settings, not on every authenticated
+  // page load — Settings is now permanently mounted inside StudentLayout.
+  const consentScopeLoadedRef = useRef(false)
   useEffect(() => {
+    if (!open || consentScopeLoadedRef.current) return
+    consentScopeLoadedRef.current = true
     apiClient
       .get('/users/me/consent-status')
       .then((res) => {
@@ -171,16 +170,32 @@ export default function Settings() {
         }
       })
       .catch(() => {})
-  }, [])
+  }, [open])
 
-  // Close handler — back if possible, fallback /home
-  const handleClose = () => {
-    if (window.history.length > 1) navigate(-1)
-    else navigate('/home')
-  }
+  // Reset sub-modal flags when the parent Settings is dismissed. Without
+  // this, the component stays mounted (returns null when !open) and any
+  // sub-modal that was open at close time would re-appear on next reopen.
+  // Especially important for destructive sub-modals: an aborted
+  // "Eliminar cuenta" or "Cambiar contraseña" shouldn't ambush the user
+  // the next time they open Settings.
+  useEffect(() => {
+    if (!open) {
+      setShowDelete(false)
+      setShowRevoke(false)
+      setShowArco(false)
+      setShowPassword(false)
+    }
+  }, [open])
 
-  // Esc shortcut
-  useKeyboardShortcuts({ esc: handleClose })
+  // Close handler — delegates to parent.
+  const handleClose = onClose
+
+  // Esc shortcut: only fires when Settings is open AND no sub-modal is
+  // active. Sub-modals (DeleteAccount, RevokeConsent, ChangePassword,
+  // ArcoExport) handle their own Esc keypresses; we don't want a single
+  // Esc to collapse two layers at once.
+  const anySubModalOpen = showDelete || showRevoke || showArco || showPassword
+  useKeyboardShortcuts(open && !anySubModalOpen ? { esc: handleClose } : {})
 
   // -------------------------------------------------------------------------
   // Save handlers (PRESERVED EXACTLY from previous implementation)
@@ -260,14 +275,17 @@ export default function Settings() {
   const currentSection =
     SECTIONS.find((s) => s.id === activeTab) ?? SECTIONS[0]
 
+  // Modal pattern: when closed, render nothing. Matches SosPanel/ReportModal.
+  if (!open) return null
+
   return (
     <div
       className="fade-in"
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 20,
-        background: 'rgba(26,17,16,0.32)',
+        zIndex: 55,
+        background: 'rgba(26,17,16,0.45)',
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
         display: 'flex',

@@ -15,13 +15,20 @@ import { useAuthStore } from '../../stores/authStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
 import { useToastStore } from '../../stores/toastStore'
 import { SkeletonText } from '../ui/Skeleton'
+import UmbAvatar from '../ui/UmbAvatar'
 import UserMenu from './UserMenu'
+import SessionSearchModal from '../chat/SessionSearchModal'
+import type { TabId as SettingsTabId } from '../../pages/Settings'
 
 interface StudentSidebarV3Props {
   open: boolean
   onToggle: () => void
   onNewChat?: () => void
-  onOpenSettings?: () => void
+  /**
+   * Open the Settings modal. Accepts an optional `tab` so UserMenu shortcuts
+   * (Perfil → 'account', Privacidad → 'privacy') can deeplink.
+   */
+  onOpenSettings?: (tab?: SettingsTabId) => void
   /** Opens the shared CrisisOverlay hosted by StudentLayout. */
   onOpenCrisis?: () => void
   /** When true, sidebar renders as mobile drawer (always 268px, fixed position). */
@@ -293,6 +300,7 @@ export default function StudentSidebarV3({
   const params = useParams()
   const user = useAuthStore((s) => s.user)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const profileButtonRef = useRef<HTMLButtonElement | null>(null)
   const { sessions, loadSessions, createSession, isLoadingSessions, saveHistoryEnabled } =
     useChatStore()
@@ -340,11 +348,8 @@ export default function StudentSidebarV3({
   }
 
   function handleSettings() {
-    if (onOpenSettings) {
-      onOpenSettings()
-      return
-    }
-    navigate('/settings')
+    // Settings is no longer a route — it's a modal opened via the prop.
+    onOpenSettings?.()
   }
 
   function handleOpenCrisis() {
@@ -359,6 +364,12 @@ export default function StudentSidebarV3({
   const email = user?.email || ''
 
   return (
+    <>
+    <SessionSearchModal
+      open={searchOpen}
+      onClose={() => setSearchOpen(false)}
+      sessions={sessions as SessionItem[]}
+    />
     <aside
       style={{
         width: isOpen ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
@@ -390,7 +401,7 @@ export default function StudentSidebarV3({
           transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out), gap ${COLLAPSE_DURATION}ms var(--ease-out)`,
         }}
       >
-        <Avatar initials="M" size={28} />
+        <UmbAvatar size={32} />
         <Label open={isOpen}>
           <span
             style={{
@@ -472,13 +483,18 @@ export default function StudentSidebarV3({
           transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
         }}
       >
-        <SidebarItem icon={Search} label="Buscar sesiones" open={isOpen} onClick={() => {}} />
+        <SidebarItem
+          icon={Search}
+          label="Buscar sesiones"
+          open={isOpen}
+          onClick={() => setSearchOpen(true)}
+        />
         <SidebarItem
           icon={MessageCircle}
           label="Conversaciones"
           open={isOpen}
           active
-          onClick={() => {}}
+          onClick={() => navigate('/home')}
         />
       </div>
 
@@ -519,7 +535,7 @@ export default function StudentSidebarV3({
             </p>
             <button
               type="button"
-              onClick={() => navigate('/settings')}
+              onClick={handleSettings}
               style={{
                 fontSize: 11.5,
                 fontWeight: 600,
@@ -579,41 +595,8 @@ export default function StudentSidebarV3({
         )}
       </div>
 
-      {/* Sticky SOS — always above profile */}
-      <div
-        style={{
-          padding: isOpen ? '0 12px 8px' : '0 10px 8px',
-          transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleOpenCrisis}
-          title={isOpen ? undefined : 'Linea de crisis SOS'}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: isOpen ? 'flex-start' : 'center',
-            gap: isOpen ? 10 : 0,
-            padding: isOpen ? '10px 12px' : '10px 0',
-            background: 'var(--mabel-50)',
-            color: 'var(--mabel-700)',
-            border: '1px solid var(--mabel-100)',
-            borderRadius: 10,
-            fontSize: 13,
-            fontWeight: 600,
-            fontFamily: 'var(--font-sans)',
-            cursor: 'pointer',
-            transition: `background var(--dur-fast) var(--ease-out), padding ${COLLAPSE_DURATION}ms var(--ease-out), gap ${COLLAPSE_DURATION}ms var(--ease-out), justify-content ${COLLAPSE_DURATION}ms var(--ease-out)`,
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--mabel-100)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--mabel-50)')}
-        >
-          <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-          <Label open={isOpen}>Linea de crisis SOS</Label>
-        </button>
-      </div>
+      {/* SOS access lives in each page's top bar (SosButton component) —
+          no longer duplicated in the sidebar. */}
 
       {/* Profile pill footer */}
       <div
@@ -690,6 +673,7 @@ export default function StudentSidebarV3({
           open={userMenuOpen}
           onClose={() => setUserMenuOpen(false)}
           anchorRef={profileButtonRef}
+          onOpenSettings={onOpenSettings}
         />
       </div>
 
@@ -729,5 +713,6 @@ export default function StudentSidebarV3({
         </button>
       )}
     </aside>
+    </>
   )
 }

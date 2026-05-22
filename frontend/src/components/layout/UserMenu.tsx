@@ -8,12 +8,20 @@ import {
   User,
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import type { TabId } from '../../pages/Settings'
 
 interface UserMenuProps {
   open: boolean
   onClose: () => void
   /** Anchor used for outside-click detection; if the click is inside this ref OR the menu, it does not close. */
   anchorRef: React.RefObject<HTMLElement | null>
+  /**
+   * Opens the Settings modal at the layout level. Wired by StudentLayout
+   * via prop drilling because UserMenu is rendered inside the sidebar,
+   * which is a sibling of the Outlet — so `useOutletContext` doesn't see
+   * the layout-level context here.
+   */
+  onOpenSettings?: (tab?: TabId) => void
 }
 
 type MenuEntry =
@@ -22,7 +30,8 @@ type MenuEntry =
       id: string
       label: string
       icon: typeof SettingsIcon
-      to?: string
+      /** When set, click opens the Settings modal (optional tab deeplink). */
+      settingsTab?: TabId | null
       shortcut?: string
       disabled?: boolean
     }
@@ -32,9 +41,9 @@ const ENTRIES: MenuEntry[] = [
   {
     kind: 'item',
     id: 'settings',
-    label: 'Configuracion',
+    label: 'Configuración',
     icon: SettingsIcon,
-    to: '/settings',
+    settingsTab: null, // null = default tab
     shortcut: '⌘,',
   },
   {
@@ -42,14 +51,14 @@ const ENTRIES: MenuEntry[] = [
     id: 'profile',
     label: 'Perfil',
     icon: User,
-    to: '/settings?tab=account',
+    settingsTab: 'account',
   },
   {
     kind: 'item',
     id: 'privacy',
     label: 'Privacidad',
     icon: Shield,
-    to: '/settings?tab=privacy',
+    settingsTab: 'privacy',
   },
   {
     kind: 'item',
@@ -68,7 +77,7 @@ const ENTRIES: MenuEntry[] = [
  *
  * Closes on: outside click, Escape, or item selection.
  */
-export default function UserMenu({ open, onClose, anchorRef }: UserMenuProps) {
+export default function UserMenu({ open, onClose, anchorRef, onOpenSettings }: UserMenuProps) {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
@@ -103,13 +112,9 @@ export default function UserMenu({ open, onClose, anchorRef }: UserMenuProps) {
 
   if (!open) return null
 
-  function handleSelect(to?: string) {
-    if (!to) {
-      onClose()
-      return
-    }
+  function handleSelectSettings(tab: TabId | null | undefined) {
     onClose()
-    navigate(to)
+    onOpenSettings?.(tab ?? undefined)
   }
 
   function handleLogout() {
@@ -187,7 +192,7 @@ export default function UserMenu({ open, onClose, anchorRef }: UserMenuProps) {
             key={entry.id}
             type="button"
             role="menuitem"
-            onClick={() => !entry.disabled && handleSelect(entry.to)}
+            onClick={() => !entry.disabled && handleSelectSettings(entry.settingsTab)}
             disabled={entry.disabled}
             style={{
               width: '100%',

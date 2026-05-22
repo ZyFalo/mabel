@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Paperclip,
   Mic,
   Loader2,
   Volume2,
@@ -23,6 +22,14 @@ interface ComposerProps {
   maxLength?: number
   showHint?: boolean
   autoFocus?: boolean
+  /**
+   * When true, render as a single-row layout (textarea + send button only).
+   * Intended for the landing/Home where mic, mute and "↵ para enviar" hint
+   * aren't shown anyway, so the empty bottom row looked wasted.
+   * In compact mode the card auto-grows vertically when the textarea
+   * wraps to multiple lines; the send button stays anchored bottom-right.
+   */
+  compact?: boolean
 }
 
 const MAX_TEXTAREA_HEIGHT = 200
@@ -34,7 +41,7 @@ const MAX_TEXTAREA_HEIGHT = 200
  * shadow-sm, padding 14px 16px 10px.
  *
  * Bottom row:
- *  - LEFT: Paperclip (placeholder) + Mic (ASR) + Mute (TTS) — 34×34 buttons
+ *  - LEFT: Mic (ASR) + Mute (TTS) — 34×34 buttons
  *  - RIGHT: hint "↵ para enviar" + circular Send button (ArrowRight, mabel-600)
  *
  * Preserves verbatim:
@@ -58,6 +65,7 @@ export default function Composer({
   maxLength = 2000,
   showHint = true,
   autoFocus = false,
+  compact = false,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [focused, setFocused] = useState(false)
@@ -110,6 +118,103 @@ export default function Composer({
     e.currentTarget.style.color = 'var(--ink-500)'
   }
 
+  // Compact mode: single-row card (textarea + send), used by the landing
+  // chat where mic/mute/hint aren't shown anyway. The textarea grows
+  // vertically when the user wraps; the send button stays anchored
+  // bottom-right via `alignItems: 'flex-end'`.
+  if (compact) {
+    return (
+      <div style={{ width: '100%' }}>
+        <div
+          style={{
+            background: '#fff',
+            border: `1px solid ${focused ? 'var(--mabel-300)' : 'var(--ink-200)'}`,
+            borderRadius: 20,
+            boxShadow: focused
+              ? 'var(--ring-mabel), var(--shadow-sm)'
+              : 'var(--shadow-sm)',
+            padding: '12px 12px 12px 18px',
+            transition: 'all var(--dur-base) var(--ease-out)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 10,
+          }}
+        >
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value.slice(0, maxLength))}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            disabled={disabled}
+            maxLength={maxLength}
+            rows={1}
+            placeholder={placeholder}
+            aria-label="Mensaje para Mabel"
+            style={{
+              flex: 1,
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 15,
+              lineHeight: 1.55,
+              color: 'var(--ink-900)',
+              background: 'transparent',
+              minHeight: 26,
+              maxHeight: MAX_TEXTAREA_HEIGHT,
+              paddingTop: 4,
+              paddingBottom: 4,
+            }}
+          />
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={!canSend}
+            aria-label="Enviar mensaje"
+            title="Enviar"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 999,
+              background: canSend ? 'var(--mabel-600)' : 'var(--ink-200)',
+              color: '#fff',
+              border: 'none',
+              cursor: canSend ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background var(--dur-fast) var(--ease-out)',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              if (canSend) e.currentTarget.style.background = 'var(--mabel-700)'
+            }}
+            onMouseLeave={(e) => {
+              if (canSend) e.currentTarget.style.background = 'var(--mabel-600)'
+            }}
+          >
+            <ArrowRight size={16} strokeWidth={2.25} />
+          </button>
+        </div>
+
+        {charsNearMax && (
+          <p
+            style={{
+              fontSize: 11,
+              color: 'var(--ink-500)',
+              textAlign: 'right',
+              marginTop: 6,
+            }}
+          >
+            {value.length}/{maxLength}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ width: '100%' }}>
       <div
@@ -159,23 +264,9 @@ export default function Composer({
             marginTop: 6,
           }}
         >
-          {/* LEFT — Paperclip (placeholder), Mic (ASR), Mute (TTS) */}
+          {/* LEFT — Mic (ASR), Mute (TTS).
+              File attachments removed: not supported by the platform. */}
           <div style={{ display: 'flex', gap: 4 }}>
-            {/* Paperclip placeholder — visual only, deferred attachment feature */}
-            <button
-              type="button"
-              title="Adjuntar"
-              aria-label="Adjuntar"
-              disabled
-              style={{
-                ...ghostBtnBase,
-                cursor: 'not-allowed',
-                opacity: 0.6,
-              }}
-            >
-              <Paperclip size={17} />
-            </button>
-
             {/* Mic (ASR) — pulsing red border when recording (PRESERVED) */}
             {showMic && (
               <button

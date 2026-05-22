@@ -1,8 +1,11 @@
 import { useEffect } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useOutletContext } from 'react-router-dom'
 import { usePreferencesStore } from '../stores/preferencesStore'
 
 export default function OnboardingGuard() {
+  // Forward parent layout context (e.g. StudentLayout `openCrisis`) so
+  // deeper page components can still consume it.
+  const parentContext = useOutletContext()
   const { hasPreferences, loading, loadPreferences } = usePreferencesStore()
   const location = useLocation()
 
@@ -22,5 +25,5 @@ export default function OnboardingGuard() {
     return <Navigate to="/onboarding" replace />
   }
 
-  return <Outlet />
+  return <Outlet context={parentContext} />
 }

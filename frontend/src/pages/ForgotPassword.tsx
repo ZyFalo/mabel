@@ -42,7 +42,7 @@ export default function ForgotPassword() {
             Recupera tu<br />acceso.
           </h1>
           <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
-            Te enviaremos un enlace seguro a tu correo institucional para restablecer tu contrasena.
+            Te enviaremos un enlace seguro a tu correo institucional para restablecer tu contraseña.
           </p>
         </div>
       }
@@ -58,7 +58,7 @@ export default function ForgotPassword() {
             fontFamily: 'var(--font-sans)',
           }}
         >
-          Recuperar contrasena
+          Recuperar contraseña
         </h2>
         <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 24px' }}>
           Ingresa tu email institucional y te enviaremos instrucciones.
@@ -80,7 +80,7 @@ export default function ForgotPassword() {
               }}
             >
               <Check size={16} style={{ marginTop: 2, flexShrink: 0 }} />
-              <span>Si el email esta registrado, recibiras instrucciones en breve.</span>
+              <span>Si el email está registrado, recibirás instrucciones en breve.</span>
             </div>
             {resetLink && (
               <div
@@ -123,7 +123,7 @@ export default function ForgotPassword() {
               }}
             >
               <ArrowLeft size={14} />
-              Volver al inicio de sesion
+              Volver al inicio de sesión
             </Link>
           </div>
         ) : (
@@ -146,7 +146,7 @@ export default function ForgotPassword() {
                 type="email"
                 placeholder="tu.nombre@est.umb.edu.co"
                 prefix={<Mail size={16} />}
-                ariaLabel="Correo electronico"
+                ariaLabel="Correo electrónico"
               />
             </div>
             <button
@@ -197,7 +197,7 @@ export default function ForgotPassword() {
               }}
             >
               <ArrowLeft size={14} />
-              Volver al inicio de sesion
+              Volver al inicio de sesión
             </Link>
           </form>
         )}

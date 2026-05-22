@@ -59,19 +59,19 @@ const DEFAULT_FILTERS: FiltersState = {
 }
 
 const REASON_LABELS: Record<string, string> = {
-  hallucination: 'Alucinacion',
-  harmful: 'Contenido danino',
+  hallucination: 'Alucinación',
+  harmful: 'Contenido dañino',
   privacy: 'Privacidad',
-  low_empathy: 'Baja empatia',
+  low_empathy: 'Baja empatía',
   other: 'Otro',
 }
 
-const REASON_CHIP_CLASSES: Record<string, string> = {
-  hallucination: 'bg-warning/10 text-warning border-warning/30',
-  harmful: 'bg-danger/10 text-danger border-danger/30',
-  privacy: 'bg-accent/10 text-accent border-accent/30',
-  low_empathy: 'bg-primary/10 text-primary border-primary/30',
-  other: 'bg-gray-100 text-text-primary/70 border-gray-300',
+const REASON_CHIP_STYLES: Record<string, React.CSSProperties> = {
+  hallucination: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  harmful: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  privacy: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37, 99, 235, 0.25)' },
+  low_empathy: { background: 'var(--mabel-50)', color: 'var(--mabel-700)', borderColor: 'var(--mabel-200)' },
+  other: { background: 'var(--ink-100)', color: 'var(--ink-600)', borderColor: 'var(--ink-200)' },
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -81,19 +81,19 @@ const STATUS_LABELS: Record<string, string> = {
   dismissed: 'Descartado',
 }
 
-const STATUS_CHIP_CLASSES: Record<string, string> = {
-  open: 'bg-danger/10 text-danger border-danger/30',
-  triaged: 'bg-warning/10 text-warning border-warning/30',
-  resolved: 'bg-success/10 text-success border-success/30',
-  dismissed: 'bg-gray-100 text-text-primary/60 border-gray-300',
+const STATUS_CHIP_STYLES: Record<string, React.CSSProperties> = {
+  open: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  triaged: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  resolved: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  dismissed: { background: 'var(--ink-100)', color: 'var(--ink-600)', borderColor: 'var(--ink-200)' },
 }
 
-const SEVERITY_BADGE_CLASSES: Record<number, string> = {
-  1: 'bg-success/15 text-success border-success/30',
-  2: 'bg-accent/15 text-accent border-accent/30',
-  3: 'bg-warning/15 text-warning border-warning/30',
-  4: 'bg-[#EA580C]/15 text-[#EA580C] border-[#EA580C]/30',
-  5: 'bg-danger/15 text-danger border-danger/30',
+const SEVERITY_BADGE_STYLES: Record<number, React.CSSProperties> = {
+  1: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  2: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37, 99, 235, 0.25)' },
+  3: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  4: { background: 'rgba(234, 88, 12, 0.10)', color: '#C2410C', borderColor: 'rgba(234, 88, 12, 0.30)' },
+  5: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
 }
 
 const TRANSITIONS: Record<string, ReportStatus[]> = {
@@ -154,17 +154,28 @@ function formatAverageDuration(ms: number | null): string {
   return `${days.toFixed(1)} d`
 }
 
+function chipBaseStyle(extra: React.CSSProperties): React.CSSProperties {
+  return {
+    padding: '2px 9px',
+    borderRadius: 9999,
+    fontSize: 11,
+    fontWeight: 600,
+    border: '1px solid',
+    letterSpacing: '0.02em',
+    whiteSpace: 'nowrap',
+    ...extra,
+  }
+}
+
 function ReasonChip({ reason }: { reason: string }) {
   const label = REASON_LABELS[reason] ?? reason
-  const cls =
-    REASON_CHIP_CLASSES[reason] ?? 'bg-gray-100 text-text-primary/70 border-gray-300'
+  const style = REASON_CHIP_STYLES[reason] ?? {
+    background: 'var(--ink-100)',
+    color: 'var(--ink-600)',
+    borderColor: 'var(--ink-200)',
+  }
   return (
-    <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border tracking-wide',
-        cls,
-      ].join(' ')}
-    >
+    <span className="inline-flex items-center" style={chipBaseStyle(style)}>
       {label}
     </span>
   )
@@ -172,30 +183,39 @@ function ReasonChip({ reason }: { reason: string }) {
 
 function StatusChip({ status }: { status: string }) {
   const label = STATUS_LABELS[status] ?? status
-  const cls =
-    STATUS_CHIP_CLASSES[status] ?? 'bg-gray-100 text-text-primary/60 border-gray-300'
+  const style = STATUS_CHIP_STYLES[status] ?? {
+    background: 'var(--ink-100)',
+    color: 'var(--ink-600)',
+    borderColor: 'var(--ink-200)',
+  }
   return (
-    <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border tracking-wide',
-        cls,
-      ].join(' ')}
-    >
+    <span className="inline-flex items-center" style={chipBaseStyle(style)}>
       {label}
     </span>
   )
 }
 
 function SeverityBadge({ severity }: { severity: number }) {
-  const cls =
-    SEVERITY_BADGE_CLASSES[severity] ?? 'bg-gray-100 text-text-primary/60 border-gray-300'
+  const style = SEVERITY_BADGE_STYLES[severity] ?? {
+    background: 'var(--ink-100)',
+    color: 'var(--ink-600)',
+    borderColor: 'var(--ink-200)',
+  }
   return (
     <span
-      className={[
-        'inline-flex items-center justify-center min-w-[28px] h-[22px] px-1.5 rounded-md text-[11px] font-semibold border tabular-nums',
-        cls,
-      ].join(' ')}
       aria-label={`Severidad ${severity}`}
+      className="inline-flex items-center justify-center"
+      style={{
+        minWidth: 28,
+        height: 22,
+        padding: '0 6px',
+        borderRadius: 6,
+        fontSize: 11,
+        fontWeight: 700,
+        border: '1px solid',
+        fontVariantNumeric: 'tabular-nums',
+        ...style,
+      }}
     >
       {severity}
     </span>
@@ -234,7 +254,7 @@ function ActionsForm({ current, reportId, onSuccess }: ActionFormProps) {
       const detail =
         e?.response?.data?.detail ??
         (e?.response?.status === 409
-          ? 'Transicion de estado no permitida.'
+          ? 'Transición de estado no permitida.'
           : 'No se pudo actualizar el reporte.')
       addToast({ type: 'error', message: detail })
     } finally {
@@ -290,7 +310,7 @@ function ActionsForm({ current, reportId, onSuccess }: ActionFormProps) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            placeholder="Contexto interno sobre la decision tomada"
+            placeholder="Contexto interno sobre la decisión tomada"
             className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-y"
           />
           <div className="flex items-center justify-end gap-2">
@@ -365,7 +385,7 @@ function ExpandedDetail({
         </p>
         {history.length === 0 ? (
           <p className="text-[12px] text-text-primary/50 italic">
-            Aun no hay notas registradas para este reporte.
+            Aún no hay notas registradas para este reporte.
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -397,7 +417,7 @@ function ExpandedDetail({
 
       {/* Privacy disclaimer */}
       <p className="text-[11px] text-text-primary/40 italic border-t border-gray-200 pt-2">
-        Por privacidad, el contenido del mensaje reportado no se muestra al administrador.
+        Por privacidad, el contenido del mensaje reportado no se muestra al administrador. D-03 preservado.
       </p>
     </div>
   )
@@ -590,16 +610,56 @@ export default function Reports() {
   }, [filters])
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
+    <div
+      className="fade-in"
+      style={{
+        padding: 32,
+        maxWidth: 1440,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
       {/* Header */}
-      <header className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+      <header
+        className="flex items-end justify-between flex-wrap"
+        style={{ gap: 16, marginBottom: 24 }}
+      >
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
-            Moderacion
+          <p
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.18em',
+              color: 'var(--mabel-700)',
+              opacity: 0.85,
+              margin: 0,
+            }}
+          >
+            Moderación
           </p>
-          <h1 className="text-2xl font-semibold text-text-primary mt-1">Reportes</h1>
-          <p className="text-sm text-text-primary/60 mt-1">
-            Triaje y resolucion de reportes de estudiantes sobre respuestas de Mabel IA.
+          <h1
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: 'var(--ink-900)',
+              marginTop: 6,
+              marginBottom: 0,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+            }}
+          >
+            Reportes
+          </h1>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: 'var(--ink-500)',
+              marginTop: 6,
+              marginBottom: 0,
+            }}
+          >
+            Triaje y resolución de reportes de estudiantes sobre respuestas de Mabel IA.
           </p>
         </div>
         <ExportCsvButton
@@ -663,10 +723,10 @@ export default function Reports() {
             className="border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           >
             <option value="todos">Todos</option>
-            <option value="hallucination">Alucinacion</option>
-            <option value="harmful">Contenido danino</option>
+            <option value="hallucination">Alucinación</option>
+            <option value="harmful">Contenido dañino</option>
             <option value="privacy">Privacidad</option>
-            <option value="low_empathy">Baja empatia</option>
+            <option value="low_empathy">Baja empatía</option>
             <option value="other">Otro</option>
           </select>
         </div>
@@ -689,7 +749,7 @@ export default function Reports() {
             <option value="2">2</option>
             <option value="3">3 — media</option>
             <option value="4">4</option>
-            <option value="5">5 — critica</option>
+            <option value="5">5 — crítica</option>
           </select>
         </div>
 
@@ -751,13 +811,33 @@ export default function Reports() {
       {errorMsg && (
         <div
           role="alert"
-          className="mb-4 border border-danger/30 bg-danger/5 rounded-lg px-4 py-3 text-sm text-danger flex items-center justify-between"
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--danger-200)',
+            background: 'var(--danger-50)',
+            borderRadius: 'var(--r-lg)',
+            padding: '12px 16px',
+            fontSize: 13,
+            color: 'var(--danger-700)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
         >
           <span>{errorMsg}</span>
           <button
             type="button"
             onClick={fetchReports}
-            className="text-xs font-semibold underline hover:no-underline"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--danger-700)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
           >
             Reintentar
           </button>
@@ -776,7 +856,7 @@ export default function Reports() {
         emptyMessage={
           activeFilterCount > 0
             ? 'No se encontraron reportes con los filtros aplicados.'
-            : 'No hay reportes registrados todavia.'
+            : 'No hay reportes registrados todavía.'
         }
       />
 

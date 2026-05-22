@@ -15,7 +15,7 @@ type TabKey = 'usage' | 'wellbeing' | 'technical' | 'safety' | 'study'
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'usage', label: 'Uso' },
   { key: 'wellbeing', label: 'Bienestar' },
-  { key: 'technical', label: 'Tecnicas' },
+  { key: 'technical', label: 'Técnicas' },
   { key: 'safety', label: 'Seguridad' },
   { key: 'study', label: 'Estudio' },
 ]
@@ -91,7 +91,7 @@ function useTabFetch<T>(
       .catch((err) => {
         if (cancelled) return
         const e = err as { response?: { data?: { detail?: string } } }
-        setError(e?.response?.data?.detail ?? 'No se pudo cargar la metrica.')
+        setError(e?.response?.data?.detail ?? 'No se pudo cargar la métrica.')
         setData(null)
       })
       .finally(() => {
@@ -117,7 +117,7 @@ function TabState({
   if (loading) {
     return (
       <div className="bg-white border border-gray-200 rounded-lg px-4 py-10 text-center text-sm text-text-primary/50">
-        Cargando metricas...
+        Cargando métricas...
       </div>
     )
   }
@@ -177,7 +177,7 @@ function TabUsage({
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <MetricCard
-          label="Mensajes por sesion"
+          label="Mensajes por sesión"
           value={
             data!.avg_messages_per_session == null
               ? '—'
@@ -186,13 +186,13 @@ function TabUsage({
           hint="Promedio en el rango"
         />
         <MetricCard
-          label="Duracion promedio"
+          label="Duración promedio"
           value={
             data!.avg_session_duration_minutes == null
               ? '—'
               : `${data!.avg_session_duration_minutes.toFixed(1)} min`
           }
-          hint="Tiempo promedio por sesion"
+          hint="Tiempo promedio por sesión"
         />
       </div>
 
@@ -209,7 +209,7 @@ function TabUsage({
           />
         </ChartCard>
         <ChartCard
-          title="Distribucion de sesiones por usuario"
+          title="Distribución de sesiones por usuario"
           subtitle="Buckets de frecuencia"
         >
           <BarChartWrapper
@@ -303,7 +303,7 @@ function TabWellbeing({
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <ChartCard title="Animo y sueno por dia" subtitle="Promedios diarios">
+          <ChartCard title="Ánimo y sueño por día" subtitle="Promedios diarios">
             <LineChartWrapper
               data={moodSleepData}
               lines={[
@@ -757,7 +757,7 @@ function TabStudy({
             height={260}
           />
         </ChartCard>
-        <ChartCard title="Distribucion de empatia" subtitle="Calificaciones 1-5">
+        <ChartCard title="Distribución de empatía" subtitle="Calificaciones 1-5">
           <BarChartWrapper
             data={data!.empathy_distribution.map((b) => ({
               score: String(b.score),
@@ -777,7 +777,7 @@ function TabStudy({
             Comparacion bienestar pre / post
           </h3>
           <p className="text-[11px] text-text-primary/50 mt-0.5">
-            Estadistica inferencial con pares emparejados por usuario
+            Estadística inferencial con pares emparejados por usuario
           </p>
         </div>
         {comparisons.length === 0 ? (
@@ -809,8 +809,8 @@ function fmt2(v: number | null | undefined): string {
 }
 
 function testLabel(t: StudyComparison['test_used']): string {
-  if (t === 'paired_t') return 'Paired t-test (parametrico)'
-  if (t === 'wilcoxon') return 'Wilcoxon signed-rank (no parametrico)'
+  if (t === 'paired_t') return 'Paired t-test (paramétrico)'
+  if (t === 'wilcoxon') return 'Wilcoxon signed-rank (no paramétrico)'
   return '—'
 }
 
@@ -928,7 +928,7 @@ function ComparisonCard({ comparison }: { comparison: StudyComparison }) {
 
       <div className="space-y-2.5 text-[12px]">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-text-primary/50">Test estadistico</span>
+          <span className="text-text-primary/50">Test estadístico</span>
           <span className="text-text-primary font-medium text-right">
             {testLabel(c.test_used)}
           </span>
@@ -1024,7 +1024,7 @@ export default function Metrics() {
 
   function applyRange() {
     if (!draft.from || !draft.to) {
-      addToast({ type: 'error', message: 'Selecciona un rango de fechas valido.' })
+      addToast({ type: 'error', message: 'Selecciona un rango de fechas válido.' })
       return
     }
     if (draft.from > draft.to) {
@@ -1043,16 +1043,56 @@ export default function Metrics() {
   }
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
+    <div
+      className="fade-in"
+      style={{
+        padding: 32,
+        maxWidth: 1440,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
       {/* Header */}
-      <header className="mb-5 flex items-end justify-between gap-4 flex-wrap">
+      <header
+        className="flex items-end justify-between flex-wrap"
+        style={{ gap: 16, marginBottom: 24 }}
+      >
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
+          <p
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.18em',
+              color: 'var(--mabel-700)',
+              opacity: 0.85,
+              margin: 0,
+            }}
+          >
             Estudio cuasiexperimental
           </p>
-          <h1 className="text-2xl font-semibold text-text-primary mt-1">Metricas</h1>
-          <p className="text-sm text-text-primary/60 mt-1">
-            Indicadores de uso, bienestar, tecnicos, seguridad y estudio.
+          <h1
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: 'var(--ink-900)',
+              marginTop: 6,
+              marginBottom: 0,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+            }}
+          >
+            Métricas
+          </h1>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: 'var(--ink-500)',
+              marginTop: 6,
+              marginBottom: 0,
+            }}
+          >
+            Indicadores de uso, bienestar, técnicos, seguridad y estudio.
           </p>
         </div>
         <ExportCsvButton
@@ -1177,7 +1217,12 @@ export default function Metrics() {
           {cohortParam && (
             <div className="mt-0.5">
               Cohorte:{' '}
-              <span className="font-medium text-accent font-mono">{cohortParam}</span>
+              <span
+                className="font-mono font-medium"
+                style={{ color: 'var(--mabel-700)' }}
+              >
+                {cohortParam}
+              </span>
             </div>
           )}
         </div>
@@ -1186,7 +1231,7 @@ export default function Metrics() {
       {/* Tabs */}
       <nav
         role="tablist"
-        aria-label="Tabs de metricas"
+        aria-label="Tabs de métricas"
         className="flex flex-wrap items-center gap-1 bg-white border border-gray-200 rounded-lg p-1 mb-4 w-fit"
       >
         {TABS.map((t) => {

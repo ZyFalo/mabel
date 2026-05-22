@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Outlet } from 'react-router-dom'
+import { Navigate, Outlet, useOutletContext } from 'react-router-dom'
 import apiClient from '../api/client'
 
 export default function ConsentGuard() {
+  // Forward whatever context the parent layout passes (e.g. StudentLayout's
+  // `openCrisis`) so deeper children can still consume it via
+  // `useOutletContext`. Without this, the intermediate <Outlet /> drops it.
+  const parentContext = useOutletContext()
   const [status, setStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -26,5 +30,5 @@ export default function ConsentGuard() {
     return <Navigate to="/consent-required" replace />
   }
 
-  return <Outlet />
+  return <Outlet context={parentContext} />
 }

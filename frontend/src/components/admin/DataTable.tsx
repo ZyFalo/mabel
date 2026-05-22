@@ -18,6 +18,8 @@ interface DataTableProps<T> {
   renderExpanded?: (row: T) => ReactNode
   loading?: boolean
   emptyMessage?: string
+  /** Optional toolbar rendered above the table inside the same wrapper. */
+  toolbar?: ReactNode
 }
 
 type SortDir = 'asc' | 'desc'
@@ -35,6 +37,7 @@ export default function DataTable<T>({
   renderExpanded,
   loading,
   emptyMessage = 'Sin resultados',
+  toolbar,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<SortState | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
@@ -65,11 +68,13 @@ export default function DataTable<T>({
     if (!sort) return rows
     const col = columns.find((c) => c.key === sort.key)
     if (!col) return rows
-    const extractor = col.sortValue ?? ((row: T) => {
-      const v = col.accessor(row)
-      if (typeof v === 'string' || typeof v === 'number') return v
-      return null
-    })
+    const extractor =
+      col.sortValue ??
+      ((row: T) => {
+        const v = col.accessor(row)
+        if (typeof v === 'string' || typeof v === 'number') return v
+        return null
+      })
     const copy = [...rows]
     copy.sort((a, b) => {
       const va = extractor(a)
@@ -87,29 +92,62 @@ export default function DataTable<T>({
   const colCount = columns.length + (renderExpanded ? 1 : 0)
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+    <div
+      style={{
+        background: 'var(--white)',
+        border: '1px solid var(--ink-200)',
+        borderRadius: 'var(--r-lg)',
+        overflow: 'hidden',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
+      {toolbar && (
+        <div
+          style={{
+            background: 'var(--ink-50)',
+            borderBottom: '1px solid var(--ink-100)',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          {toolbar}
+        </div>
+      )}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+        <table className="w-full" style={{ fontSize: 13, borderCollapse: 'collapse' }}>
+          <thead style={{ background: 'var(--ink-50)' }}>
             <tr>
-              {renderExpanded && <th className="w-10" aria-label="Expandir" />}
+              {renderExpanded && <th style={{ width: 36 }} aria-label="Expandir" />}
               {columns.map((col) => {
                 const isSorted = sort?.key === col.key
                 return (
                   <th
                     key={col.key}
-                    className={[
-                      'text-left text-[11px] font-semibold uppercase tracking-wider text-text-primary/60 px-4 py-3',
-                      col.sortable ? 'cursor-pointer select-none hover:text-text-primary' : '',
-                      col.className ?? '',
-                    ].join(' ')}
                     onClick={() => toggleSort(col)}
                     aria-sort={isSorted ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+                    className={col.className ?? ''}
+                    style={{
+                      textAlign: 'left',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: 'var(--ink-500)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.14em',
+                      padding: '10px 16px',
+                      cursor: col.sortable ? 'pointer' : 'default',
+                      userSelect: 'none',
+                      borderBottom: '1px solid var(--ink-200)',
+                      whiteSpace: 'nowrap',
+                    }}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center" style={{ gap: 4 }}>
                       {col.header}
                       {col.sortable && (
-                        <span className="text-text-primary/40 text-[10px] leading-none">
+                        <span style={{ color: 'var(--ink-400)', fontSize: 9, lineHeight: 1 }}>
                           {isSorted ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
                         </span>
                       )}
@@ -122,13 +160,29 @@ export default function DataTable<T>({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={colCount} className="px-4 py-10 text-center text-text-primary/50">
-                  Cargando...
+                <td
+                  colSpan={colCount}
+                  style={{
+                    padding: '40px 16px',
+                    textAlign: 'center',
+                    color: 'var(--ink-400)',
+                    fontSize: 13,
+                  }}
+                >
+                  Cargando…
                 </td>
               </tr>
             ) : sortedRows.length === 0 ? (
               <tr>
-                <td colSpan={colCount} className="px-4 py-10 text-center text-text-primary/50">
+                <td
+                  colSpan={colCount}
+                  style={{
+                    padding: '40px 16px',
+                    textAlign: 'center',
+                    color: 'var(--ink-400)',
+                    fontSize: 13,
+                  }}
+                >
                   {emptyMessage}
                 </td>
               </tr>
@@ -139,23 +193,54 @@ export default function DataTable<T>({
                 return (
                   <Fragment key={key}>
                     <tr
-                      className={[
-                        'border-b border-gray-100 last:border-b-0',
-                        onRowClick ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50/60',
-                      ].join(' ')}
                       onClick={() => onRowClick?.(row)}
+                      style={{
+                        cursor: onRowClick ? 'pointer' : 'default',
+                        transition: 'background var(--dur-fast) var(--ease-out)',
+                      }}
+                      onMouseEnter={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.background = 'rgba(244, 237, 236, 0.55)'
+                      }}
+                      onMouseLeave={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                      }}
                     >
                       {renderExpanded && (
-                        <td className="px-2 py-3 align-middle">
+                        <td
+                          style={{
+                            padding: '10px 8px',
+                            verticalAlign: 'middle',
+                            borderBottom: '1px solid var(--ink-100)',
+                          }}
+                        >
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                               toggleExpanded(key)
                             }}
-                            className="w-6 h-6 inline-flex items-center justify-center rounded text-text-primary/60 hover:bg-gray-100 hover:text-text-primary text-xs"
                             aria-label={isExpanded ? 'Colapsar fila' : 'Expandir fila'}
                             aria-expanded={isExpanded}
+                            style={{
+                              width: 24,
+                              height: 24,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 6,
+                              color: 'var(--ink-500)',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: 11,
+                              transition: 'background var(--dur-fast) var(--ease-out)',
+                            }}
+                            onMouseEnter={(e) => {
+                              ;(e.currentTarget as HTMLElement).style.background = 'var(--ink-100)'
+                            }}
+                            onMouseLeave={(e) => {
+                              ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                            }}
                           >
                             {isExpanded ? '▾' : '▸'}
                           </button>
@@ -164,15 +249,32 @@ export default function DataTable<T>({
                       {columns.map((col) => (
                         <td
                           key={col.key}
-                          className={['px-4 py-3 align-middle text-text-primary', col.className ?? ''].join(' ')}
+                          className={col.className ?? ''}
+                          style={{
+                            padding: '10px 16px',
+                            verticalAlign: 'middle',
+                            color: 'var(--ink-900)',
+                            borderBottom: '1px solid var(--ink-100)',
+                            fontSize: 13,
+                          }}
                         >
                           {col.accessor(row)}
                         </td>
                       ))}
                     </tr>
                     {renderExpanded && isExpanded && (
-                      <tr className="bg-gray-50/70 border-b border-gray-100">
-                        <td colSpan={colCount} className="px-6 py-4">
+                      <tr
+                        style={{
+                          background: 'var(--ink-50)',
+                        }}
+                      >
+                        <td
+                          colSpan={colCount}
+                          style={{
+                            padding: '16px 24px',
+                            borderBottom: '1px solid var(--ink-100)',
+                          }}
+                        >
                           {renderExpanded(row)}
                         </td>
                       </tr>

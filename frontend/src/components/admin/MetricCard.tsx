@@ -8,17 +8,23 @@ interface MetricCardProps {
   onClick?: () => void
 }
 
-const THRESHOLD_STYLES: Record<NonNullable<MetricCardProps['threshold']>, { value: string; dot: string }> = {
-  green: { value: 'text-success', dot: 'bg-success' },
-  yellow: { value: 'text-warning', dot: 'bg-warning' },
-  red: { value: 'text-danger', dot: 'bg-danger' },
+const THRESHOLD_DOT: Record<NonNullable<MetricCardProps['threshold']>, string> = {
+  green: 'var(--success-600)',
+  yellow: 'var(--warn-600)',
+  red: 'var(--danger-600)',
+}
+
+const THRESHOLD_VALUE_COLOR: Record<NonNullable<MetricCardProps['threshold']>, string> = {
+  green: 'var(--ink-900)',
+  yellow: 'var(--ink-900)',
+  red: 'var(--danger-700)',
 }
 
 function TrendIcon({ trend }: { trend: NonNullable<MetricCardProps['trend']> }) {
   if (trend === 'up') {
     return (
-      <span aria-label="Tendencia al alza" className="inline-flex items-center text-success text-xs">
-        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+      <span aria-label="Tendencia al alza" style={{ color: 'var(--success-600)', display: 'inline-flex' }}>
+        <svg width={12} height={12} viewBox="0 0 12 12" fill="none">
           <path d="M2 8L6 4L10 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
@@ -26,16 +32,16 @@ function TrendIcon({ trend }: { trend: NonNullable<MetricCardProps['trend']> }) 
   }
   if (trend === 'down') {
     return (
-      <span aria-label="Tendencia a la baja" className="inline-flex items-center text-danger text-xs">
-        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+      <span aria-label="Tendencia a la baja" style={{ color: 'var(--danger-600)', display: 'inline-flex' }}>
+        <svg width={12} height={12} viewBox="0 0 12 12" fill="none">
           <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
     )
   }
   return (
-    <span aria-label="Tendencia estable" className="inline-flex items-center text-text-primary/50 text-xs">
-      <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+    <span aria-label="Tendencia estable" style={{ color: 'var(--ink-400)', display: 'inline-flex' }}>
+      <svg width={12} height={12} viewBox="0 0 12 12" fill="none">
         <path d="M2 6H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     </span>
@@ -51,45 +57,123 @@ export default function MetricCard({
   hint,
   onClick,
 }: MetricCardProps) {
-  const tStyle = threshold ? THRESHOLD_STYLES[threshold] : null
+  const dotColor = threshold ? THRESHOLD_DOT[threshold] : null
+  const valueColor = threshold ? THRESHOLD_VALUE_COLOR[threshold] : 'var(--ink-900)'
   const Container = onClick ? 'button' : 'div'
 
   return (
     <Container
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={[
-        'bg-white border border-gray-200 rounded-lg p-4 flex flex-col gap-2 text-left w-full',
-        onClick ? 'hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer' : '',
-      ].join(' ')}
+      className="text-left w-full fade-in"
+      style={{
+        background: 'var(--white)',
+        border: '1px solid var(--ink-200)',
+        borderRadius: 'var(--r-lg)',
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        cursor: onClick ? 'pointer' : 'default',
+        transition:
+          'border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out)',
+        fontFamily: 'var(--font-sans)',
+      }}
+      onMouseEnter={
+        onClick
+          ? (e) => {
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--mabel-300)'
+              ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-brand)'
+            }
+          : undefined
+      }
+      onMouseLeave={
+        onClick
+          ? (e) => {
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--ink-200)'
+              ;(e.currentTarget as HTMLElement).style.boxShadow = 'none'
+            }
+          : undefined
+      }
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          {tStyle && <span className={`w-2 h-2 rounded-full ${tStyle.dot} shrink-0`} aria-hidden="true" />}
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-text-primary/60 truncate">
-            {label}
-          </p>
-        </div>
+      <div className="flex items-start justify-between" style={{ gap: 8 }}>
+        <p
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: 'var(--ink-500)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.14em',
+            margin: 0,
+            lineHeight: 1.4,
+          }}
+          className="truncate"
+        >
+          {label}
+        </p>
         {badge && (
-          <span className="px-2 py-0.5 bg-accent/10 text-accent text-[10px] rounded-full font-medium shrink-0">
+          <span
+            style={{
+              flexShrink: 0,
+              padding: '2px 8px',
+              background: 'var(--success-50)',
+              color: 'var(--success-700)',
+              border: '1px solid var(--success-200)',
+              borderRadius: 9999,
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.02em',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {badge}
           </span>
         )}
       </div>
 
-      <div className="flex items-baseline gap-2">
+      <div className="flex items-baseline" style={{ gap: 8 }}>
+        {dotColor && (
+          <span
+            aria-hidden
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: dotColor,
+              display: 'inline-block',
+              alignSelf: 'center',
+              flexShrink: 0,
+            }}
+          />
+        )}
         <span
-          className={[
-            'text-3xl font-semibold leading-none tabular-nums',
-            tStyle ? tStyle.value : 'text-text-primary',
-          ].join(' ')}
+          style={{
+            fontSize: 28,
+            lineHeight: 1.05,
+            fontWeight: 700,
+            color: valueColor,
+            fontFeatureSettings: '"tnum"',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '-0.02em',
+          }}
         >
           {value}
         </span>
         {trend && <TrendIcon trend={trend} />}
       </div>
 
-      {hint && <p className="text-xs text-text-primary/50">{hint}</p>}
+      {hint && (
+        <p
+          style={{
+            fontSize: 11.5,
+            color: 'var(--ink-500)',
+            margin: 0,
+            lineHeight: 1.45,
+          }}
+        >
+          {hint}
+        </p>
+      )}
     </Container>
   )
 }

@@ -58,18 +58,18 @@ const STATUS_LABELS: Record<string, string> = {
   resolved: 'Resuelto',
 }
 
-const STATUS_CHIP_CLASSES: Record<string, string> = {
-  active: 'bg-danger/10 text-danger border-danger/30',
-  reviewed: 'bg-warning/10 text-warning border-warning/30',
-  resolved: 'bg-success/10 text-success border-success/30',
+const STATUS_CHIP_STYLES: Record<string, React.CSSProperties> = {
+  active: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  reviewed: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  resolved: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
 }
 
-const SEVERITY_BADGE_CLASSES: Record<number, string> = {
-  1: 'bg-success/15 text-success border-success/30',
-  2: 'bg-accent/15 text-accent border-accent/30',
-  3: 'bg-warning/15 text-warning border-warning/30',
-  4: 'bg-[#EA580C]/15 text-[#EA580C] border-[#EA580C]/30',
-  5: 'bg-danger/15 text-danger border-danger/30',
+const SEVERITY_BADGE_STYLES: Record<number, React.CSSProperties> = {
+  1: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  2: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37, 99, 235, 0.25)' },
+  3: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  4: { background: 'rgba(234, 88, 12, 0.10)', color: '#C2410C', borderColor: 'rgba(234, 88, 12, 0.30)' },
+  5: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
 }
 
 const TRANSITIONS: Record<string, EventStatus[]> = {
@@ -134,14 +134,24 @@ function sanitizePayload(input: unknown): unknown {
 
 function StatusChip({ status }: { status: string }) {
   const label = STATUS_LABELS[status] ?? status
-  const cls =
-    STATUS_CHIP_CLASSES[status] ?? 'bg-gray-100 text-text-primary/60 border-gray-300'
+  const style: React.CSSProperties = STATUS_CHIP_STYLES[status] ?? {
+    background: 'var(--ink-100)',
+    color: 'var(--ink-600)',
+    borderColor: 'var(--ink-200)',
+  }
   return (
     <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border tracking-wide',
-        cls,
-      ].join(' ')}
+      className="inline-flex items-center"
+      style={{
+        padding: '2px 9px',
+        borderRadius: 9999,
+        fontSize: 11,
+        fontWeight: 600,
+        border: '1px solid',
+        letterSpacing: '0.02em',
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
     >
       {label}
     </span>
@@ -150,17 +160,28 @@ function StatusChip({ status }: { status: string }) {
 
 function SeverityBadge({ severity }: { severity: number | null }) {
   if (severity == null) {
-    return <span className="text-text-primary/40 text-sm">—</span>
+    return <span style={{ color: 'var(--ink-400)', fontSize: 13 }}>—</span>
   }
-  const cls =
-    SEVERITY_BADGE_CLASSES[severity] ?? 'bg-gray-100 text-text-primary/60 border-gray-300'
+  const style: React.CSSProperties = SEVERITY_BADGE_STYLES[severity] ?? {
+    background: 'var(--ink-100)',
+    color: 'var(--ink-600)',
+    borderColor: 'var(--ink-200)',
+  }
   return (
     <span
-      className={[
-        'inline-flex items-center justify-center min-w-[28px] h-[22px] px-1.5 rounded-md text-[11px] font-semibold border tabular-nums',
-        cls,
-      ].join(' ')}
       aria-label={`Severidad ${severity}`}
+      className="inline-flex items-center justify-center"
+      style={{
+        minWidth: 28,
+        height: 22,
+        padding: '0 6px',
+        borderRadius: 6,
+        fontSize: 11,
+        fontWeight: 700,
+        border: '1px solid',
+        fontVariantNumeric: 'tabular-nums',
+        ...style,
+      }}
     >
       {severity}
     </span>
@@ -169,7 +190,21 @@ function SeverityBadge({ severity }: { severity: number | null }) {
 
 function EventTypeChip({ eventType }: { eventType: string }) {
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border bg-accent/10 text-accent border-accent/30 tracking-wide font-mono">
+    <span
+      className="inline-flex items-center"
+      style={{
+        padding: '2px 9px',
+        borderRadius: 9999,
+        fontSize: 11,
+        fontWeight: 600,
+        border: '1px solid var(--ink-200)',
+        background: 'var(--ink-50)',
+        color: 'var(--ink-700)',
+        fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+        letterSpacing: '0.01em',
+        whiteSpace: 'nowrap',
+      }}
+    >
       {eventType}
     </span>
   )
@@ -210,7 +245,7 @@ function ActionsForm({ current, eventId, onSuccess }: ActionFormProps) {
       const detail =
         e?.response?.data?.detail ??
         (e?.response?.status === 409
-          ? 'Transicion de estado no permitida.'
+          ? 'Transición de estado no permitida.'
           : 'No se pudo actualizar el evento de seguridad.')
       addToast({ type: 'error', message: detail })
     } finally {
@@ -220,7 +255,7 @@ function ActionsForm({ current, eventId, onSuccess }: ActionFormProps) {
 
   if (allowed.length === 0) {
     return (
-      <div className="text-[12px] text-text-primary/50 italic">
+      <div style={{ fontSize: 12, color: 'var(--ink-400)', fontStyle: 'italic' }}>
         Sin transiciones disponibles para este estado.
       </div>
     )
@@ -266,7 +301,7 @@ function ActionsForm({ current, eventId, onSuccess }: ActionFormProps) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            placeholder="Contexto interno sobre la revision realizada"
+            placeholder="Contexto interno sobre la revisión realizada"
             className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-y"
           />
           <div className="flex items-center justify-end gap-2">
@@ -325,7 +360,7 @@ function ExpandedDetail({
         </div>
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-text-primary/50">
-            Sesion
+            Sesión
           </p>
           <p className="font-mono text-text-primary/80">
             {row.session_id_truncated ?? '—'}
@@ -364,7 +399,7 @@ function ExpandedDetail({
         </p>
         {history.length === 0 ? (
           <p className="text-[12px] text-text-primary/50 italic">
-            Aun no hay revisiones registradas para este evento.
+            Aún no hay revisiones registradas para este evento.
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -395,8 +430,17 @@ function ExpandedDetail({
       <ActionsForm current={row.status} eventId={row.id} onSuccess={onUpdated} />
 
       {/* Privacy disclaimer */}
-      <p className="text-[11px] text-text-primary/40 italic border-t border-gray-200 pt-2">
-        El contenido del mensaje que activo el evento no se expone al administrador.
+      <p
+        style={{
+          fontSize: 11,
+          color: 'var(--ink-400)',
+          fontStyle: 'italic',
+          borderTop: '1px solid var(--ink-200)',
+          paddingTop: 10,
+          margin: 0,
+        }}
+      >
+        El contenido del mensaje que activó el evento no se expone al administrador.
       </p>
     </div>
   )
@@ -480,7 +524,9 @@ export default function SafetyEvents() {
         sortable: true,
         sortValue: (row) => row.created_at,
         accessor: (row) => (
-          <span className="text-sm text-text-primary/80 tabular-nums">
+          <span
+            style={{ fontSize: 13, color: 'var(--ink-700)', fontVariantNumeric: 'tabular-nums' }}
+          >
             {formatDateTime(row.created_at)}
           </span>
         ),
@@ -504,9 +550,16 @@ export default function SafetyEvents() {
       },
       {
         key: 'session',
-        header: 'Sesion',
+        header: 'Sesión',
         accessor: (row) => (
-          <span className="font-mono text-[11px] text-text-primary/70 tracking-tight">
+          <span
+            style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+              fontSize: 11,
+              color: 'var(--ink-600)',
+              letterSpacing: '-0.01em',
+            }}
+          >
             {row.session_id_truncated ?? '—'}
           </span>
         ),
@@ -544,16 +597,56 @@ export default function SafetyEvents() {
   }, [filters])
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
+    <div
+      className="fade-in"
+      style={{
+        padding: 32,
+        maxWidth: 1440,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
       {/* Header */}
-      <header className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+      <header
+        className="flex items-end justify-between flex-wrap"
+        style={{ gap: 16, marginBottom: 24 }}
+      >
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
-            Seguridad
+          <p
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.18em',
+              color: 'var(--mabel-700)',
+              opacity: 0.85,
+              margin: 0,
+            }}
+          >
+            Vigilancia operativa
           </p>
-          <h1 className="text-2xl font-semibold text-text-primary mt-1">Eventos de seguridad</h1>
-          <p className="text-sm text-text-primary/60 mt-1">
-            Eventos generados por el sistema de guardrails y deteccion de riesgo.
+          <h1
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: 'var(--ink-900)',
+              marginTop: 6,
+              marginBottom: 0,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+            }}
+          >
+            Safety events
+          </h1>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: 'var(--ink-500)',
+              marginTop: 6,
+              marginBottom: 0,
+            }}
+          >
+            Eventos generados por el sistema de guardrails y detección de riesgo.
           </p>
         </div>
         <ExportCsvButton
@@ -608,7 +701,7 @@ export default function SafetyEvents() {
             <option value="2">2</option>
             <option value="3">3 — media</option>
             <option value="4">4</option>
-            <option value="5">5 — critica</option>
+            <option value="5">5 — crítica</option>
           </select>
         </div>
 
@@ -669,13 +762,33 @@ export default function SafetyEvents() {
       {errorMsg && (
         <div
           role="alert"
-          className="mb-4 border border-danger/30 bg-danger/5 rounded-lg px-4 py-3 text-sm text-danger flex items-center justify-between"
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--danger-200)',
+            background: 'var(--danger-50)',
+            borderRadius: 'var(--r-lg)',
+            padding: '12px 16px',
+            fontSize: 13,
+            color: 'var(--danger-700)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
         >
           <span>{errorMsg}</span>
           <button
             type="button"
             onClick={fetchEvents}
-            className="text-xs font-semibold underline hover:no-underline"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--danger-700)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
           >
             Reintentar
           </button>
@@ -694,7 +807,7 @@ export default function SafetyEvents() {
         emptyMessage={
           activeFilterCount > 0
             ? 'No se encontraron eventos con los filtros aplicados.'
-            : 'No hay eventos de seguridad registrados todavia.'
+            : 'No hay eventos de seguridad registrados todavía.'
         }
       />
 

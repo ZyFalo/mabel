@@ -99,7 +99,7 @@ export default function Onboarding() {
             }}
           >
             <Sparkles size={13} />
-            Configuracion inicial
+            Configuración inicial
           </div>
           <h1
             style={{
@@ -114,7 +114,7 @@ export default function Onboarding() {
             Personaliza tu<br />experiencia.
           </h1>
           <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.6 }}>
-            Ajusta privacidad, accesibilidad y voz a la medida. Podras cambiar todo despues desde
+            Ajusta privacidad, accesibilidad y voz a la medida. Podrás cambiar todo después desde
             Ajustes.
           </p>
         </div>
@@ -193,7 +193,7 @@ export default function Onboarding() {
                 Privacidad
               </h2>
               <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 22px', lineHeight: 1.55 }}>
-                Configura como Mabel IA maneja tu informacion.
+                Configura cómo Mabel IA maneja tu información.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -210,7 +210,7 @@ export default function Onboarding() {
                       Guardar historial de conversaciones
                     </p>
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
-                      Si esta desactivado, los mensajes no se guardan despues de cerrar la sesion.
+                      Si está desactivado, los mensajes no se guardan después de cerrar la sesión.
                     </p>
                   </div>
                   <Toggle
@@ -235,7 +235,7 @@ export default function Onboarding() {
                       Check-in emocional al inicio
                     </p>
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
-                      Te preguntaremos como te sientes antes de iniciar la conversacion.
+                      Te preguntaremos cómo te sientes antes de iniciar la conversación.
                     </p>
                   </div>
                   <Toggle
@@ -302,14 +302,14 @@ export default function Onboarding() {
                       margin: '0 0 10px',
                     }}
                   >
-                    Tamano de fuente
+                    Tamaño de fuente
                   </p>
                   <Segmented
-                    ariaLabel="Tamano de fuente"
+                    ariaLabel="Tamaño de fuente"
                     value={form.font_size}
                     onChange={(v) => update('font_size', v)}
                     options={[
-                      { value: 'small', label: 'Pequena', icon: Type },
+                      { value: 'small', label: 'Pequeña', icon: Type },
                       { value: 'normal', label: 'Normal', icon: Type },
                       { value: 'large', label: 'Grande', icon: Type },
                     ]}
@@ -328,7 +328,7 @@ export default function Onboarding() {
                 >
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
-                      Subtitulos TTS
+                      Subtítulos TTS
                     </p>
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Resalta el texto mientras Mabel habla.
@@ -337,7 +337,7 @@ export default function Onboarding() {
                   <Toggle
                     checked={form.subtitles}
                     onChange={(v) => update('subtitles', v)}
-                    label="Subtitulos"
+                    label="Subtítulos"
                   />
                 </div>
               </div>
@@ -360,7 +360,7 @@ export default function Onboarding() {
                 Voz
               </h2>
               <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 22px', lineHeight: 1.55 }}>
-                Configura como suena Mabel IA.
+                Configura cómo suena Mabel IA.
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -398,14 +398,14 @@ export default function Onboarding() {
                       margin: '0 0 10px',
                     }}
                   >
-                    Modo de interaccion
+                    Modo de interacción
                   </p>
                   <Segmented
-                    ariaLabel="Modo de interaccion"
+                    ariaLabel="Modo de interacción"
                     value={form.preferred_chat_mode}
                     onChange={(v) => update('preferred_chat_mode', v)}
                     options={[
-                      { value: 'chat', label: 'Chat clasico', icon: MonitorSmartphone },
+                      { value: 'chat', label: 'Chat clásico', icon: MonitorSmartphone },
                       { value: 'avatar', label: 'Avatar 3D', icon: Bot },
                     ]}
                   />

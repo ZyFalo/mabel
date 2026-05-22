@@ -26,7 +26,7 @@ export default function ConsentRejected() {
               fontFamily: 'var(--font-sans)',
             }}
           >
-            Respetamos tu<br />decision.
+            Respetamos tu<br />decisión.
           </h1>
           <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 380, lineHeight: 1.55 }}>
             El consentimiento informado es necesario para utilizar Mabel IA bajo la Ley 1581/2012.
@@ -78,7 +78,7 @@ export default function ConsentRejected() {
         >
           De acuerdo con la Ley 1581 de 2012, el consentimiento informado es necesario para utilizar
           Mabel IA, ya que el sistema procesa datos personales como parte de un proyecto de
-          investigacion academica.
+          investigación académica.
         </p>
 
         <div
@@ -112,7 +112,7 @@ export default function ConsentRejected() {
           >
             {[
               'Acceder al asistente de apoyo psicoeducativo',
-              'Recibir orientacion sobre bienestar emocional',
+              'Recibir orientación sobre bienestar emocional',
               'Utilizar herramientas de check-in y seguimiento',
               'Revocar el consentimiento en cualquier momento',
             ].map((item, i) => (
@@ -187,7 +187,7 @@ export default function ConsentRejected() {
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-100)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
-            Cerrar sesion
+            Cerrar sesión
           </button>
         </div>
 
@@ -200,7 +200,7 @@ export default function ConsentRejected() {
             lineHeight: 1.5,
           }}
         >
-          Si tienes preguntas, contacta al equipo de investigacion a traves de los canales
+          Si tienes preguntas, contacta al equipo de investigación a través de los canales
           institucionales de la UMB.
         </p>
       </div>

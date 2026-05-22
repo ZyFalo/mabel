@@ -218,7 +218,7 @@ function ConsentSection() {
     if (!form.version.trim() || !form.title.trim() || !form.body.trim()) {
       addToast({
         type: 'warning',
-        message: 'Completa version, titulo y contenido antes de crear el borrador.',
+        message: 'Completa versión, título y contenido antes de crear el borrador.',
       })
       return
     }
@@ -247,14 +247,14 @@ function ConsentSection() {
     setPublishing(true)
     try {
       await apiClient.post(`/admin/consent-versions/${id}/publish`)
-      addToast({ type: 'success', message: 'Version publicada como activa.' })
+      addToast({ type: 'success', message: 'Versión publicada como activa.' })
       setConfirmPublishId(null)
       await loadVersions()
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } }
       addToast({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'No se pudo publicar la version.',
+        message: e?.response?.data?.detail ?? 'No se pudo publicar la versión.',
       })
     } finally {
       setPublishing(false)
@@ -265,7 +265,7 @@ function ConsentSection() {
     <SectionCard
       index="01"
       title="Consentimiento informado"
-      description="Gestiona la version activa del documento legal y publica nuevas versiones."
+      description="Gestiona la versión activa del documento legal y publica nuevas versiones."
     >
       {loading ? (
         <p className="text-sm text-text-primary/50">Cargando...</p>
@@ -287,7 +287,7 @@ function ConsentSection() {
               </div>
             ) : (
               <p className="text-sm text-text-primary/60 italic mt-2">
-                Sin version activa registrada.
+                Sin versión activa registrada.
               </p>
             )}
           </div>
@@ -306,7 +306,7 @@ function ConsentSection() {
               </p>
               <div className="mt-3 border-t border-warning/20 pt-3">
                 <p className="text-[12px] text-text-primary/80">
-                  Al publicar, todos los usuarios deberan re-aceptar el consentimiento informado.
+                  Al publicar, todos los usuarios deberán re-aceptar el consentimiento informado.
                 </p>
                 {confirmPublishId === draft.id ? (
                   <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -324,7 +324,7 @@ function ConsentSection() {
                       disabled={publishing}
                       className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-warning text-white hover:bg-warning/90 disabled:opacity-60 transition-colors"
                     >
-                      {publishing ? 'Publicando...' : 'Confirmar publicacion'}
+                      {publishing ? 'Publicando...' : 'Confirmar publicación'}
                     </button>
                   </div>
                 ) : (
@@ -333,7 +333,7 @@ function ConsentSection() {
                     onClick={() => setConfirmPublishId(draft.id)}
                     className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-warning text-white hover:bg-warning/90 transition-colors"
                   >
-                    Publicar version
+                    Publicar versión
                   </button>
                 )}
               </div>
@@ -343,7 +343,7 @@ function ConsentSection() {
           {/* New version form */}
           <div className="flex flex-col gap-3 border-t border-gray-100 pt-5">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-text-primary/60">
-              Crear nueva version
+              Crear nueva versión
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
@@ -715,7 +715,7 @@ function GuardrailsSection({
                   </svg>
                 </span>
                 <p className="text-sm font-semibold text-text-primary">
-                  Bloqueo de configuracion para estudio
+                  Bloqueo de configuración para estudio
                 </p>
               </div>
               <p className="text-[12px] text-text-primary/65 mt-1 max-w-[520px]">
@@ -831,8 +831,8 @@ function GuardrailsSection({
                 Umbral de severidad para activar SOS
               </p>
               <p className="text-[12px] text-text-primary/60 mt-0.5">
-                Eventos con severidad mayor o igual a este valor disparan derivacion SOS
-                automatica.
+                Eventos con severidad mayor o igual a este valor disparan derivación SOS
+                automática.
               </p>
             </div>
             <span className="text-3xl font-semibold tabular-nums text-primary leading-none">
@@ -1009,7 +1009,7 @@ function HotlinesSection({
       if (!isValidPhoneNumber(e.number)) {
         addToast({
           type: 'error',
-          message: `Fila ${i + 1}: el numero debe contener solo digitos (7 a 12).`,
+          message: `Fila ${i + 1}: el número debe contener solo dígitos (7 a 12).`,
         })
         return
       }
@@ -1037,7 +1037,7 @@ function HotlinesSection({
     <SectionCard
       index="03"
       title="Lineas de crisis SOS"
-      description="Numeros telefonicos que se muestran al estudiante al activar el panel SOS."
+      description="Números telefónicos que se muestran al estudiante al activar el panel SOS."
     >
       <div className="flex flex-col gap-3">
         {entries.length === 0 ? (
@@ -1092,7 +1092,7 @@ function HotlinesSection({
                       ].join(' ')}
                     />
                     {numberInvalid && (
-                      <p className="text-[11px] text-danger">Solo digitos, 7 a 12 caracteres.</p>
+                      <p className="text-[11px] text-danger">Solo dígitos, 7 a 12 caracteres.</p>
                     )}
                   </div>
                   <button
@@ -1156,7 +1156,7 @@ function GeminiSection() {
       const e = err as { response?: { data?: { detail?: string } } }
       addToast({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'Error al probar conexion con Gemini.',
+        message: e?.response?.data?.detail ?? 'Error al probar conexión con Gemini.',
       })
     } finally {
       setTesting(false)
@@ -1226,7 +1226,7 @@ function GeminiSection() {
           disabled={testing}
           className="inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold bg-accent text-white hover:bg-accent/90 disabled:opacity-60 transition-colors"
         >
-          {testing ? 'Probando...' : 'Probar conexion'}
+          {testing ? 'Probando...' : 'Probar conexión'}
         </button>
       </div>
     </SectionCard>
@@ -1307,7 +1307,7 @@ function SystemStatusSection() {
     <SectionCard
       index="05"
       title="Estado del sistema"
-      description="Diagnostico rapido de servicios y version desplegada."
+      description="Diagnóstico rápido de servicios y versión desplegada."
     >
       <div className="border border-gray-200 rounded-md overflow-hidden">
         <table className="w-full text-sm">
@@ -1366,7 +1366,7 @@ export default function Config() {
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } }
       const msg =
-        e?.response?.data?.detail ?? 'No se pudo cargar la configuracion del sistema.'
+        e?.response?.data?.detail ?? 'No se pudo cargar la configuración del sistema.'
       setErrorMsg(msg)
       addToast({ type: 'error', message: msg })
     } finally {
@@ -1385,17 +1385,52 @@ export default function Config() {
   const initialHotlines = asHotlineArray(configMap['sos_hotline_numbers']?.value)
 
   return (
-    <div className="p-6 max-w-[1100px] mx-auto">
+    <div
+      className="fade-in"
+      style={{
+        padding: 32,
+        maxWidth: 1200,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
       {/* Header */}
-      <header className="mb-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
-          Operacion
+      <header style={{ marginBottom: 24 }}>
+        <p
+          style={{
+            fontSize: 10.5,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.18em',
+            color: 'var(--mabel-700)',
+            opacity: 0.85,
+            margin: 0,
+          }}
+        >
+          Operación
         </p>
-        <h1 className="text-2xl font-semibold text-text-primary mt-1">
-          Configuracion del sistema
+        <h1
+          style={{
+            fontSize: 28,
+            fontWeight: 800,
+            color: 'var(--ink-900)',
+            marginTop: 6,
+            marginBottom: 0,
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15,
+          }}
+        >
+          Configuración del sistema
         </h1>
-        <p className="text-sm text-text-primary/60 mt-1">
-          Parametros operativos, guardrails, lineas de crisis y diagnostico tecnico.
+        <p
+          style={{
+            fontSize: 13.5,
+            color: 'var(--ink-500)',
+            marginTop: 6,
+            marginBottom: 0,
+          }}
+        >
+          Parámetros operativos, guardrails, líneas de crisis y diagnóstico técnico.
         </p>
       </header>
 
@@ -1403,13 +1438,33 @@ export default function Config() {
       {errorMsg && (
         <div
           role="alert"
-          className="mb-4 border border-danger/30 bg-danger/5 rounded-lg px-4 py-3 text-sm text-danger flex items-center justify-between"
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--danger-200)',
+            background: 'var(--danger-50)',
+            borderRadius: 'var(--r-lg)',
+            padding: '12px 16px',
+            fontSize: 13,
+            color: 'var(--danger-700)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
         >
           <span>{errorMsg}</span>
           <button
             type="button"
             onClick={loadConfig}
-            className="text-xs font-semibold underline hover:no-underline"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--danger-700)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
           >
             Reintentar
           </button>

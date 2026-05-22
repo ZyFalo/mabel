@@ -115,39 +115,46 @@ function pickKpis(d: DashboardResponse): DashboardKpis {
   }
 }
 
-const SEVERITY_CHIP: Record<string, string> = {
-  low: 'bg-success/10 text-success border-success/30',
-  medium: 'bg-warning/10 text-warning border-warning/30',
-  high: 'bg-danger/10 text-danger border-danger/30',
-  critical: 'bg-danger/15 text-danger border-danger/40',
+const SEVERITY_CHIP: Record<string, React.CSSProperties> = {
+  low: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  medium: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  high: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  critical: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
 }
 
-const STATUS_CHIP: Record<string, string> = {
-  open: 'bg-danger/10 text-danger border-danger/30',
-  reviewing: 'bg-warning/10 text-warning border-warning/30',
-  triaged: 'bg-warning/10 text-warning border-warning/30',
-  resolved: 'bg-success/10 text-success border-success/30',
-  closed: 'bg-gray-100 text-text-primary/60 border-gray-300',
-  dismissed: 'bg-gray-100 text-text-primary/60 border-gray-300',
+const STATUS_CHIP: Record<string, React.CSSProperties> = {
+  open: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  reviewing: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  triaged: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  resolved: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  closed: { background: 'var(--ink-100)', color: 'var(--ink-600)', borderColor: 'var(--ink-200)' },
+  dismissed: { background: 'var(--ink-100)', color: 'var(--ink-600)', borderColor: 'var(--ink-200)' },
 }
 
 const EVENT_TYPE_LABEL: Record<string, string> = {
   crisis: 'Crisis',
   suicide_risk: 'Riesgo suicidio',
-  self_harm: 'Autolesion',
+  self_harm: 'Autolesión',
   violence: 'Violencia',
   abuse: 'Abuso',
   guardrail_violation: 'Guardrails',
   other: 'Otro',
 }
 
-function Chip({ label, cls }: { label: string; cls: string }) {
+function Chip({ label, style }: { label: string; style?: React.CSSProperties }) {
   return (
     <span
-      className={[
-        'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border tracking-wide',
-        cls,
-      ].join(' ')}
+      className="inline-flex items-center"
+      style={{
+        padding: '2px 9px',
+        borderRadius: 9999,
+        fontSize: 10.5,
+        fontWeight: 600,
+        border: '1px solid var(--ink-200)',
+        letterSpacing: '0.02em',
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
     >
       {label}
     </span>
@@ -245,22 +252,71 @@ export default function Dashboard() {
   const lastEvents = data?.last_5_safety_events ?? []
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
+    <div
+      className="fade-in"
+      style={{
+        padding: 32,
+        maxWidth: 1440,
+        margin: '0 auto',
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
       {/* Editorial header */}
-      <header className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+      <header
+        className="flex items-end justify-between flex-wrap"
+        style={{ gap: 16, marginBottom: 28 }}
+      >
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
+          <p
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.18em',
+              color: 'var(--mabel-700)',
+              opacity: 0.85,
+              margin: 0,
+            }}
+          >
             Panel ejecutivo
           </p>
-          <h1 className="text-2xl font-semibold text-text-primary mt-1">Dashboard</h1>
-          <p className="text-sm text-text-primary/60 mt-1">
+          <h1
+            style={{
+              fontSize: 30,
+              fontWeight: 800,
+              color: 'var(--ink-900)',
+              marginTop: 6,
+              marginBottom: 0,
+              letterSpacing: '-0.02em',
+              lineHeight: 1.15,
+            }}
+          >
+            Dashboard
+          </h1>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: 'var(--ink-500)',
+              marginTop: 6,
+              marginBottom: 0,
+              lineHeight: 1.5,
+            }}
+          >
             Indicadores en tiempo real del piloto Mabel IA en la UMB.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center" style={{ gap: 12 }}>
           {lastUpdated && (
-            <p className="text-[11px] text-text-primary/50 tabular-nums">
-              Actualizado {lastUpdated.toLocaleTimeString('es-CO', {
+            <p
+              style={{
+                fontSize: 11.5,
+                color: 'var(--ink-400)',
+                margin: 0,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              Actualizado{' '}
+              {lastUpdated.toLocaleTimeString('es-CO', {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
@@ -270,9 +326,31 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={() => fetchDashboard()}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-white border border-gray-300 text-text-primary hover:bg-gray-50"
+            className="inline-flex items-center"
+            style={{
+              gap: 6,
+              padding: '8px 14px',
+              borderRadius: 9999,
+              fontSize: 12.5,
+              fontWeight: 600,
+              background: 'var(--white)',
+              border: '1px solid var(--ink-200)',
+              color: 'var(--ink-700)',
+              cursor: 'pointer',
+              transition: 'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => {
+              ;(e.currentTarget as HTMLElement).style.background = 'var(--ink-50)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--mabel-700)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--mabel-200)'
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLElement).style.background = 'var(--white)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--ink-700)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--ink-200)'
+            }}
           >
-            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path
                 d="M2.5 8a5.5 5.5 0 0 1 9.6-3.6M13.5 8a5.5 5.5 0 0 1-9.6 3.6M12 2v3h-3M4 14v-3h3"
                 stroke="currentColor"
@@ -289,13 +367,33 @@ export default function Dashboard() {
       {errorMsg && (
         <div
           role="alert"
-          className="mb-4 border border-danger/30 bg-danger/5 rounded-lg px-4 py-3 text-sm text-danger flex items-center justify-between"
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--danger-200)',
+            background: 'var(--danger-50)',
+            borderRadius: 'var(--r-lg)',
+            padding: '12px 16px',
+            fontSize: 13,
+            color: 'var(--danger-700)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
         >
           <span>{errorMsg}</span>
           <button
             type="button"
             onClick={() => fetchDashboard()}
-            className="text-xs font-semibold underline hover:no-underline"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--danger-700)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
           >
             Reintentar
           </button>
@@ -305,7 +403,8 @@ export default function Dashboard() {
       {/* KPI grid — 7 cards in a fluid 2 / 3 / 4 grid */}
       <section
         aria-label="Indicadores clave"
-        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-6"
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7"
+        style={{ gap: 12, marginBottom: 28 }}
       >
         <MetricCard
           label="Total usuarios"
@@ -355,25 +454,25 @@ export default function Dashboard() {
         <MetricCard
           label="Nuevos esta semana"
           value={loading && !kpis ? '—' : (kpis?.users_new_this_week ?? 0).toLocaleString('es-CO')}
-          hint="Altas en los ultimos 7 dias"
+          hint="Altas en los últimos 7 días"
         />
       </section>
 
       {/* Charts grid 2x2 */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <ChartCard
-          title="Sesiones por dia"
-          subtitle="Ultimos 30 dias"
-        >
+      <section
+        className="grid grid-cols-1 lg:grid-cols-2"
+        style={{ gap: 16, marginBottom: 16 }}
+      >
+        <ChartCard title="Sesiones por día" subtitle="Últimos 30 días">
           <LineChartWrapper
             data={sessionsSeries.map((p) => ({ date: p.date, sesiones: p.value }))}
-            lines={[{ key: 'sesiones', label: 'Sesiones', color: CHART_COLORS.accent }]}
+            lines={[{ key: 'sesiones', label: 'Sesiones', color: CHART_COLORS.primary }]}
             yLabel="Sesiones"
             height={240}
           />
         </ChartCard>
 
-        <ChartCard title="Distribucion de animo" subtitle="Check-ins de los ultimos 30 dias">
+        <ChartCard title="Distribución de ánimo" subtitle="Check-ins de los últimos 30 días">
           <BarChartWrapper
             data={moodData}
             bars={[{ key: 'count', label: 'Estudiantes', color: CHART_COLORS.primary }]}
@@ -383,10 +482,10 @@ export default function Dashboard() {
           />
         </ChartCard>
 
-        <ChartCard title="Latencia por dia" subtitle="Promedio en ms — umbral 20 000 ms">
+        <ChartCard title="Latencia por día" subtitle="Promedio en ms · umbral 20 s">
           <MetricLineWithReference
             data={latencySeries.map((p) => ({ date: p.date, latencia: p.value }))}
-            lines={[{ key: 'latencia', label: 'Latencia (ms)', color: CHART_COLORS.violet }]}
+            lines={[{ key: 'latencia', label: 'Latencia (ms)', color: CHART_COLORS.accent }]}
             reference={20000}
             referenceLabel="20 s"
             yLabel="ms"
@@ -395,7 +494,7 @@ export default function Dashboard() {
           />
         </ChartCard>
 
-        <ChartCard title="Activaciones de guardrails" subtitle="Ultimos 14 dias">
+        <ChartCard title="Activaciones de guardrails" subtitle="Últimos 14 días">
           <BarChartWrapper
             data={guardrailsData}
             bars={[{ key: 'count', label: 'Activaciones', color: CHART_COLORS.warning }]}
@@ -408,11 +507,14 @@ export default function Dashboard() {
       </section>
 
       {/* Donut + last events row */}
-      <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <section
+        className="grid grid-cols-1 lg:grid-cols-5"
+        style={{ gap: 16 }}
+      >
         <div className="lg:col-span-2">
           <ChartCard
             title="Safety events por tipo"
-            subtitle="Distribucion de los ultimos 30 dias"
+            subtitle="Distribución de los últimos 30 días"
           >
             <DonutChartWrapper
               data={safetyByType}
@@ -424,45 +526,106 @@ export default function Dashboard() {
         </div>
 
         <div className="lg:col-span-3">
-          <div className="bg-white border border-gray-200 rounded-lg h-full overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div
+            style={{
+              background: 'var(--white)',
+              border: '1px solid var(--ink-200)',
+              borderRadius: 'var(--r-lg)',
+              height: '100%',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              className="flex items-center justify-between"
+              style={{
+                padding: '14px 18px',
+                borderBottom: '1px solid var(--ink-100)',
+              }}
+            >
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80">
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.16em',
+                    color: 'var(--mabel-700)',
+                    opacity: 0.85,
+                    margin: 0,
+                  }}
+                >
                   Vigilancia
                 </p>
-                <h3 className="text-sm font-semibold text-text-primary mt-0.5">
-                  Ultimos 5 safety events
+                <h3
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: 'var(--ink-900)',
+                    marginTop: 4,
+                    marginBottom: 0,
+                  }}
+                >
+                  Últimos 5 safety events
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => navigate('/admin/safety-events')}
-                className="text-xs text-primary font-semibold hover:underline"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: 'var(--mabel-700)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.textDecoration = 'underline'
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.textDecoration = 'none'
+                }}
               >
-                Ver todos
+                Ver todos →
               </button>
             </div>
             {lastEvents.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-text-primary/40 italic">
+              <div
+                style={{
+                  padding: '40px 16px',
+                  textAlign: 'center',
+                  fontSize: 13,
+                  color: 'var(--ink-400)',
+                  fontStyle: 'italic',
+                }}
+              >
                 Sin eventos recientes
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50/70 border-b border-gray-100">
+              <table className="w-full" style={{ fontSize: 13, borderCollapse: 'collapse' }}>
+                <thead style={{ background: 'var(--ink-50)' }}>
                   <tr>
-                    <th className="text-left text-[10px] font-semibold uppercase tracking-wider text-text-primary/60 px-4 py-2">
-                      Fecha
-                    </th>
-                    <th className="text-left text-[10px] font-semibold uppercase tracking-wider text-text-primary/60 px-4 py-2">
-                      Tipo
-                    </th>
-                    <th className="text-left text-[10px] font-semibold uppercase tracking-wider text-text-primary/60 px-4 py-2">
-                      Severidad
-                    </th>
-                    <th className="text-left text-[10px] font-semibold uppercase tracking-wider text-text-primary/60 px-4 py-2">
-                      Estado
-                    </th>
-                    <th className="w-12" />
+                    {['Fecha', 'Tipo', 'Severidad', 'Estado'].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          textAlign: 'left',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: 'var(--ink-500)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.14em',
+                          padding: '10px 16px',
+                          borderBottom: '1px solid var(--ink-200)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                    <th style={{ width: 48, borderBottom: '1px solid var(--ink-200)' }} />
                   </tr>
                 </thead>
                 <tbody>
@@ -472,34 +635,48 @@ export default function Dashboard() {
                     return (
                       <tr
                         key={ev.id}
-                        className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer"
                         onClick={() => navigate('/admin/safety-events')}
+                        style={{ cursor: 'pointer', transition: 'background var(--dur-fast) var(--ease-out)' }}
+                        onMouseEnter={(e) => {
+                          ;(e.currentTarget as HTMLElement).style.background = 'rgba(244, 237, 236, 0.55)'
+                        }}
+                        onMouseLeave={(e) => {
+                          ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                        }}
                       >
-                        <td className="px-4 py-2 align-middle text-text-primary/80 tabular-nums">
+                        <td
+                          style={{
+                            padding: '10px 16px',
+                            color: 'var(--ink-700)',
+                            fontVariantNumeric: 'tabular-nums',
+                            borderBottom: '1px solid var(--ink-100)',
+                          }}
+                        >
                           {formatDateTime(ev.created_at)}
                         </td>
-                        <td className="px-4 py-2 align-middle text-text-primary/80">
+                        <td
+                          style={{
+                            padding: '10px 16px',
+                            color: 'var(--ink-900)',
+                            borderBottom: '1px solid var(--ink-100)',
+                          }}
+                        >
                           {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
                         </td>
-                        <td className="px-4 py-2 align-middle">
-                          <Chip
-                            label={String(ev.severity)}
-                            cls={
-                              SEVERITY_CHIP[sevKey] ??
-                              'bg-gray-100 text-text-primary/70 border-gray-300'
-                            }
-                          />
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid var(--ink-100)' }}>
+                          <Chip label={String(ev.severity)} style={SEVERITY_CHIP[sevKey]} />
                         </td>
-                        <td className="px-4 py-2 align-middle">
-                          <Chip
-                            label={ev.status}
-                            cls={
-                              STATUS_CHIP[statusKey] ??
-                              'bg-gray-100 text-text-primary/60 border-gray-300'
-                            }
-                          />
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid var(--ink-100)' }}>
+                          <Chip label={ev.status} style={STATUS_CHIP[statusKey]} />
                         </td>
-                        <td className="px-4 py-2 align-middle text-text-primary/40 text-xs">
+                        <td
+                          style={{
+                            padding: '10px 16px',
+                            color: 'var(--ink-300)',
+                            fontSize: 14,
+                            borderBottom: '1px solid var(--ink-100)',
+                          }}
+                        >
                           ›
                         </td>
                       </tr>
@@ -525,11 +702,38 @@ function ChartCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+    <div
+      style={{
+        background: 'var(--white)',
+        border: '1px solid var(--ink-200)',
+        borderRadius: 'var(--r-lg)',
+        padding: 18,
+        fontFamily: 'var(--font-sans)',
+      }}
+    >
+      <div style={{ marginBottom: 14 }}>
+        <h3
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: 'var(--ink-900)',
+            margin: 0,
+            letterSpacing: '-0.005em',
+          }}
+        >
+          {title}
+        </h3>
         {subtitle && (
-          <p className="text-[11px] text-text-primary/50 mt-0.5">{subtitle}</p>
+          <p
+            style={{
+              fontSize: 11.5,
+              color: 'var(--ink-500)',
+              marginTop: 3,
+              marginBottom: 0,
+            }}
+          >
+            {subtitle}
+          </p>
         )}
       </div>
       {children}

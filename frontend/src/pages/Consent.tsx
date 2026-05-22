@@ -106,8 +106,8 @@ export default function Consent() {
         Consentimiento<br />informado.
       </h1>
       <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 400, lineHeight: 1.6 }}>
-        Antes de comenzar, es importante que conozcas como tratamos tu informacion. Lee con calma y
-        toma una decision informada.
+        Antes de comenzar, es importante que conozcas cómo tratamos tu información. Lee con calma y
+        toma una decisión informada.
       </p>
     </div>
   )
@@ -167,7 +167,7 @@ export default function Consent() {
               letterSpacing: '-0.015em',
             }}
           >
-            Sin version disponible
+            Sin versión disponible
           </h2>
           <p
             style={{
@@ -177,7 +177,7 @@ export default function Consent() {
               lineHeight: 1.55,
             }}
           >
-            No hay una version de consentimiento disponible. Contacta al equipo de investigacion.
+            No hay una versión de consentimiento disponible. Contacta al equipo de investigación.
           </p>
           <button
             onClick={() => {
@@ -197,7 +197,7 @@ export default function Consent() {
               fontFamily: 'var(--font-sans)',
             }}
           >
-            Cerrar sesion
+            Cerrar sesión
           </button>
         </div>
       </AuthShell>
@@ -240,7 +240,7 @@ export default function Consent() {
         </div>
 
         <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 20px', lineHeight: 1.55 }}>
-          Lee con atencion el documento. Debes desplazarte hasta el final antes de aceptar.
+          Lee con atención el documento. Debes desplazarte hasta el final antes de aceptar.
         </p>
 
         {error && (
@@ -330,11 +330,11 @@ export default function Consent() {
                 {
                   value: 'solo_uso',
                   title: 'Solo uso',
-                  desc: 'Datos minimos para el funcionamiento del sistema.',
+                  desc: 'Datos mínimos para el funcionamiento del sistema.',
                 },
                 {
                   value: 'uso_mejora_anon',
-                  title: 'Uso + mejora anonima',
+                  title: 'Uso + mejora anónima',
                   desc: 'Datos anonimizados para mejorar el servicio.',
                 },
               ].map((opt) => {
@@ -405,7 +405,7 @@ export default function Consent() {
               style={{ accentColor: 'var(--mabel-600)', width: 16, height: 16 }}
             />
             <span style={{ fontSize: 13, color: 'var(--ink-700)' }}>
-              He leido y acepto el consentimiento informado
+              He leído y acepto el consentimiento informado
             </span>
           </label>
 

@@ -1,57 +1,68 @@
 /**
  * Shared chart theme tokens for admin Recharts wrappers.
- * Aligned with the Mabel-IA admin design system.
+ * Aligned with the Mabel-IA brand-skin tokens (var(--mabel-*), var(--ink-*)).
+ *
+ * Note: Recharts requires literal color values (not CSS variables) for its
+ * stroke/fill props, so we mirror the brand palette here as hex constants.
+ * Keep these in sync with `index.css` when tokens evolve.
  */
 
 export const CHART_COLORS = {
-  primary: '#A51916',
-  accent: '#0F303A',
-  success: '#16A34A',
-  warning: '#F59E0B',
-  danger: '#DC2626',
-  neutral: '#64748B',
+  primary: '#A51916', // var(--mabel-600)
+  accent: '#3D332F', // var(--ink-700) — replaces legacy teal
+  success: '#059669', // var(--success-600)
+  warning: '#D97706', // var(--warn-600)
+  danger: '#DC2626', // var(--danger-600)
+  neutral: '#6B7280', // var(--ink-500)
   violet: '#7C3AED',
   cyan: '#0891B2',
+  info: '#2563EB', // var(--info-600)
 } as const
 
+// Brand-aligned palette used when callers don't pin colors per series.
+// Order matters: first colors are dominant brand reds + ink, secondary are
+// semantic warm/cool accents.
 export const CHART_PALETTE: string[] = [
-  CHART_COLORS.accent,
   CHART_COLORS.primary,
-  CHART_COLORS.warning,
+  CHART_COLORS.accent,
   CHART_COLORS.success,
+  CHART_COLORS.warning,
+  CHART_COLORS.info,
   CHART_COLORS.violet,
   CHART_COLORS.cyan,
   CHART_COLORS.danger,
-  CHART_COLORS.neutral,
 ]
 
-export const CHART_GRID_STROKE = '#E5E7EB'
-export const CHART_AXIS_STROKE = '#94A3B8'
-export const CHART_AXIS_TEXT = '#475569'
+export const CHART_GRID_STROKE = '#E7E3E1' // var(--ink-200)
+export const CHART_AXIS_STROKE = '#C8C2BF' // var(--ink-300)
+export const CHART_AXIS_TEXT = '#6B7280' // var(--ink-500)
 
 export const AXIS_TICK_STYLE = {
   fontSize: 11,
   fill: CHART_AXIS_TEXT,
-  fontFamily: 'inherit',
+  fontFamily: 'var(--font-sans), Nunito, system-ui, sans-serif',
 } as const
 
 export const TOOLTIP_CONTENT_STYLE: React.CSSProperties = {
   backgroundColor: '#FFFFFF',
-  border: '1px solid #E5E7EB',
-  borderRadius: 8,
-  boxShadow: '0 4px 16px rgba(15, 48, 58, 0.08)',
+  border: '1px solid #E7E3E1',
+  borderRadius: 12,
+  boxShadow: '0 8px 24px -6px rgba(26, 17, 16, 0.10), 0 4px 8px -2px rgba(26, 17, 16, 0.05)',
   fontSize: 12,
-  padding: '8px 10px',
+  padding: '8px 12px',
+  fontFamily: 'var(--font-sans), Nunito, system-ui, sans-serif',
 }
 
 export const TOOLTIP_LABEL_STYLE: React.CSSProperties = {
-  color: '#0F303A',
-  fontWeight: 600,
-  marginBottom: 2,
+  color: '#1A1110', // var(--ink-900)
+  fontWeight: 700,
+  marginBottom: 4,
+  fontSize: 11,
+  letterSpacing: '0.01em',
 }
 
 export const TOOLTIP_ITEM_STYLE: React.CSSProperties = {
-  color: '#1F2937',
+  color: '#3D332F', // var(--ink-700)
   fontVariantNumeric: 'tabular-nums',
 }
 

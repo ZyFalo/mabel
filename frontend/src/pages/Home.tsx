@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import {
   Heart,
   MessageCircle,
@@ -13,6 +13,10 @@ import { useChatStore } from '../stores/chatStore'
 import { useToastStore } from '../stores/toastStore'
 import Composer from '../components/chat/Composer'
 import SuggestionChip from '../components/chat/SuggestionChip'
+import UmbAvatar from '../components/ui/UmbAvatar'
+import SosButton from '../components/ui/SosButton'
+import type { StudentOutletContext } from '../types/studentOutlet'
+import { getTimedGreeting } from '../utils/greetings'
 
 interface Suggestion {
   icon: LucideIcon
@@ -45,6 +49,7 @@ const SUGGESTIONS: Suggestion[] = [
 
 export default function Home() {
   const navigate = useNavigate()
+  const { openCrisis } = useOutletContext<StudentOutletContext>()
   const user = useAuthStore((s) => s.user)
   const createSession = useChatStore((s) => s.createSession)
   const addToast = useToastStore((s) => s.addToast)
@@ -58,24 +63,34 @@ export default function Home() {
     return full.split(/\s+/)[0]
   }, [user?.display_name])
 
-  async function launchSession(topicHint?: string) {
+  // Random greeting picked once per mount and stabilised. Browser time
+  // determines the bucket (morning/afternoon/evening).
+  const greetingText = useMemo(() => getTimedGreeting(firstName), [firstName])
+
+  // `pendingMessage` is the text the user typed (or a chip prompt they
+  // clicked) BEFORE a session existed. We forward it via router state so
+  // Chat.tsx can send it as the user's first message. We deliberately do
+  // NOT pass it as `topic_hint` — that would turn the message into just a
+  // session title and the user's words would never reach Mabel.
+  async function launchSession(pendingMessage?: string) {
     if (creating) return
     setCreating(true)
     try {
-      const result = await createSession(topicHint)
+      const result = await createSession()
       if (result.previous_session_closed) {
         addToast({
           type: 'info',
-          message: 'Sesion anterior finalizada automaticamente',
+          message: 'Sesión anterior finalizada automáticamente',
         })
       }
+      const state = pendingMessage ? { pendingMessage } : undefined
       if (result.checkin_opt_in) {
-        navigate(`/session/${result.id}/checkin`)
+        navigate(`/session/${result.id}/checkin`, { state })
       } else {
-        navigate(`/session/${result.id}/chat`)
+        navigate(`/session/${result.id}/chat`, { state })
       }
     } catch {
-      addToast({ type: 'error', message: 'Error al crear sesion' })
+      addToast({ type: 'error', message: 'Error al crear sesión' })
     } finally {
       setCreating(false)
     }
@@ -103,31 +118,16 @@ export default function Home() {
         justifyContent: 'center',
         padding: '40px 24px',
         overflowY: 'auto',
+        position: 'relative',
       }}
     >
+      <SosButton variant="floating" onClick={openCrisis} />
       <div style={{ width: '100%', maxWidth: 640, textAlign: 'center' }}>
-        {/* Mabel M avatar with brand shadow */}
-        <div
-          aria-hidden="true"
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: '50%',
-            background: 'var(--mabel-600)',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: 23,
-            margin: '0 auto 20px',
-            boxShadow: 'var(--shadow-brand)',
-            fontFamily: 'var(--font-sans)',
-            letterSpacing: '-0.01em',
-          }}
-        >
-          M
-        </div>
+        {/* Mabel brand mark — escudo UMB rojo, sin fondo ni wrapper */}
+        <UmbAvatar
+          size={72}
+          style={{ margin: '0 auto 20px' }}
+        />
 
         <h1
           style={{
@@ -140,7 +140,7 @@ export default function Home() {
             fontFamily: 'var(--font-sans)',
           }}
         >
-          Hola, {firstName}.
+          {greetingText}
         </h1>
 
         <p
@@ -166,6 +166,7 @@ export default function Home() {
             autoFocus
             placeholder="Cuéntame qué necesitas hoy…"
             showHint={false}
+            compact
           />
         </div>
 
@@ -204,7 +205,7 @@ export default function Home() {
         >
           <Lock size={12} />
           <span>
-            Conversaciones cifradas · Mabel no reemplaza la atención profesional
+            Conversaciones privadas · Mabel no reemplaza la atención profesional
           </span>
         </div>
       </div>
