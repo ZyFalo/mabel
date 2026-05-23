@@ -57,6 +57,18 @@ COPY backend/ ./
 # El handler SPA en app/main.py busca exactamente esta ruta.
 COPY --from=frontend-build /app/frontend/dist ./static
 
+# Modelo de voz español para Piper TTS — se descarga en el build porque
+# el .onnx pesa 60MB y NO lo commiteamos al repo (ver .gitignore). El
+# código resuelve `PIPER_MODEL_PATH=models/piper/` relativo a WORKDIR
+# (/app), así que el destino debe ser /app/models/piper/.
+# Si en el futuro queremos varias voces, repetir el bloque o cambiar a
+# un script de setup. El hash de la versión esta en setup-piper.sh.
+RUN mkdir -p /app/models/piper \
+    && curl -fSL -o /app/models/piper/es_ES-mls_9972-low.onnx \
+        "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/es/es_ES/mls_9972/low/es_ES-mls_9972-low.onnx" \
+    && curl -fSL -o /app/models/piper/es_ES-mls_9972-low.onnx.json \
+        "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/es/es_ES/mls_9972/low/es_ES-mls_9972-low.onnx.json"
+
 EXPOSE 8000
 
 # Boot sequence:

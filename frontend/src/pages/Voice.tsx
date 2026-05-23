@@ -310,10 +310,11 @@ export default function Voice() {
     return items.slice(-2)
   }, [messages, isStreaming, streamingText, state, lastUserText])
 
-  // Loader hasta que preferences resuelvan — evita montar el avatar
-  // (que dispara mic init, greeting, etc.) antes de que el route guard
-  // pueda decidir si redirige a /chat.
-  if (!preferences) {
+  // Loader solo MIENTRAS preferences carga. Si ya cargo y vino null
+  // (404 = student sin preferences row), seguimos al render con los
+  // defaults (voice_enabled/voice_mode_enabled =true por accForGate),
+  // sino el usuario queda con spinner infinito.
+  if (!preferences && prefsLoading) {
     return (
       <div
         style={{
