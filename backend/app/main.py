@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 
@@ -78,3 +81,51 @@ app.include_router(admin_empathy_ratings_router, prefix="/api/v1")
 @app.get("/api/v1/health")
 async def health_check():
     return {"status": "ok", "version": "0.1.0"}
+
+
+# ---------------------------------------------------------------------------
+# Frontend SPA — sirve el build de Vite cuando existe (deploy en Railway).
+# En dev local el frontend corre aparte en :5173, asi que si no hay carpeta
+# `static/` simplemente no montamos nada y los browsers ven el 404 esperado.
+# ---------------------------------------------------------------------------
+
+_FRONTEND_DIR = (Path(__file__).resolve().parent.parent / "static").resolve()
+
+if _FRONTEND_DIR.is_dir():
+    # /assets/* y demas archivos de Vite con sus hashes
+    _ASSETS_DIR = _FRONTEND_DIR / "assets"
+    if _ASSETS_DIR.is_dir():
+        app.mount(
+            "/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="assets"
+        )
+
+    _INDEX_FILE = _FRONTEND_DIR / "index.html"
+
+    # Solo registramos el catch-all si el build esta completo. Sin esto, un
+    # static/ parcial (sin index.html) provocaria 500 silencioso en cada
+    # request al SPA porque FileResponse rompe sobre archivo inexistente.
+    if _INDEX_FILE.is_file():
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(full_path: str):
+            """Catch-all para React Router. SEGURIDAD: resolvemos la ruta
+            destino y verificamos que quede DENTRO de `_FRONTEND_DIR`
+            antes de servirla; sin esta validacion, un GET con `../`
+            permitiria leer cualquier archivo legible del container
+            (config.py con JWT_SECRET, .env files leakeados al build,
+            todo el codigo fuente).
+            """
+            if full_path.startswith("api/"):
+                raise HTTPException(status_code=404)
+            if not full_path:
+                return FileResponse(_INDEX_FILE)
+            candidate = (_FRONTEND_DIR / full_path).resolve()
+            try:
+                candidate.relative_to(_FRONTEND_DIR)
+            except ValueError:
+                # Intento de path traversal: caemos al SPA en vez de 403
+                # para no filtrar la existencia del filtro.
+                return FileResponse(_INDEX_FILE)
+            if candidate.is_file():
+                return FileResponse(candidate)
+            return FileResponse(_INDEX_FILE)

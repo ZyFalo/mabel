@@ -13,9 +13,16 @@ class RegisterRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_umb_email(cls, v: str) -> str:
-        pattern = r"^[a-zA-Z0-9._%+-]+@est\.umb\.edu\.co$"
+        # Cualquier `@umb.edu.co` puede registrarse via /register y por
+        # default cae con role='student' (User.role server_default). El
+        # admin se siembra via env vars (scripts/seed_admin.py) y bypassa
+        # este validador. Para el MVP el riesgo de que profesores/staff
+        # se auto-registren y contaminen la cohorte N=30 es bajo: la URL
+        # del estudio se comparte solo con estudiantes seleccionados y
+        # el panel admin permite revocar/eliminar cualquier cuenta.
+        pattern = r"^[a-zA-Z0-9._%+-]+@umb\.edu\.co$"
         if not re.match(pattern, v):
-            raise ValueError("El email debe ser institucional (@est.umb.edu.co)")
+            raise ValueError("El email debe ser institucional (@umb.edu.co)")
         return v.lower()
 
     @field_validator("password")

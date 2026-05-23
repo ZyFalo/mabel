@@ -15,8 +15,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set DB URL from env var
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Set DB URL from env var. Escapamos `%` → `%%` porque alembic.ini se
+# parsea con ConfigParser y los `%` se interpretan como interpolacion;
+# Railway autogenera passwords con `%` y sin este escape get_section()
+# tira InterpolationSyntaxError al boot.
+config.set_main_option(
+    "sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%")
+)
 
 target_metadata = Base.metadata
 

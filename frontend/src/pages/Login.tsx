@@ -137,7 +137,7 @@ export default function Login() {
               value={form.email}
               onChange={(v) => setForm({ ...form, email: v })}
               type="email"
-              placeholder="tu.nombre@est.umb.edu.co"
+              placeholder="tu.nombre@umb.edu.co"
               prefix={<Mail size={16} />}
               ariaLabel="Correo electrónico"
             />

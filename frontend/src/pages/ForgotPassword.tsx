@@ -145,7 +145,7 @@ export default function ForgotPassword() {
                 value={email}
                 onChange={setEmail}
                 type="email"
-                placeholder="tu.nombre@est.umb.edu.co"
+                placeholder="tu.nombre@umb.edu.co"
                 prefix={<Mail size={16} />}
                 ariaLabel="Correo electrónico"
               />

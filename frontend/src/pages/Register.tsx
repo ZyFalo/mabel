@@ -29,8 +29,8 @@ export default function Register() {
   function validate(): Record<string, string> {
     const e: Record<string, string> = {}
     if (form.display_name.trim().length < 2) e.display_name = 'Mínimo 2 caracteres'
-    if (!/^[a-zA-Z0-9._%+-]+@est\.umb\.edu\.co$/.test(form.email))
-      e.email = 'Debe ser un email @est.umb.edu.co'
+    if (!/^[a-zA-Z0-9._%+-]+@umb\.edu\.co$/.test(form.email))
+      e.email = 'Debe ser un email @umb.edu.co'
     if (form.password.length < 8) e.password = 'Mínimo 8 caracteres'
     else if (!/[A-Z]/.test(form.password)) e.password = 'Debe tener al menos 1 mayúscula'
     else if (!/[0-9]/.test(form.password)) e.password = 'Debe tener al menos 1 número'
@@ -161,7 +161,7 @@ export default function Register() {
               value={form.email}
               onChange={(v) => setForm({ ...form, email: v })}
               type="email"
-              placeholder="tu.nombre@est.umb.edu.co"
+              placeholder="tu.nombre@umb.edu.co"
               prefix={<Mail size={16} />}
               error={errors.email}
               ariaLabel="Correo electrónico"

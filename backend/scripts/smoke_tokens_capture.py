@@ -31,7 +31,7 @@ from app.repositories.session_repository import SessionRepository  # noqa: E402
 from app.services.chat_service import ChatService  # noqa: E402
 from app.services.llm import get_llm_provider  # noqa: E402
 
-USER_EMAIL = os.environ.get("SMOKE_USER_EMAIL", "estudiante@est.umb.edu.co")
+USER_EMAIL = os.environ.get("SMOKE_USER_EMAIL", "estudiante@umb.edu.co")
 
 
 async def main() -> int:

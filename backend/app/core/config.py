@@ -55,4 +55,18 @@ class Settings(BaseSettings):
     model_config = {"env_file": str(_env_file), "env_file_encoding": "utf-8"}
 
 
+def _coerce_async_pg_url(url: str) -> str:
+    """Railway's Postgres plugin injects DATABASE_URL as `postgres://` or
+    `postgresql://`. SQLAlchemy + asyncpg need the explicit driver
+    suffix (`postgresql+asyncpg://`), otherwise the engine boots with
+    the sync psycopg2 driver and async sessions fail at startup.
+    """
+    if url.startswith("postgres://"):
+        return "postgresql+asyncpg://" + url[len("postgres://") :]
+    if url.startswith("postgresql://") and "+asyncpg" not in url:
+        return "postgresql+asyncpg://" + url[len("postgresql://") :]
+    return url
+
+
 settings = Settings()
+settings.DATABASE_URL = _coerce_async_pg_url(settings.DATABASE_URL)
