@@ -56,10 +56,23 @@ export default function Voice() {
   // sub `voice_mode_enabled` off), lo redirigimos al chat de texto.
   // Defaults a permitir para no romper sesiones legacy.
   const preferences = usePreferencesStore((s) => s.preferences)
+  const prefsLoading = usePreferencesStore((s) => s.loading)
+  const loadPrefs = usePreferencesStore((s) => s.loadPreferences)
   const accForGate = preferences?.accessibility as Record<string, unknown> | null
   const voiceEnabled = accForGate?.voice_enabled !== false
   const voiceModeEnabled =
     voiceEnabled && accForGate?.voice_mode_enabled !== false
+
+  // Asegura que preferences esten cargadas antes de cualquier mount-side
+  // effect (mic init, greeting fetch, etc.). Sin esto, el avatar montaba
+  // antes del guard y podia disparar request de permisos del mic en
+  // usuarios que tenian voz desactivada — luego se redirigia al chat
+  // pero el flash y el prompt nativo ya habian ocurrido.
+  useEffect(() => {
+    if (!preferences && !prefsLoading) {
+      loadPrefs()
+    }
+  }, [preferences, prefsLoading, loadPrefs])
 
   useEffect(() => {
     if (!preferences) return // todavia cargando, esperar
@@ -296,6 +309,35 @@ export default function Voice() {
     }
     return items.slice(-2)
   }, [messages, isStreaming, streamingText, state, lastUserText])
+
+  // Loader hasta que preferences resuelvan — evita montar el avatar
+  // (que dispara mic init, greeting, etc.) antes de que el route guard
+  // pueda decidir si redirige a /chat.
+  if (!preferences) {
+    return (
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--ink-50)',
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            border: '3px solid var(--ink-200)',
+            borderTopColor: 'var(--mabel-600)',
+            borderRadius: '50%',
+            animation: 'rotate 0.8s linear infinite',
+          }}
+          aria-label="Cargando"
+        />
+      </div>
+    )
+  }
 
   return (
     <div

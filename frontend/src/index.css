@@ -478,8 +478,11 @@ button, input, select, textarea {
     align-items: center;
     justify-content: center;
   }
-  /* Header con menos padding en mobile */
-  header.shrink-0 {
+  /* Header con menos padding en mobile — SCOPED al admin layout
+     para no romper otros <header> de la app (student Header rojo,
+     chat TopBar, etc.) que también usan `shrink-0` y se verían
+     pisados por una regla global con !important. */
+  .admin-layout-root header.shrink-0 {
     padding: 0 14px !important;
   }
 }

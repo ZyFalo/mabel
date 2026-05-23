@@ -35,7 +35,24 @@ const AUTH_PATHS_WITHOUT_TOKEN = [
 
 function isAuthPathWithoutToken(url: string | undefined): boolean {
   if (!url) return false
-  return AUTH_PATHS_WITHOUT_TOKEN.some((p) => url.includes(p))
+  // Match con boundary: el path termina ahí (exact) o sigue con `/` o
+  // `?`. Sin esta restricción, `/auth/login-mfa` o un futuro
+  // `/auth/login/verify` (que SÍ requeriría token de pre-MFA y por
+  // tanto un 401 ahí significaria "token expirado", no "credencial
+  // mala") quedarían silenciados como pre-auth.
+  return AUTH_PATHS_WITHOUT_TOKEN.some((p) => {
+    const idx = url.indexOf(p)
+    if (idx === -1) return false
+    const after = url.charAt(idx + p.length)
+    // Aceptamos: fin de string, query (?), o slash seguido de path
+    // adicional QUE NO sea un sub-endpoint (e.g. /auth/reset-password/:token
+    // sí es valido pre-auth). Para simplicidad: aceptamos `/:token` o
+    // `/<algo>` que NO contenga otro segmento — match heurístico
+    // específico al patrón actual del backend.
+    if (after === '' || after === '?') return true
+    if (p === '/auth/reset-password' && after === '/') return true
+    return false
+  })
 }
 
 apiClient.interceptors.response.use(

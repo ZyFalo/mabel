@@ -56,9 +56,16 @@ interface FormState {
 const DEFAULT_STATE: FormState = {
   save_history: false,
   checkin_enabled: true,
+  // Voz: master default TRUE (voz disponible para que la persona
+  // decida). Sub-toggles: voice_mode_enabled default TRUE para mostrar
+  // el boton "Hablar" (el modo voz 2D es una experiencia diferencial
+  // del producto y ocultarlo por default es esconder la feature
+  // principal). tts_enabled OPT-IN para no autoplay sin consentimiento
+  // explicito (bug 2026-05-23). subtitles default TRUE — son ayuda
+  // visual gratuita cuando ya hay TTS sonando.
   voice_enabled: true,
   voice_mode_enabled: true,
-  tts_enabled: false,            // OPT-IN: bug 2026-05-23, no autoplay sin consentimiento explicito
+  tts_enabled: false,
   subtitles: true,
   contrast: false,
   font_size: 'normal',
@@ -106,15 +113,23 @@ export default function Onboarding() {
   async function handleSave() {
     setSaving(true)
     try {
+      // COERCION: si el master voice_enabled está OFF, todos los
+      // sub-flags deben ir a false. El UI los gatea visualmente (`checked
+      // = form.voice_enabled && form.X`) pero el estado interno mantiene
+      // su valor anterior, así que sin esta coerción se persiste un
+      // estado inconsistente. Mismo patron que saveVoice en Settings.tsx.
+      const effectiveVoiceMode = form.voice_enabled ? form.voice_mode_enabled : false
+      const effectiveTtsEnabled = form.voice_enabled ? form.tts_enabled : false
+      const effectiveSubtitles = form.voice_enabled ? form.subtitles : false
       await updatePreferences({
         save_history: form.save_history,
         checkin_enabled: form.checkin_enabled,
         accessibility: {
           // Keys ACTIVAS (visibles en el UI del paso 2):
           voice_enabled: form.voice_enabled,
-          voice_mode_enabled: form.voice_mode_enabled,
-          tts_enabled: form.tts_enabled,
-          subtitles: form.subtitles,
+          voice_mode_enabled: effectiveVoiceMode,
+          tts_enabled: effectiveTtsEnabled,
+          subtitles: effectiveSubtitles,
           // Keys LATENTES — guardadas para no perder el shape JSONB
           // cuando reactivemos los controles.
           contrast: form.contrast,

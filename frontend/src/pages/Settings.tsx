@@ -38,9 +38,11 @@ import SectionHeader from '../components/settings/primitives/SectionHeader'
 
 export type TabId = 'privacy' | 'accessibility' | 'voice' | 'account' | 'arco'
 
+// 'accessibility' queda en el TYPE para no romper tipos en callers
+// viejos, pero NO en VALID_TABS — cualquier intento de deeplink a esa
+// tab cae al fallback en useState y abre 'privacy'. Audit 2026-05-23.
 const VALID_TABS: ReadonlySet<TabId> = new Set([
   'privacy',
-  'accessibility',
   'voice',
   'account',
   'arco',
@@ -387,19 +389,24 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
 
   async function saveVoice() {
     try {
+      // COERCION CRITICA: si el master voice_enabled esta OFF, todos los
+      // sub-flags (voice_mode_enabled, tts_enabled, subtitles) deben
+      // ir a false en el payload. Sin esta coerción se persistia un
+      // estado inconsistente que Chat.tsx leia con `acc?.tts_enabled
+      // === true` y reproducia TTS sin permiso del usuario — la misma
+      // regresion que el opt-in fix buscaba evitar. Audit 2026-05-23.
+      const effectiveVoiceMode = voiceEnabled ? voiceModeEnabled : false
+      const effectiveTtsEnabled = voiceEnabled ? ttsEnabled : false
+      const effectiveSubtitles = voiceEnabled ? subtitles : false
       await updatePreferences({
         tts_voice: ttsVoice || null,
         preferred_chat_mode: chatMode,
         accessibility: {
           ...((preferences?.accessibility as Record<string, unknown>) || {}),
-          // Voice gating (audit 2026-05-23)
           voice_enabled: voiceEnabled,
-          voice_mode_enabled: voiceModeEnabled,
-          // Autoplay TTS en chat texto
-          tts_enabled: ttsEnabled,
-          // Subtitles — se movio aqui desde la seccion Accesibilidad
-          // porque solo tiene sentido si hay TTS.
-          subtitles,
+          voice_mode_enabled: effectiveVoiceMode,
+          tts_enabled: effectiveTtsEnabled,
+          subtitles: effectiveSubtitles,
         },
       })
       addToast({ type: 'success', message: 'Cambios guardados' })
@@ -576,17 +583,13 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
                 />
               )}
 
-              {activeTab === 'accessibility' && (
-                <AccesibilidadSection
-                  contrast={contrast}
-                  setContrast={setContrast}
-                  fontSize={fontSize}
-                  setFontSize={setFontSize}
-                  subtitles={subtitles}
-                  setSubtitles={setSubtitles}
-                  onSave={saveAccessibility}
-                />
-              )}
+              {/* Tab 'accessibility' eliminada del UI activo. Si llega
+                  un deeplink con activeTab='accessibility', VALID_TABS
+                  ya no lo acepta y caemos a 'privacy' en el useState
+                  inicial. La funcion AccesibilidadSection y los estados
+                  contrast/font_size/subtitles se mantienen en el
+                  archivo por si se reactivan en el futuro (subtitles
+                  ahora se gestiona desde la tab Voz). */}
 
               {activeTab === 'voice' && (
                 <VozSection
@@ -730,7 +733,21 @@ function PrivacidadSection({
           movieron exclusivamente a la tab "Mis datos (ARCO)" para
           eliminar duplicacion. Privacidad queda como el centro de los
           toggles cotidianos; ARCO concentra los derechos legales Ley
-          1581. Auditoria UX 2026-05-23. */}
+          1581. Auditoria UX 2026-05-23.
+
+          Pista de discoverability: pequeño link debajo de los toggles
+          que apunta a la tab ARCO, sin re-introducir la duplicacion. */}
+      <p
+        style={{
+          marginTop: 16,
+          fontSize: 12.5,
+          color: 'var(--ink-500)',
+          lineHeight: 1.5,
+        }}
+      >
+        Para exportar tus datos o revocar tu consentimiento,
+        consulta la pestaña <strong style={{ color: 'var(--ink-700)' }}>Mis datos (ARCO)</strong>.
+      </p>
 
       <SaveBar onClick={onSave} />
     </section>
@@ -874,12 +891,14 @@ function VozSection({
         </PrimaryButton>
       </div>
 
-      {/* voice_mode_enabled — gated */}
+      {/* voice_mode_enabled — gated.
+          A11y: pasamos `disabled={!voiceEnabled}` AL Toggle, no solo
+          pointerEvents al wrapper, sino keyboard users (Tab + Space)
+          pueden activarlo aunque visualmente parezca off. */}
       <div
         style={{
           paddingTop: 22,
           opacity: voiceEnabled ? 1 : 0.5,
-          pointerEvents: voiceEnabled ? 'auto' : 'none',
         }}
       >
         <Toggle
@@ -887,6 +906,7 @@ function VozSection({
           onChange={setVoiceModeEnabled}
           label="Modo voz 2D"
           hint="Muestra el boton 'Hablar' en la cabecera del chat para entrar al modo conversacion por voz con avatar 2D animado de Mabel."
+          disabled={!voiceEnabled}
         />
       </div>
 
@@ -895,7 +915,6 @@ function VozSection({
         style={{
           paddingTop: 22,
           opacity: voiceEnabled ? 1 : 0.5,
-          pointerEvents: voiceEnabled ? 'auto' : 'none',
         }}
       >
         <Toggle
@@ -903,6 +922,7 @@ function VozSection({
           onChange={setTtsEnabled}
           label="Mabel lee sus respuestas en chat texto"
           hint="Cuando Mabel responde en el chat de texto, su mensaje se reproduce automaticamente en voz alta sin que tengas que pedirlo."
+          disabled={!voiceEnabled}
         />
       </div>
 
@@ -911,7 +931,6 @@ function VozSection({
         style={{
           paddingTop: 22,
           opacity: voiceEnabled ? 1 : 0.5,
-          pointerEvents: voiceEnabled ? 'auto' : 'none',
         }}
       >
         <Toggle
@@ -919,6 +938,7 @@ function VozSection({
           onChange={setSubtitles}
           label="Resaltar palabras mientras Mabel habla"
           hint="En cualquier mensaje que se reproduzca por voz, resalta en su burbuja la palabra que esta pronunciando ahora mismo — util para seguir el ritmo y para baja audicion."
+          disabled={!voiceEnabled}
         />
       </div>
 

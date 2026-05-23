@@ -3,6 +3,7 @@ interface ToggleProps {
   onChange: (next: boolean) => void
   label: string
   hint?: string
+  disabled?: boolean
 }
 
 /**
@@ -12,10 +13,18 @@ interface ToggleProps {
  *  - Including label + hint inline (left), switch (right)
  *  - 40x22 pill with 18x18 animated thumb (ink-200 off / mabel-600 on)
  *  - Bottom border ink-100 between rows
+ *  - Supports `disabled` para a11y: el boton sale del tab order y no
+ *    responde a Space/Enter cuando esta gated por un master toggle.
  *
  * Used only inside Settings sections.
  */
-export default function Toggle({ checked, onChange, label, hint }: ToggleProps) {
+export default function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled = false,
+}: ToggleProps) {
   return (
     <div
       style={{
@@ -24,6 +33,7 @@ export default function Toggle({ checked, onChange, label, hint }: ToggleProps) 
         justifyContent: 'space-between',
         padding: '16px 0',
         borderBottom: '1px solid var(--ink-100)',
+        opacity: disabled ? 0.55 : 1,
       }}
     >
       <div style={{ flex: 1, paddingRight: 16 }}>
@@ -51,7 +61,8 @@ export default function Toggle({ checked, onChange, label, hint }: ToggleProps) 
       </div>
       <button
         type="button"
-        onClick={() => onChange(!checked)}
+        onClick={() => !disabled && onChange(!checked)}
+        disabled={disabled}
         role="switch"
         aria-checked={checked}
         aria-label={label}
@@ -61,7 +72,7 @@ export default function Toggle({ checked, onChange, label, hint }: ToggleProps) 
           borderRadius: 999,
           background: checked ? 'var(--mabel-600)' : 'var(--ink-200)',
           border: 'none',
-          cursor: 'pointer',
+          cursor: disabled ? 'not-allowed' : 'pointer',
           position: 'relative',
           flexShrink: 0,
           transition: 'background var(--dur-base) var(--ease-out)',
