@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,7 +10,11 @@ from app.models.base import Base
 
 class ConsentVersion(Base):
     __tablename__ = "consent_versions"
-    __table_args__ = (CheckConstraint("status IN ('draft', 'active', 'archived')", name="chk_consent_versions_status"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'active', 'archived')", name="chk_consent_versions_status"),
+        # Mirror DDL so autogenerate doesn't propose to drop the partial index.
+        Index("idx_consent_versions_active", "status", postgresql_where=text("status = 'active'")),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")

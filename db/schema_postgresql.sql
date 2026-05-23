@@ -155,9 +155,17 @@ CREATE INDEX idx_messages_latency      ON messages(latency_ms)
 -- El check `if existing: return None` no es atomico; este indice unico
 -- parcial garantiza que solo UN saludo sobrevive por sesion. La segunda
 -- transaccion levanta IntegrityError, el service la maneja y retorna None.
+-- Predicado: text equality `meta->>'greeting' = 'true'` (no cast a boolean).
+-- Razon: `meta` es JSONB libre; un row futuro con `{"greeting": "yes"}`
+-- haria que `'yes'::boolean` levantara `invalid input syntax for type boolean`
+-- al evaluar el predicado del indice y rompiera CUALQUIER INSERT sobre la
+-- tabla. Text equality matchea exactamente lo que escribe el backend
+-- (Python `True` -> JSONB boolean -> text `'true'`) y lo que consulta
+-- `MessageRepository.find_greeting`, asi el planner puede usar este indice
+-- como single-row probe.
 CREATE UNIQUE INDEX uq_messages_session_greeting ON messages(session_id)
                                                  WHERE role = 'assistant'
-                                                   AND (meta->>'greeting')::boolean = true;
+                                                   AND meta->>'greeting' = 'true';
 -- [Evolucion 006] indice parcial sobre cohort
 CREATE INDEX idx_users_cohort          ON users(cohort) WHERE cohort IS NOT NULL;
 -- (Opcional - habilitar post-MVP si volumen > 100K mensajes)

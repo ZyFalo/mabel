@@ -51,7 +51,7 @@ async def audit_log_action(
     db: AsyncSession,
     *,
     actor_id: uuid.UUID | None,
-    actor_role: Literal["admin", "student", "system"] = "admin",
+    actor_role: Literal["admin", "student", "system"],
     action: str,
     target_type: str | None = None,
     target_id: uuid.UUID | None = None,
@@ -67,6 +67,10 @@ async def audit_log_action(
     Kwargs-only signature (after the `*`) forces every caller to be
     explicit about `actor_role`, which makes the audit feed honest about
     whether an action was driven by an admin, a student, or the system.
+    There is intentionally NO default for `actor_role`: the previous
+    `= "admin"` silently mislabeled new student/system call sites that
+    forgot the kwarg (matched by the corresponding DROP DEFAULT in
+    migration 008 and the missing `server_default` on the model).
     """
     repo = AuditLogRepository(db)
     await repo.create(

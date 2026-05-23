@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,6 +10,16 @@ from app.models.base import Base
 
 class Session(Base):
     __tablename__ = "sessions"
+    __table_args__ = (
+        # Mirror DDL so autogenerate doesn't propose to drop these.
+        Index("idx_sessions_user_time", "user_id", "started_at"),
+        Index(
+            "uq_sessions_user_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("ended_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")

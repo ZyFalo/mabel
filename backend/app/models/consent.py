@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,6 +13,8 @@ class Consent(Base):
     __table_args__ = (
         CheckConstraint("scope IN ('solo_uso', 'uso_mejora_anon')", name="chk_consents_scope"),
         UniqueConstraint("user_id", "consent_version_id", name="uq_consents_user_version"),
+        # Mirror DDL so autogenerate doesn't propose to drop the index.
+        Index("idx_consents_user_latest", "user_id", text("accepted_at DESC")),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

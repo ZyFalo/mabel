@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, String, text
+from sqlalchemy import CheckConstraint, DateTime, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,6 +15,14 @@ class User(Base):
         CheckConstraint(
             "disabled_at IS NULL OR disabled_reason IS NOT NULL",
             name="chk_users_disabled_reason",
+        ),
+        # Mirrors migration 006 + `db/schema_postgresql.sql`. Without this
+        # declaration `alembic revision --autogenerate` would propose to
+        # DROP `idx_users_cohort` on the next schema change.
+        Index(
+            "idx_users_cohort",
+            "cohort",
+            postgresql_where=text("cohort IS NOT NULL"),
         ),
     )
 
@@ -31,7 +39,7 @@ class User(Base):
         DateTime(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP")
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    cohort: Mapped[str | None] = mapped_column(String, nullable=True)
+    cohort: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     consents = relationship("Consent", back_populates="user", cascade="all, delete-orphan")
     preferences = relationship("Preference", back_populates="user", uselist=False, cascade="all, delete-orphan")

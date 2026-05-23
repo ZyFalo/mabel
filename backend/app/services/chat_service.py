@@ -4,9 +4,11 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
+from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
+from app.models.message import Message
 from app.repositories.message_repository import MessageRepository
 from app.repositories.preference_repository import PreferenceRepository
 from app.repositories.session_repository import SessionRepository
@@ -303,6 +305,40 @@ class ChatService:
                 # return None. The first one already saved the greeting and
                 # the client just sees a benign null on the loser race.
                 await self.message_repo.db.rollback()
+
+                # Token attribution: even though this INSERT lost, the LLM
+                # was actually invoked and billed for `usage_sink`. If we
+                # discarded these tokens, the metrics dashboard would
+                # under-report cost (subtle bias proportional to StrictMode
+                # / double-click frequency in the pilot). We add them to
+                # the surviving greeting via UPDATE so the dashboard sees
+                # the true cost of producing this greeting.
+                #
+                # The UPDATE is built as a single SQL statement with a
+                # COALESCE(col, 0) + :delta increment, NOT a Python
+                # read-modify-write on the ORM object. This is intentional:
+                # with two or more concurrent losers (3+ greeting requests
+                # in flight, e.g. StrictMode + retries) a Python-side
+                # read-then-write would let both losers read the same
+                # snapshot of `tokens_prompt = X` and both commit
+                # `X + their_delta`, dropping one of the deltas via
+                # last-commit-wins. The SQL-side increment makes the
+                # delta atomic per loser; concurrent UPDATEs serialize on
+                # the row lock and both deltas land.
+                prompt = usage_sink.get("prompt_tokens") or 0
+                completion = usage_sink.get("completion_tokens") or 0
+                if prompt or completion:
+                    winner = await self.message_repo.find_greeting(session_id)
+                    if winner is not None:
+                        await self.message_repo.db.execute(
+                            update(Message)
+                            .where(Message.id == winner.id)
+                            .values(
+                                tokens_prompt=func.coalesce(Message.tokens_prompt, 0) + prompt,
+                                tokens_completion=func.coalesce(Message.tokens_completion, 0) + completion,
+                            )
+                        )
+                        await self.message_repo.db.commit()
                 return None
             return {"id": str(msg.id), "role": "assistant", "content": full_response, "created_at": str(msg.created_at)}
 

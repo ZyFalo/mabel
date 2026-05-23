@@ -19,12 +19,14 @@ import hashlib
 import math
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
+from datetime import time as dtime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import scipy.stats as scipy_stats
-from sqlalchemy import Float, Integer, String, cast, func, select
+from sqlalchemy import Float, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.message import Message
@@ -35,6 +37,16 @@ from app.models.survey_response import SurveyResponse
 from app.models.user import User
 from app.repositories.empathy_rating_repository import EmpathyRatingRepository
 from app.repositories.survey_response_repository import SurveyResponseRepository
+
+# Pilot study runs in Bogotá. All admin "today / last 30 days / per-day bucket"
+# semantics MUST be anchored to America/Bogota — anchoring to UTC produces a
+# 5-hour cutoff bug: events created between 19:00–23:59 hora Bogotá (= 00:00–
+# 04:59 UTC next day) get classified into the wrong day, and the "hoy" filter
+# loses the last 5 hours of activity. Per the cohort coordinator decision
+# this is the canonical timezone for every aggregation surfaced in the
+# admin panel.
+BOGOTA_TZ = ZoneInfo("America/Bogota")
+BOGOTA_TZ_NAME = "America/Bogota"
 
 # Gemini 2.5 Flash pricing snapshot (USD per 1M tokens).
 # Source: Google AI pricing page (as of 2026 — verified for gemini-2.5-flash).
@@ -49,12 +61,23 @@ def _hash16(value: object) -> str:
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
+
+
+def _bogota_today() -> date:
+    """Calendar date 'today' in America/Bogota.
+
+    Using `date.today()` would read the server clock in its local timezone
+    (UTC inside Docker / Railway), which is wrong: a request issued at 21:00
+    hora Bogotá would set `today` to the NEXT day, losing 5 hours of
+    aggregated activity.
+    """
+    return datetime.now(BOGOTA_TZ).date()
 
 
 def _date_range(from_date: date | None, to_date: date | None) -> tuple[date, date]:
-    """Normalize from/to. Default last 30 days inclusive."""
-    today = date.today()
+    """Normalize from/to. Default last 30 days inclusive (Bogotá-anchored)."""
+    today = _bogota_today()
     to_d = to_date or today
     from_d = from_date or (to_d - timedelta(days=30))
     if from_d > to_d:
@@ -63,15 +86,46 @@ def _date_range(from_date: date | None, to_date: date | None) -> tuple[date, dat
 
 
 def _to_dt(d: date, end: bool = False) -> datetime:
-    """Convert a calendar date to a UTC-aware bound used in TIMESTAMPTZ queries.
+    """Convert a calendar date to a Bogotá-aware bound for TIMESTAMPTZ queries.
 
-    `datetime.combine(d, t)` returns a naive datetime; with TIMESTAMPTZ columns
-    asyncpg rejects the comparison ("can't subtract offset-aware and
-    offset-naive"). We anchor the bound to UTC so it composes cleanly with
-    the now-aware columns. End-of-day uses `datetime.max.time()` (23:59:59.999999).
+    Before the TZ fix this anchored the bound to UTC, so the "to" bound for
+    "today" was 23:59:59 UTC = 18:59:59 hora Bogotá: events between 19:00 and
+    23:59 hora Bogotá were silently filtered out. We now anchor to
+    `America/Bogota`; asyncpg converts to UTC at the wire boundary, so the
+    SQL still compares offset-aware values correctly.
+
+    End-of-day uses `time.max` (23:59:59.999999) in Bogotá, which is
+    04:59:59.999999 UTC of the NEXT calendar day.
     """
-    naive = datetime.combine(d, datetime.max.time() if end else datetime.min.time())
-    return naive.replace(tzinfo=timezone.utc)
+    t = dtime.max if end else dtime.min
+    return datetime.combine(d, t, tzinfo=BOGOTA_TZ)
+
+
+def _bogota_day_trunc(col):
+    """`date_trunc('day', col AT TIME ZONE 'America/Bogota')` for daily bucketing.
+
+    Postgres `date_trunc('day', tstz_col)` truncates by UTC day. To get
+    Bogotá-aligned daily buckets (so 21:00 hora Bogotá doesn't roll into the
+    next day) we shift to local time first. The result is a naive timestamp
+    representing the Bogotá-local start-of-day, which `_date_str` formats
+    as YYYY-MM-DD without further conversion.
+    """
+    return func.date_trunc("day", func.timezone(BOGOTA_TZ_NAME, col))
+
+
+def _bogota_week_trunc(col):
+    """Same as `_bogota_day_trunc` but truncates to ISO week (Mon)."""
+    return func.date_trunc("week", func.timezone(BOGOTA_TZ_NAME, col))
+
+
+def _bogota_date_of(col):
+    """`(col AT TIME ZONE 'America/Bogota')::date` — for equality with a date.
+
+    Used by KPIs that compare against `_bogota_today()` (e.g. "sessions today").
+    Without this, `func.date(SessionModel.started_at)` would extract the UTC
+    calendar date and mis-bucket evening Bogotá traffic into tomorrow.
+    """
+    return func.date(func.timezone(BOGOTA_TZ_NAME, col))
 
 
 # ---------------------------------------------------------------------------
@@ -255,11 +309,15 @@ class AdminMetricsService:
 
     async def dashboard_kpis(self, cohort: str | None = None) -> dict[str, Any]:
         now = _utc_now()
-        today = date.today()
-        week_ago = now - timedelta(days=7)
+        today = _bogota_today()
+        # Calendar-day windows (anchored to Bogotá midnight) for series
+        # bucketed by `_bogota_day_trunc` — keeps the leftmost daily bar
+        # full instead of partial. `day_ago` stays as a rolling 24 h window
+        # because it feeds scalar KPIs (safety_events_24h), not daily series.
+        week_ago = _bogota_window_start(7)
         day_ago = now - timedelta(hours=24)
-        thirty_days_ago = now - timedelta(days=30)
-        fourteen_days_ago = now - timedelta(days=14)
+        thirty_days_ago = _bogota_window_start(30)
+        fourteen_days_ago = _bogota_window_start(14)
 
         # KPI: total active users
         total_users_stmt = select(func.count()).select_from(User).where(User.deleted_at.is_(None))
@@ -275,9 +333,9 @@ class AdminMetricsService:
             new_week_stmt = new_week_stmt.where(User.cohort == cohort)
         users_new_this_week = await self._scalar(new_week_stmt)
 
-        # KPI: sessions today (by date of started_at)
+        # KPI: sessions today (by Bogotá-local date of started_at)
         sessions_today_stmt = (
-            select(func.count()).select_from(SessionModel).where(func.date(SessionModel.started_at) == today)
+            select(func.count()).select_from(SessionModel).where(_bogota_date_of(SessionModel.started_at) == today)
         )
         if cohort is not None:
             sessions_today_stmt = sessions_today_stmt.join(User, SessionModel.user_id == User.id).where(
@@ -415,8 +473,8 @@ class AdminMetricsService:
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
 
-        # Active users per day (distinct user_id in sessions)
-        day_col = func.date_trunc("day", SessionModel.started_at).label("day")
+        # Active users per day (distinct user_id in sessions, Bogotá-day buckets)
+        day_col = _bogota_day_trunc(SessionModel.started_at).label("day")
         active_users_stmt = (
             select(day_col, func.count(func.distinct(SessionModel.user_id)).label("count"))
             .where(SessionModel.started_at >= from_dt, SessionModel.started_at <= to_dt)
@@ -524,8 +582,8 @@ class AdminMetricsService:
         sleep_expr = cast(SessionModel.checkin_payload["sleep"].astext, Float)
         focus_expr = SessionModel.checkin_payload["focus"].astext
 
-        # Mood per day (mean)
-        day_col = func.date_trunc("day", SessionModel.checkin_completed_at).label("day")
+        # Mood per day (mean) — Bogotá-day buckets
+        day_col = _bogota_day_trunc(SessionModel.checkin_completed_at).label("day")
         mood_stmt = (
             select(day_col, func.avg(mood_expr).label("mean"))
             .where(*completed_filter)
@@ -551,8 +609,8 @@ class AdminMetricsService:
             {"date": _date_str(d), "mean": float(m) if m is not None else None} for d, m in sleep_result.all()
         ]
 
-        # Focus distribution per week
-        week_col = func.date_trunc("week", SessionModel.checkin_completed_at).label("week")
+        # Focus distribution per week (Bogotá ISO weeks)
+        week_col = _bogota_week_trunc(SessionModel.checkin_completed_at).label("week")
         focus_stmt = (
             select(week_col, focus_expr.label("focus"), func.count().label("count"))
             .where(*completed_filter)
@@ -626,8 +684,8 @@ class AdminMetricsService:
                 .where(User.cohort == cohort)
             )
 
-        # Latency percentiles per day (assistant messages)
-        day_col = func.date_trunc("day", Message.created_at).label("day")
+        # Latency percentiles per day (assistant messages, Bogotá-day buckets)
+        day_col = _bogota_day_trunc(Message.created_at).label("day")
         latency_filter = (
             Message.role == "assistant",
             Message.latency_ms.is_not(None),
@@ -661,8 +719,8 @@ class AdminMetricsService:
         under_20s = int((await self.db.execute(under_20s_stmt)).scalar_one())
         pct_turns_under_20s = (under_20s / total_turns * 100.0) if total_turns > 0 else 0.0
 
-        # Tokens per day (assistant messages — completion + matching prompt)
-        token_day_col = func.date_trunc("day", Message.created_at).label("day")
+        # Tokens per day (assistant messages — completion + matching prompt, Bogotá)
+        token_day_col = _bogota_day_trunc(Message.created_at).label("day")
         tokens_stmt = (
             select(
                 token_day_col,
@@ -722,8 +780,8 @@ class AdminMetricsService:
                 return stmt
             return stmt.join(User, SafetyEvent.user_id == User.id).where(User.cohort == cohort)
 
-        # Safety events per day
-        day_col = func.date_trunc("day", SafetyEvent.created_at).label("day")
+        # Safety events per day (Bogotá-day buckets)
+        day_col = _bogota_day_trunc(SafetyEvent.created_at).label("day")
         per_day_stmt = (
             select(day_col, func.count().label("count"))
             .where(SafetyEvent.created_at >= from_dt, SafetyEvent.created_at <= to_dt)
@@ -888,11 +946,11 @@ class AdminMetricsService:
             result = await self.db.execute(stmt)
             for sid, uid, started, ended, mc in result.all():
                 yield [
-                    started.date().isoformat() if started else "",
+                    _bogota_date_str(started),
                     _hash16(sid),
                     _hash16(uid) if uid else "",
-                    started.isoformat() if started else "",
-                    ended.isoformat() if ended else "",
+                    _bogota_iso_str(started),
+                    _bogota_iso_str(ended),
                     str(int(mc) if mc is not None else 0),
                 ]
 
@@ -918,7 +976,7 @@ class AdminMetricsService:
             for sid, uid, when, payload in result.all():
                 payload = payload or {}
                 yield [
-                    when.date().isoformat() if when else "",
+                    _bogota_date_str(when),
                     _hash16(sid),
                     _hash16(uid) if uid else "",
                     str(payload.get("mood", "")),
@@ -960,7 +1018,7 @@ class AdminMetricsService:
             result = await self.db.execute(stmt)
             for mid, sid, when, lat, tp, tc in result.all():
                 yield [
-                    when.date().isoformat() if when else "",
+                    _bogota_date_str(when),
                     _hash16(mid),
                     _hash16(sid) if sid else "",
                     str(lat if lat is not None else ""),
@@ -996,7 +1054,7 @@ class AdminMetricsService:
                     if isinstance(raw_sev, (int, float)):
                         sev = int(raw_sev)
                 yield [
-                    ev.created_at.date().isoformat() if ev.created_at else "",
+                    _bogota_date_str(ev.created_at),
                     _hash16(ev.id),
                     _hash16(ev.user_id) if ev.user_id else "",
                     _hash16(ev.session_id) if ev.session_id else "",
@@ -1040,7 +1098,7 @@ class AdminMetricsService:
         return int(value) if value is not None else 0
 
     async def _sessions_per_day(self, from_dt: datetime, to_dt: datetime, cohort: str | None = None) -> list[dict]:
-        day_col = func.date_trunc("day", SessionModel.started_at).label("day")
+        day_col = _bogota_day_trunc(SessionModel.started_at).label("day")
         stmt = (
             select(day_col, func.count().label("count"))
             .where(SessionModel.started_at >= from_dt, SessionModel.started_at <= to_dt)
@@ -1077,7 +1135,7 @@ class AdminMetricsService:
         return {"bajo": bajo, "medio": medio, "alto": alto}
 
     async def _latency_per_day(self, from_dt: datetime, to_dt: datetime, cohort: str | None = None) -> list[dict]:
-        day_col = func.date_trunc("day", Message.created_at).label("day")
+        day_col = _bogota_day_trunc(Message.created_at).label("day")
         stmt = (
             select(day_col, func.avg(Message.latency_ms).label("avg_ms"))
             .where(
@@ -1117,7 +1175,7 @@ class AdminMetricsService:
         event_type: str,
         cohort: str | None = None,
     ) -> list[dict]:
-        day_col = func.date_trunc("day", SafetyEvent.created_at).label("day")
+        day_col = _bogota_day_trunc(SafetyEvent.created_at).label("day")
         stmt = (
             select(day_col, func.count().label("count"))
             .where(
@@ -1197,7 +1255,12 @@ class AdminMetricsService:
 
 
 def _date_str(d: Any) -> str:
-    """Format a datetime/date from date_trunc as YYYY-MM-DD."""
+    """Format a datetime/date from date_trunc as YYYY-MM-DD.
+
+    `_bogota_day_trunc` returns a naive timestamp (Postgres `timezone(tz, col)`
+    drops the offset after converting), so the wall-clock day is already the
+    Bogotá day — no extra conversion required.
+    """
     if d is None:
         return ""
     if isinstance(d, datetime):
@@ -1205,3 +1268,51 @@ def _date_str(d: Any) -> str:
     if isinstance(d, date):
         return d.isoformat()
     return str(d)
+
+
+def _bogota_date_str(dt: datetime | None) -> str:
+    """Format an aware UTC datetime as the Bogotá-local YYYY-MM-DD.
+
+    Used by CSV export rows that aggregate by calendar day from raw
+    TIMESTAMPTZ columns: asyncpg returns those as `datetime` with
+    `tzinfo=UTC`, so a naive `.date()` would silently use the UTC date.
+    """
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(BOGOTA_TZ).date().isoformat()
+
+
+def _bogota_iso_str(dt: datetime | None) -> str:
+    """Format an aware datetime as an ISO 8601 string in America/Bogota.
+
+    The CSV export emits both a calendar `date` column (Bogotá-local, via
+    `_bogota_date_str`) AND raw start/end ISO timestamps. Before this helper
+    those raw timestamps were emitted as `.isoformat()` straight from asyncpg
+    (which returns TIMESTAMPTZ with `tzinfo=UTC`), so a session started at
+    2026-05-23T03:30:00+00:00 would show up alongside `date=2026-05-22` —
+    same instant, different calendar day, looking like a corrupt export to
+    researchers reconciling the columns in Excel. We now render both
+    sides of the row in the same timezone so the `date` column matches
+    the wall-clock displayed in `started_at`/`ended_at`.
+    """
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(BOGOTA_TZ).isoformat()
+
+
+def _bogota_window_start(days: int) -> datetime:
+    """Aware-Bogotá datetime for the start of the day `days` ago.
+
+    The dashboard KPIs feed rolling windows into series that bucket by
+    `_bogota_day_trunc`. Anchoring the WHERE bound to `datetime.now(UTC)`
+    while the GROUP BY uses Bogotá midnight creates partial-day buckets at
+    the edges (0–5 h short), so the leftmost daily bar silently undercounts
+    whenever the request fires before 05:00 UTC (= midnight Bogotá). Using
+    Bogotá midnight as the window edge keeps the bucket and the window
+    aligned, so the leftmost bar always covers a full Bogotá day.
+    """
+    return _to_dt(_bogota_today() - timedelta(days=days))

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,9 +26,12 @@ class AuditLog(Base):
     actor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    actor_role: Mapped[str] = mapped_column(
-        String, nullable=False, server_default=text("'admin'")
-    )
+    # No server_default: migration 008 backfilled historic rows with
+    # 'admin' (correct label — pre-007 audit was admin-only) and then
+    # DROPped the DEFAULT so any future INSERT that omits actor_role
+    # fails loudly with a NOT NULL violation instead of silently
+    # mislabeling student/system rows as 'admin'.
+    actor_role: Mapped[str] = mapped_column(Text, nullable=False)
     action: Mapped[str] = mapped_column(String, nullable=False)
     target_type: Mapped[str | None] = mapped_column(String, nullable=True)
     target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)

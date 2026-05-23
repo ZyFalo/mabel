@@ -37,3 +37,22 @@ class MessageRepository:
         messages = list(result.scalars().all())
         messages.reverse()  # chronological order
         return messages
+
+    async def find_greeting(self, session_id: uuid.UUID) -> Message | None:
+        """Return the unique greeting row for a session, if any.
+
+        Pairs with the partial UNIQUE INDEX `uq_messages_session_greeting`
+        (`role='assistant' AND meta->>'greeting' = 'true'`). Used by the
+        greeting-race recovery path in ChatService to attribute consumed
+        tokens to the surviving INSERT.
+        """
+        result = await self.db.execute(
+            select(Message)
+            .where(
+                Message.session_id == session_id,
+                Message.role == "assistant",
+                Message.meta["greeting"].astext == "true",
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()

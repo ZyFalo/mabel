@@ -9,10 +9,12 @@ Implements the admin Empathy Ratings flow:
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, true
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.models.empathy_rating import EmpathyRating
 from app.models.message import Message
@@ -21,6 +23,50 @@ from app.models.user import User
 from app.repositories.empathy_rating_repository import EmpathyRatingRepository
 from app.services.admin.users_service import mask_email
 from app.services.audit_service import audit_log_action
+
+
+async def _batch_preceding_user_messages(
+    db: AsyncSession, anchors: Sequence[Message]
+) -> dict[uuid.UUID, str]:
+    """Return {anchor_message_id: previous_user_message_content} in ONE query.
+
+    Replaces the previous per-message ``SELECT ... ORDER BY created_at DESC
+    LIMIT 1`` loop (N+1 against ``messages``) with a single Postgres LATERAL
+    join: for each anchor we ask the planner for the latest user message in
+    the same session strictly preceding the anchor. At pilot scale (30
+    students × 50 sessions × 10 msgs ≈ 15k ratings) the loop made the
+    Calificadas tab visibly slow — this version is O(1) round-trip and uses
+    the same index as the original (``messages(session_id, created_at)``).
+    """
+    if not anchors:
+        return {}
+
+    anchor_ids = [m.id for m in anchors]
+
+    # Aliased target message and previous user-message inside a LATERAL.
+    Anchor = aliased(Message, name="anchor_msg")
+    Prev = aliased(Message, name="prev_user_msg")
+
+    prev_lat = (
+        select(Prev.content.label("prev_content"))
+        .where(
+            Prev.session_id == Anchor.session_id,
+            Prev.role == "user",
+            Prev.created_at < Anchor.created_at,
+        )
+        .order_by(Prev.created_at.desc())
+        .limit(1)
+        .lateral("prev_lat")
+    )
+
+    stmt = (
+        select(Anchor.id, prev_lat.c.prev_content)
+        .select_from(Anchor)
+        .join(prev_lat, true(), isouter=True)
+        .where(Anchor.id.in_(anchor_ids))
+    )
+    result = await db.execute(stmt)
+    return {row[0]: row[1] for row in result.all() if row[1] is not None}
 
 
 class AdminEmpathyService:
@@ -70,25 +116,10 @@ class AdminEmpathyService:
             s.id: s.started_at for s in sessions_result.scalars().all()
         }
 
-        # S-02: Load the immediately preceding user message per assistant msg
-        # for rater context (improves scoring accuracy). One query per session
-        # ID range — for the pilot's small batch (limit<=100) the overhead is
-        # negligible vs N+1 with explicit JOIN/lateral.
-        preceding_by_msg: dict[uuid.UUID, str] = {}
-        for m in messages:
-            prev_result = await self.db.execute(
-                select(Message.content)
-                .where(
-                    Message.session_id == m.session_id,
-                    Message.role == "user",
-                    Message.created_at < m.created_at,
-                )
-                .order_by(Message.created_at.desc())
-                .limit(1)
-            )
-            prev = prev_result.scalar_one_or_none()
-            if prev is not None:
-                preceding_by_msg[m.id] = prev
+        # S-02: Load the immediately preceding user message per assistant
+        # message in ONE LATERAL query (single round-trip — see
+        # `_batch_preceding_user_messages`).
+        preceding_by_msg = await _batch_preceding_user_messages(self.db, messages)
 
         out: list[dict] = []
         for m in messages:
@@ -192,23 +223,16 @@ class AdminEmpathyService:
             for rid, email in rater_result.all():
                 rater_emails[rid] = mask_email(email)
 
-        # 3. Load preceding user messages per assistant message (same N+1
-        #    approach as get_queue — fine for pilot scale).
-        preceding_by_msg: dict[uuid.UUID, str] = {}
+        # 3. Load preceding user messages in ONE LATERAL query (see
+        #    `_batch_preceding_user_messages`). Dedupe anchors by id because
+        #    the same assistant message can appear in multiple rating rows
+        #    (cross-rater visibility), and we only need its predecessor once.
+        anchor_msgs: dict[uuid.UUID, Message] = {}
         for _r, m, _s, _u in rows:
-            prev_result = await self.db.execute(
-                select(Message.content)
-                .where(
-                    Message.session_id == m.session_id,
-                    Message.role == "user",
-                    Message.created_at < m.created_at,
-                )
-                .order_by(Message.created_at.desc())
-                .limit(1)
-            )
-            prev = prev_result.scalar_one_or_none()
-            if prev is not None:
-                preceding_by_msg[m.id] = prev
+            anchor_msgs.setdefault(m.id, m)
+        preceding_by_msg = await _batch_preceding_user_messages(
+            self.db, list(anchor_msgs.values())
+        )
 
         items: list[dict] = []
         for rating, message, session, _user in rows:
