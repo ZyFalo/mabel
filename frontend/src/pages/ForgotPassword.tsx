@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Mail, ArrowLeft, ArrowRight, Check } from 'lucide-react'
+import { Mail, ArrowLeft, ArrowRight, Check, AlertTriangle } from 'lucide-react'
 import apiClient from '../api/client'
 import AuthShell from '../components/auth/AuthShell'
 import Input from '../components/settings/primitives/Input'
@@ -9,16 +9,17 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
-  const [resetLink, setResetLink] = useState('')
 
   async function handleSubmit(ev: FormEvent) {
     ev.preventDefault()
     setLoading(true)
     try {
-      const res = await apiClient.post('/auth/forgot-password', { email })
+      await apiClient.post('/auth/forgot-password', { email })
       setSent(true)
-      if (res.data.reset_link) setResetLink(res.data.reset_link)
     } catch {
+      // Mismo path success que el OK por anti-enumeracion (D-03): el
+      // usuario nunca debe poder distinguir "email existe" de "email no
+      // existe" desde el resultado de este endpoint.
       setSent(true)
     } finally {
       setLoading(false)
@@ -49,6 +50,10 @@ export default function ForgotPassword() {
       }
     >
       <div>
+        <Link to="/login" className="auth-back-link">
+          <ArrowLeft size={14} strokeWidth={2.25} />
+          Volver al inicio de sesión
+        </Link>
         <h2
           style={{
             fontSize: 26,
@@ -61,9 +66,39 @@ export default function ForgotPassword() {
         >
           Recuperar contraseña
         </h2>
-        <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 24px' }}>
+        <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 18px' }}>
           Ingresa tu email institucional y te enviaremos instrucciones.
         </p>
+
+        {/* Aviso honesto: el envio de correo aun no esta cableado a un
+            proveedor SMTP. El usuario que pulsa este boton no recibira
+            nada en su bandeja — la unica via para recuperar acceso es
+            que el administrador resetee la clave manualmente. Lo
+            mostramos siempre (no solo en el estado `sent`) para que
+            nadie pierda 24h esperando un correo que no llegara. */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            padding: '12px 14px',
+            fontSize: 12.5,
+            lineHeight: 1.5,
+            borderRadius: 12,
+            background: 'var(--warn-50)',
+            color: 'var(--warn-700)',
+            border: '1px solid var(--warn-200)',
+            alignItems: 'flex-start',
+            marginBottom: 20,
+          }}
+        >
+          <AlertTriangle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
+          <span>
+            <strong>Funcion en habilitacion.</strong> El envio automatico
+            por correo aun no esta disponible en esta version. Si necesitas
+            recuperar tu acceso, escribe al administrador del proyecto
+            indicando tu correo institucional.
+          </span>
+        </div>
 
         {sent ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -83,49 +118,6 @@ export default function ForgotPassword() {
               <Check size={16} style={{ marginTop: 2, flexShrink: 0 }} />
               <span>Si el email está registrado, recibirás instrucciones en breve.</span>
             </div>
-            {resetLink && (
-              <div
-                style={{
-                  padding: 14,
-                  borderRadius: 12,
-                  background: 'var(--ink-50)',
-                  border: '1px dashed var(--ink-200)',
-                }}
-              >
-                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-700)', marginBottom: 6 }}>
-                  Enlace simulado (MVP)
-                </p>
-                <Link
-                  to={resetLink}
-                  style={{
-                    fontSize: 12,
-                    color: 'var(--mabel-600)',
-                    wordBreak: 'break-all',
-                    textDecoration: 'underline',
-                  }}
-                >
-                  {window.location.origin}
-                  {resetLink}
-                </Link>
-              </div>
-            )}
-            <Link
-              to="/login"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                marginTop: 6,
-                fontSize: 13,
-                color: 'var(--mabel-600)',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              <ArrowLeft size={14} />
-              Volver al inicio de sesión
-            </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -183,23 +175,6 @@ export default function ForgotPassword() {
               {loading ? 'Enviando...' : 'Enviar enlace'}
               {!loading && <ArrowRight size={15} strokeWidth={2.25} />}
             </button>
-            <Link
-              to="/login"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                marginTop: 4,
-                fontSize: 13,
-                color: 'var(--mabel-600)',
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
-            >
-              <ArrowLeft size={14} />
-              Volver al inicio de sesión
-            </Link>
           </form>
         )}
       </div>

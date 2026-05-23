@@ -5,6 +5,7 @@ import AuthShell from '../components/auth/AuthShell'
 export default function Landing() {
   return (
     <AuthShell
+      compactHero
       side={
         <div>
           <div

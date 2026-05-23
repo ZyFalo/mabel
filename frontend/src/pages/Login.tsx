@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Mail, Lock, ArrowRight } from 'lucide-react'
+import { Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuthStore } from '../stores/authStore'
 import AuthShell from '../components/auth/AuthShell'
@@ -73,6 +73,10 @@ export default function Login() {
       }
     >
       <div>
+        <Link to="/" className="auth-back-link">
+          <ArrowLeft size={14} strokeWidth={2.25} />
+          Volver al inicio
+        </Link>
         <h2
           style={{
             fontSize: 26,

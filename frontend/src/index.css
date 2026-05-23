@@ -267,3 +267,31 @@ button, input, select, textarea {
     padding-left: 60px !important;
   }
 }
+
+/* ============================================================
+   Auth back link — shared style for "← Volver" link in Landing/
+   Login/Register/ForgotPassword. CSS class porque `:focus-visible`
+   no es posible via inline styles (WCAG 2.4.7 Focus Visible).
+   ============================================================ */
+.auth-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-500);
+  text-decoration: none;
+  margin-bottom: 18px;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin-left: -4px;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.auth-back-link:hover {
+  color: var(--mabel-600);
+}
+.auth-back-link:focus-visible {
+  outline: 2px solid var(--mabel-600);
+  outline-offset: 2px;
+  color: var(--mabel-600);
+}

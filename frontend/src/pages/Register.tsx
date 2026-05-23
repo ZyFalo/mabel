@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { User, Mail, Lock, ArrowRight } from 'lucide-react'
+import { User, Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react'
 import apiClient from '../api/client'
 import AuthShell from '../components/auth/AuthShell'
 import Input from '../components/settings/primitives/Input'
@@ -87,6 +87,10 @@ export default function Register() {
       }
     >
       <div>
+        <Link to="/" className="auth-back-link">
+          <ArrowLeft size={14} strokeWidth={2.25} />
+          Volver al inicio
+        </Link>
         <h2
           style={{
             fontSize: 26,

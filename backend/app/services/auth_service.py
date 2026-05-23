@@ -152,12 +152,20 @@ class AuthService:
             user_id=user.id, token_hash=token_hash, expires_at=expires_at
         )
 
-        reset_link = f"/reset-password/{raw_token}"
+        # SEGURIDAD: NO devolvemos `reset_link` en la response. Antes lo
+        # haciamos para acelerar el dev local, pero en produccion eso
+        # significa que cualquiera que conozca el email de otra persona
+        # puede pedir el endpoint y recibir un token valido para
+        # tomarle la cuenta. Los emails @umb.edu.co son enumerables
+        # (firstname.lastname@umb.edu.co), asi que el riesgo es real.
+        # El reset_link solo debe viajar via correo (cuando se cablee
+        # SMTP). Mientras tanto, el operador puede consultar la tabla
+        # `password_reset_tokens` para asistir al usuario manualmente.
+        _ = raw_token  # token creado y persistido; no expuesto via API.
 
         return (
             ForgotPasswordResponse(
                 message="Si el email esta registrado, recibiras instrucciones",
-                reset_link=reset_link,
             ),
             user.id,
         )
