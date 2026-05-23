@@ -573,8 +573,6 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
                   checkinEnabled={checkinEnabled}
                   setCheckinEnabled={setCheckinEnabled}
                   onSave={savePrivacy}
-                  onOpenArco={() => setShowArco(true)}
-                  onRevokeConsent={() => setShowRevoke(true)}
                 />
               )}
 
@@ -700,8 +698,6 @@ interface PrivacidadSectionProps {
   checkinEnabled: boolean
   setCheckinEnabled: (v: boolean) => void
   onSave: () => void
-  onOpenArco: () => void
-  onRevokeConsent: () => void
 }
 
 function PrivacidadSection({
@@ -710,8 +706,6 @@ function PrivacidadSection({
   checkinEnabled,
   setCheckinEnabled,
   onSave,
-  onOpenArco,
-  onRevokeConsent,
 }: PrivacidadSectionProps) {
   return (
     <section>
@@ -732,126 +726,11 @@ function PrivacidadSection({
         hint="Pregunta opcional sobre tu estado emocional cuando inicias sesion."
       />
 
-      <Card style={{ marginTop: 24 }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            marginBottom: 8,
-          }}
-        >
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 9,
-              background: 'var(--info-50)',
-              color: 'var(--info-600)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Shield size={16} />
-          </div>
-          <div style={{ fontSize: 14.5, fontWeight: 700 }}>Derechos ARCO</div>
-        </div>
-        <p
-          style={{
-            fontSize: 13,
-            color: 'var(--ink-600)',
-            lineHeight: 1.5,
-            margin: '4px 0 14px',
-          }}
-        >
-          Ejerce tus derechos de Acceso, Rectificacion, Cancelacion y Oposicion
-          sobre tus datos personales de acuerdo con la Ley 1581 de 2012.
-        </p>
-        <button
-          type="button"
-          onClick={onOpenArco}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '9px 16px',
-            background: '#fff',
-            color: 'var(--info-600)',
-            border: '1px solid var(--info-600)',
-            borderRadius: 10,
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-          }}
-        >
-          <Info size={14} /> Solicitar datos ARCO
-        </button>
-      </Card>
-
-      <Card
-        style={{
-          marginTop: 16,
-          background: 'var(--warn-50)',
-          borderColor: 'var(--warn-200)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            marginBottom: 8,
-          }}
-        >
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 9,
-              background: '#fff',
-              color: 'var(--warn-600)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ShieldOff size={16} />
-          </div>
-          <div style={{ fontSize: 14.5, fontWeight: 700 }}>
-            Consentimiento informado
-          </div>
-        </div>
-        <p
-          style={{
-            fontSize: 13,
-            color: 'var(--ink-700)',
-            lineHeight: 1.5,
-            margin: '4px 0 14px',
-          }}
-        >
-          Puedes revocar tu consentimiento en cualquier momento. Esto eliminara
-          tus datos y finalizara tu acceso al servicio.
-        </p>
-        <button
-          type="button"
-          onClick={onRevokeConsent}
-          style={{
-            padding: '8px 14px',
-            border: '1px solid var(--warn-600)',
-            color: 'var(--warn-700)',
-            background: 'transparent',
-            borderRadius: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-          }}
-        >
-          Revocar consentimiento
-        </button>
-      </Card>
+      {/* Las cards de "Derechos ARCO" y "Consentimiento informado" se
+          movieron exclusivamente a la tab "Mis datos (ARCO)" para
+          eliminar duplicacion. Privacidad queda como el centro de los
+          toggles cotidianos; ARCO concentra los derechos legales Ley
+          1581. Auditoria UX 2026-05-23. */}
 
       <SaveBar onClick={onSave} />
     </section>
