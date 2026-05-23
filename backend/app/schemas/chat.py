@@ -100,6 +100,10 @@ class UpdateSessionEnd(BaseModel):
 
 class SendMessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
+    # Si el mensaje viene del modo voz, el backend ajusta el system
+    # prompt para responder breve y conversacional — evita markdown,
+    # emojis y respuestas largas que suenan robóticas en TTS.
+    voice_mode: bool = Field(default=False)
 
 
 class MessageResponse(BaseModel):

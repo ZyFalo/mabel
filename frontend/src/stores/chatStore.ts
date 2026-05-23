@@ -43,7 +43,11 @@ interface ChatState {
   }) => Promise<CreateSessionResponse>
   loadSession: (sessionId: string) => Promise<Session>
   loadMessages: (sessionId: string) => Promise<void>
-  sendMessage: (sessionId: string, content: string) => Promise<void>
+  sendMessage: (
+    sessionId: string,
+    content: string,
+    opts?: { voiceMode?: boolean },
+  ) => Promise<void>
   endSession: (sessionId: string) => Promise<void>
   loadPreferences: () => Promise<void>
   clearRisk: () => void
@@ -108,7 +112,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (sessionId: string, content: string) => {
+  sendMessage: async (
+    sessionId: string,
+    content: string,
+    opts?: { voiceMode?: boolean },
+  ) => {
     // Optimistically add user message
     const userMsg: Message = {
       id: `temp-${Date.now()}`,
@@ -131,7 +139,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, voice_mode: opts?.voiceMode ?? false }),
       })
 
       if (!response.ok || !response.body) {

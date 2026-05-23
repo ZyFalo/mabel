@@ -130,11 +130,14 @@ async def update_session(
 @router.post("/{session_id}/greeting")
 async def generate_greeting(
     session_id: uuid.UUID,
+    voice_mode: bool = False,
     current_user: User = Depends(require_consent),
     service: ChatService = Depends(_get_chat_service),
 ):
     try:
-        result = await service.generate_greeting(session_id, current_user.id)
+        result = await service.generate_greeting(
+            session_id, current_user.id, voice_mode=voice_mode
+        )
     except ValueError as e:
         msg = str(e)
         if "NOT_FOUND" in msg:
@@ -156,7 +159,12 @@ async def send_message(
     service: ChatService = Depends(_get_chat_service),
 ):
     try:
-        stream = service.send_message(session_id, current_user.id, body.content)
+        stream = service.send_message(
+            session_id,
+            current_user.id,
+            body.content,
+            voice_mode=body.voice_mode,
+        )
     except ValueError as e:
         msg = str(e)
         if "NOT_FOUND" in msg:

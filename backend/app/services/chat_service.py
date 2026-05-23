@@ -1,4 +1,5 @@
 import hashlib
+import re
 import time
 import uuid
 from collections.abc import AsyncGenerator
@@ -14,6 +15,83 @@ from app.repositories.preference_repository import PreferenceRepository
 from app.repositories.session_repository import SessionRepository
 from app.services.llm.prompts import build_system_prompt
 from app.services.llm.provider import LLMProvider
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Voice mode helpers (compartidos entre send_message y generate_greeting)
+# ─────────────────────────────────────────────────────────────────────
+
+_VOICE_SUFFIX = (
+    "\n\n[MODO VOZ ACTIVO]\n"
+    "Esta conversacion se reproduce en audio sintetizado "
+    "por un motor TTS sencillo (Piper, voz en español). El "
+    "TTS NO sabe interpretar emociones — solo lee texto. "
+    "Para sonar empatica debes escribir como una "
+    "psicoeducadora que habla en voz alta, no como una IA "
+    "que escribe.\n\n"
+    "Reglas de FORMA:\n"
+    "- Ajusta la longitud al tema: si el usuario pide algo "
+    "profundo, responde con la extension que merezca. Si "
+    "es algo breve, mantente breve. No alargues de mas "
+    "por relleno.\n"
+    "- NUNCA uses markdown (** _ # - * ` []()), nunca emojis.\n"
+    "- NUNCA listas con bullets ni enumeraciones tipo \"1. 2. 3.\" "
+    "— si necesitas enumerar, hazlo con frases conectadas: "
+    "\"Primero..., despues..., y por ultimo...\".\n"
+    "- Numeros y siglas: escribelos en letras (\"veinte\", "
+    "\"u eme b\", \"ocho de la noche\"), no \"20\" ni \"UMB\".\n\n"
+    "Reglas de CALIDEZ (el TTS lee literal, asi que el calor "
+    "tiene que venir del texto):\n"
+    "- Usa pausas con comas y puntos suspensivos para crear "
+    "ritmo reflexivo: \"Mira..., te entiendo. No es facil.\"\n"
+    "- Empieza muchos turnos con interjecciones suaves: "
+    "\"Mmm\", \"Oh\", \"Aja\", \"Vale\", \"Claro\".\n"
+    "- Usa apelativos calidos cuando corresponda: \"tranquila/o\", "
+    "\"oye\", \"mira\", \"escucha\", \"a ver\".\n"
+    "- Tono conversacional, no formal. Como si fueras una "
+    "amiga psicologa tomando un cafe con la persona.\n"
+    "- Valida antes de proponer: \"Entiendo lo que dices...\" "
+    "antes de cualquier sugerencia.\n"
+    "- Termina con una pregunta corta y abierta cuando sea "
+    "apropiado, para sostener el dialogo."
+)
+
+
+def _voice_mode_system_suffix() -> str:
+    return _VOICE_SUFFIX
+
+
+# Patron para limpiar markdown comun de respuestas assistant cuando
+# las pasamos como historial en modo voz. Sin esto, el LLM ve un
+# historial con bullets/emfasis y replica el estilo en la nueva
+# respuesta, contradiciendo el system prompt.
+_MD_PATTERNS = [
+    (re.compile(r"\*\*([^*]+)\*\*"), r"\1"),     # **bold**
+    (re.compile(r"__([^_]+)__"), r"\1"),         # __bold__
+    (re.compile(r"(?<!\w)\*([^*]+)\*(?!\w)"), r"\1"),  # *italic*
+    (re.compile(r"(?<!\w)_([^_]+)_(?!\w)"), r"\1"),    # _italic_
+    (re.compile(r"`([^`]+)`"), r"\1"),           # `code`
+    (re.compile(r"^#+\s+", re.MULTILINE), ""),   # headers
+    (re.compile(r"^[-*+]\s+", re.MULTILINE), ""),  # bullet -
+    (re.compile(r"^\d+[.)]\s+", re.MULTILINE), ""),  # 1.
+    (re.compile(r"\[([^\]]+)\]\([^)]+\)"), r"\1"),  # [text](url)
+]
+
+
+def _strip_assistant_markdown(messages: list[dict]) -> list[dict]:
+    """Quita markdown de los turnos role=assistant del historial. Los
+    user messages quedan intactos (pueden contener formato citado
+    legitimamente). NO muta la lista original."""
+    out: list[dict] = []
+    for m in messages:
+        if m.get("role") != "assistant":
+            out.append(m)
+            continue
+        content = m.get("content", "")
+        for pat, repl in _MD_PATTERNS:
+            content = pat.sub(repl, content)
+        out.append({**m, "content": content})
+    return out
 
 
 class ChatService:
@@ -119,7 +197,13 @@ class ChatService:
         await self.session_repo.db.commit()
         return session
 
-    async def send_message(self, session_id: uuid.UUID, user_id: uuid.UUID, content: str) -> AsyncGenerator[str, None]:
+    async def send_message(
+        self,
+        session_id: uuid.UUID,
+        user_id: uuid.UUID,
+        content: str,
+        voice_mode: bool = False,
+    ) -> AsyncGenerator[str, None]:
         session = await self.get_session(session_id, user_id)
         if session.ended_at is not None:
             raise ValueError("SESSION_ENDED")
@@ -161,6 +245,18 @@ class ChatService:
         # Build system prompt with check-in context
         system_prompt = build_system_prompt(session.checkin_payload)
 
+        if voice_mode:
+            # Anexa instrucciones explicitas al system prompt para que
+            # las respuestas suenen naturales en TTS.
+            system_prompt += _voice_mode_system_suffix()
+            # IMPORTANT: el historial puede tener turnos previos del modo
+            # texto con markdown/emojis/bullets. Si los mandamos crudos,
+            # Gemini ve "system dice no markdown pero mi historial esta
+            # lleno" → mirrors prior style. Limpiamos los assistant
+            # messages para que el contexto sea coherente con la nueva
+            # consigna.
+            messages = _strip_assistant_markdown(messages)
+
         # Stream from LLM
         start_time = time.time()
         full_response = ""
@@ -179,8 +275,34 @@ class ChatService:
                 full_response += token
                 yield f'{{"token": {_json_str(token)}}}'
 
-        except ValueError:
-            yield '{"error": "Error al generar respuesta. Intenta de nuevo."}'
+        except ValueError as e:
+            # Antes el except tragaba `e` y el frontend recibia un
+            # mensaje generico — imposible saber si era timeout, 401,
+            # rate limit, modelo invalido, etc. Logueamos en server y
+            # detectamos casos especificos para devolver mensaje
+            # accionable al usuario.
+            import logging
+            logging.getLogger(__name__).exception(
+                "LLM stream failed in chat_service.run_chat — %s", e
+            )
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "rate" in err_str.lower():
+                user_msg = (
+                    "Mabel necesita una pausa breve (limite del proveedor "
+                    "alcanzado). Intenta de nuevo en unos minutos."
+                )
+            elif "401" in err_str or "API key" in err_str.lower():
+                user_msg = (
+                    "Configuracion del modelo no valida. Avisa al administrador."
+                )
+            elif "timeout" in err_str.lower():
+                user_msg = (
+                    "La respuesta tardo demasiado. Intenta de nuevo o "
+                    "acorta tu mensaje."
+                )
+            else:
+                user_msg = "Error al generar respuesta. Intenta de nuevo."
+            yield f'{{"error": {_json_str(user_msg)}}}'
             return
 
         latency_ms = int((time.time() - start_time) * 1000)
@@ -222,7 +344,12 @@ class ChatService:
             done_payload += ', "risk_detected": true'
         yield f"{{{done_payload}}}"
 
-    async def generate_greeting(self, session_id: uuid.UUID, user_id: uuid.UUID) -> dict | None:
+    async def generate_greeting(
+        self,
+        session_id: uuid.UUID,
+        user_id: uuid.UUID,
+        voice_mode: bool = False,
+    ) -> dict | None:
         session = await self.get_session(session_id, user_id)
         if session.ended_at is not None:
             return None
@@ -236,6 +363,11 @@ class ChatService:
         save_history = prefs.save_history if prefs else False
 
         system_prompt = build_system_prompt(session.checkin_payload)
+        if voice_mode:
+            # Sin esto, el PRIMER mensaje en voice mode se genera con el
+            # prompt de texto (bullets, emojis, parrafos largos) y suena
+            # robotico al TTS — primera impresion rota del modo voz.
+            system_prompt += _voice_mode_system_suffix()
 
         # Build the greeting instruction. Two distinct shapes:
         #

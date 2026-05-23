@@ -34,6 +34,7 @@ import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
 import SessionDetail from './pages/SessionDetail'
 import SessionEnd from './pages/SessionEnd'
+import Voice from './pages/Voice'
 import { useAuthStore } from './stores/authStore'
 
 function SessionExpiredHandler() {
@@ -119,6 +120,7 @@ export default function App() {
                   <Route path="/checkin/new" element={<CheckIn />} />
                   <Route path="/session/:id/checkin" element={<CheckIn />} />
                   <Route path="/session/:id/chat" element={<Chat />} />
+                  <Route path="/session/:id/voice" element={<Voice />} />
                   <Route path="/session/:id/end" element={<SessionEnd />} />
                   <Route path="/session/:id/detail" element={<SessionDetail />} />
                 </Route>

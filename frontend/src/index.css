@@ -295,3 +295,91 @@ button, input, select, textarea {
   outline-offset: 2px;
   color: var(--mabel-600);
 }
+
+/* ============================================================
+   Voice mode — keyframes para el avatar 2D Mabel y sus rings
+   reactivos (idle/listening/thinking/speaking/error).
+   ============================================================ */
+@keyframes mouth-talk {
+  from { transform: scaleY(0.55); }
+  to   { transform: scaleY(1.15); }
+}
+@keyframes halo-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.9;  transform: scale(1.05); }
+}
+@keyframes ring-out {
+  0%   { opacity: 0.7; transform: scale(0.85); }
+  100% { opacity: 0;   transform: scale(1.55); }
+}
+@keyframes bar-pulse {
+  from { transform: scaleY(0.6); opacity: 0.35; }
+  to   { transform: scaleY(1.2); opacity: 0.85; }
+}
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+@keyframes voice-badge-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 6px 16px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06); }
+  50%      { transform: scale(1.08); box-shadow: 0 8px 20px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Apaga animaciones agresivas del voice mode si el usuario las pidio
+     desactivar a nivel sistema — la accesibilidad gana sobre estetica. */
+  .voice-no-motion {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   Voice mode — sizing responsivo del avatar y su marco.
+   Desktop:  marco 300x388, avatar interior ~210
+   Tablet:   marco 260x336, avatar interior ~182
+   Mobile:   marco 220x285, avatar interior ~154
+   El avatar interior se calcula como 70% del ancho del marco
+   gracias a `width: 70%` en .voice-avatar-figure.
+   ============================================================ */
+.voice-avatar-frame {
+  width: 300px;
+  height: 388px;
+}
+.voice-avatar-figure {
+  width: 70%;
+  transform: translateY(28px);
+}
+
+@media (max-width: 900px) {
+  .voice-avatar-frame {
+    width: 260px;
+    height: 336px;
+  }
+  .voice-avatar-figure {
+    transform: translateY(24px);
+  }
+}
+
+@media (max-width: 560px) {
+  .voice-avatar-frame {
+    width: 220px;
+    height: 285px;
+  }
+  .voice-avatar-figure {
+    transform: translateY(20px);
+  }
+}
+
+/* Esconde el texto "Volver" en mobile, deja solo el ícono ← */
+.hidden-mobile {
+  display: inline;
+}
+@media (max-width: 560px) {
+  .hidden-mobile {
+    display: none;
+  }
+}

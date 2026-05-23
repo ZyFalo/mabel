@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { Copy, Flag, MoreVertical, Lock } from 'lucide-react'
+import { Copy, Flag, MoreVertical, Lock, Mic } from 'lucide-react'
 import CheckinContextPopover from '../components/chat/CheckinContextPopover'
 import HeartRating from '../components/chat/HeartRating'
 import UmbAvatar from '../components/ui/UmbAvatar'
@@ -99,7 +99,16 @@ export default function Chat() {
 
   const preferences = usePreferencesStore((s) => s.preferences)
   const acc = preferences?.accessibility as Record<string, unknown> | null
-  const ttsEnabled = acc?.tts_enabled !== false
+  // OPT-IN, no opt-out: el chat de texto NO debe leer en voz alta
+  // automáticamente. Solo si la usuaria activó explícitamente
+  // `tts_enabled = true` en Settings → Accesibilidad. El modo voz
+  // tiene su propio TTS independiente de esta preferencia.
+  // (Bug reportado 2026-05-23: chat texto leía mensajes sin permiso.)
+  const ttsEnabled = acc?.tts_enabled === true
+  // Subtitulos NO cambian aqui: el bug original era solo sobre TTS
+  // autoplay. Subtitulos son un feature de accesibilidad
+  // independiente — mantener el default opt-out (TRUE por defecto)
+  // evita regresion en usuarios que dependian de ellos.
   const subtitlesEnabled = acc?.subtitles !== false
   const ttsVoice = preferences?.tts_voice || undefined
 
@@ -477,6 +486,44 @@ export default function Chat() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {/* SOS — crisis access pill, always visible in header */}
           <SosButton onClick={openCrisis} />
+
+          {/* Modo voz — abre la pantalla de avatar 2D animado. Solo
+              visible en sesiones activas (las terminadas son read-only,
+              entrar al voice no tiene sentido). */}
+          {!sessionEnded && id && (
+            <button
+              type="button"
+              onClick={() => navigate(`/session/${id}/voice`)}
+              title="Hablar con Mabel (modo voz)"
+              aria-label="Hablar con Mabel"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: 'var(--mabel-50)',
+                border: '1px solid var(--mabel-200)',
+                color: 'var(--mabel-700)',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                transition: 'all var(--dur-fast) var(--ease-out)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mabel-100)'
+                e.currentTarget.style.borderColor = 'var(--mabel-300)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--mabel-50)'
+                e.currentTarget.style.borderColor = 'var(--mabel-200)'
+              }}
+            >
+              <Mic size={13} strokeWidth={2.25} />
+              <span>Hablar</span>
+            </button>
+          )}
 
           {/* Info / contexto inicial — muestra el checkin_payload de la sesión */}
           <CheckinContextPopover

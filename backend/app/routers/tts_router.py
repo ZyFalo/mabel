@@ -1,4 +1,5 @@
 import io
+import subprocess
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -19,8 +20,30 @@ async def synthesize_speech(
     tts = TtsService()
     try:
         audio_bytes = tts.synthesize(text, voice)
-    except ValueError:
-        raise HTTPException(status_code=500, detail="Error al sintetizar audio")
+    except subprocess.TimeoutExpired as e:
+        # Aunque TtsService convierte timeout → ValueError, dejamos este
+        # branch como red de seguridad: si alguien refactoriza el servicio
+        # y vuelve a expone TimeoutExpired, NO debe caer como 500 sin
+        # CORS headers (el bug que justamente este endpoint busca evitar).
+        raise HTTPException(
+            status_code=504,
+            detail="TTS tardo demasiado en responder.",
+        ) from e
+    except FileNotFoundError as e:
+        # Piper binario o modelo no encontrado. Devolvemos 503 (Service
+        # Unavailable) en vez de dejar que la excepcion bubble como 500
+        # sin headers — un 500 generado por excepcion no manejada se
+        # renderea ANTES del CORS middleware y el browser termina
+        # mostrando "CORS error" en lugar del error real, lo que
+        # confunde mucho el debugging.
+        raise HTTPException(
+            status_code=503,
+            detail=f"TTS no disponible: {e}",
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error al sintetizar audio: {e}"
+        ) from e
 
     return StreamingResponse(
         io.BytesIO(audio_bytes),

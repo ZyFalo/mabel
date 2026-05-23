@@ -45,3 +45,14 @@ htmlcov/
 # Temporary
 *.tmp
 *.log
+
+# Voice — modelos Piper se descargan en deploy via scripts, no se commitean
+# (cada .onnx pesa 30-60 MB, son binarios). Ver scripts/setup-piper.sh
+backend/models/piper/*.onnx
+backend/models/piper/*.onnx.json
+
+# Voice — uploads efimeras de audio del usuario tras ASR
+backend/uploads/
+
+# Test outputs
+backend/output.wav

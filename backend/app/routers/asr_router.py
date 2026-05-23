@@ -1,8 +1,11 @@
 import hashlib
+import logging
 import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -38,16 +41,49 @@ async def transcribe_audio(
     try:
         asr = AsrService()
         text = asr.transcribe(file_path)
-    except Exception:
-        # Clean up on failure
+    except Exception as e:
+        # Log el error real (antes lo tragabamos y devolviamos un 500
+        # genérico — imposible debuggear sin tocar el código).
+        logger.exception(
+            "ASR failed for %s (size=%d)", file_path, len(content_bytes)
+        )
         if os.path.exists(file_path):
             os.remove(file_path)
-        raise HTTPException(status_code=500, detail="Error al transcribir audio")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al transcribir audio: {type(e).__name__}: {e}",
+        ) from e
 
     if not text or not text.strip():
-        if os.path.exists(file_path):
+        # PRIVACY (Ley 1581 / D-14): si el usuario esta en save_history=false
+        # (solo_uso), NO debemos persistir audio biometrico bajo ninguna
+        # circunstancia, ni siquiera "para forensics". Solo retenemos cuando
+        # el usuario consintio retencion via consent.scope. Los empty-text
+        # casos en sesiones save_history=true se mantienen para diagnostico.
+        keep_for_forensics = False
+        if session_id:
+            try:
+                pref_repo = PreferenceRepository(db)
+                prefs = await pref_repo.get_by_user_id(current_user.id)
+                keep_for_forensics = bool(prefs and prefs.save_history)
+            except Exception:  # noqa: BLE001 - best-effort, fail closed
+                keep_for_forensics = False
+        if not keep_for_forensics and os.path.exists(file_path):
             os.remove(file_path)
-        raise HTTPException(status_code=400, detail="No se detecto texto en el audio")
+        logger.warning(
+            "ASR returned empty text for %s (size=%d bytes, kept=%s).",
+            file_path,
+            len(content_bytes),
+            keep_for_forensics,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"No se detecto texto en el audio "
+                f"({len(content_bytes)} bytes capturados). "
+                "Habla mas claro y mantén pulsado el botón al menos 1 segundo."
+            ),
+        )
 
     # If session_id provided, persist message and optionally attachment
     message_id = None
