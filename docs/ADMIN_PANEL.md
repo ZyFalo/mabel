@@ -720,6 +720,100 @@ Tabla original:
 | **#9** | `empathy_service.list_rated` y `get_queue` ejecutaban N+1 SELECT (`preceding_user_message` per rating). A escala de 30 estudiantes × 50 sesiones × 10 msgs = ~15k ratings la pestaña Calificadas se volvía lenta. | **Resuelto**. Nuevo helper `_batch_preceding_user_messages` en `backend/app/services/admin/empathy_service.py` usa LATERAL JOIN: una sola query devuelve el dict `{anchor_message_id → preceding_user_content}` aprovechando el índice `idx_messages_session_time`. Ambos `get_queue` y `list_rated` lo usan; `list_rated` deduplica anchors antes del fetch porque cross-rater puede repetir un message en múltiples filas. Live test contra BD: 5 anchors → 1 query (vs 5 anteriores). |
 | **#10** | `chat_service.generate_greeting` descartaba el `usage_sink` (tokens consumidos) cuando perdía la carrera del UNIQUE INDEX `uq_messages_session_greeting`. | **Resuelto**. `backend/app/repositories/message_repository.py` expone `find_greeting(session_id)` (lookup vía partial UNIQUE INDEX). `chat_service.generate_greeting` ahora, en el `except IntegrityError`, hace rollback y suma `usage_sink.prompt_tokens`/`completion_tokens` al ganador via UPDATE. El dashboard refleja el costo real de generar el saludo (sin sub-reporte por StrictMode/double-clicks). |
 
+## 11.ter Deuda técnica pendiente — Code-review 2026-05-23 (config secciones 04+05)
+
+Origen: code-review automático del commit que ingresó:
+- Sección 04 "Proveedor LLM" enriquecida (snapshot read-only + last_test persistido).
+- Sección 05 "Estado del sistema" con chequeo real backend (DB, LLM, Piper, faster-whisper, uptime) reemplazando el "Configurado" hardcoded.
+- Botones "Probar conexión" + "Volver a comprobar" restilados a outline neutral.
+
+**Estado:** 10 hallazgos detectados, **0 arreglados**, decisión deliberada de diferir todos para iterar contra el panel real antes de tocar arquitectura. Severidad ordenada de mayor a menor. **F1 es bloqueante para deploy** (compliance Ley 1581).
+
+### F1 — D-12 commit violation en `_persist_last_test` 🔴 HIGH
+
+- **Archivos**: `backend/app/services/admin/config_service.py:359` (commit dentro del service), `backend/app/routers/admin/config_router.py:339-365` (segundo commit del router).
+- **Bug**: `_persist_last_test()` ejecuta `await self.db.commit()` directamente — el service NUNCA debe comitear según la convención D-12 documentada en el docstring del archivo. El router `test_admin_gemini` luego escribe `audit_log_action` y vuelve a comitear. Resultado: 2 commits separados. Si el segundo commit falla (DB blip, FK violation), queda el `llm_last_test` persistido sin el audit log del ping → rastro incompleto bajo Ley 1581.
+- **Peor**: el `except` de `_persist_last_test` hace `await self.db.rollback()` que descarta cualquier fila pendiente ya añadida a la sesión por código previo en el request (incluyendo audit rows).
+- **Fix recomendado**: `_persist_last_test` debe solo hacer la UPSERT sin commit (devolver el payload o el bool de éxito); el router comitea TODO junto (UPSERT + audit_log) en su única transacción. Patrón a seguir: igual que `update_config` que ya respeta la convención.
+- **Verificar el fix**: smoke test que confirme un ping exitoso + audit_log row aparece en `/admin/logs` con `action='change_config'` y `target_type='gemini_test'`.
+
+### F2 — GeminiSection skeleton eterno si falla `GET /admin/llm-info` 🟠 MED-HIGH
+
+- **Archivo**: `frontend/src/pages/admin/Config.tsx:1494` (render gate).
+- **Bug**: si la llamada falla en mount, `info=null` + `loadingInfo=false` → el render gate `loadingInfo || !info` cae al skeleton para siempre. El botón "Probar conexión" está dentro del `else` branch (no renderiza). Único feedback: un toast rojo que auto-dismiss en 5s.
+- **Fix recomendado**: cuando `loadingInfo === false && info === null`, renderizar bloque de error con mensaje + botón "Reintentar" que invoca `loadInfo()` de nuevo. NO mantener el skeleton porque transmite "estoy cargando" mintiendo.
+- **Verificación manual**: matar el backend, recargar `/admin/config`, confirmar que se ve un mensaje claro + botón.
+
+### F3 — Triple gap en check de Piper (path relativo + concat divergente + sidecar faltante) 🟠 MEDIUM
+
+- **Archivo**: `backend/app/services/admin/config_service.py:434` (check), `backend/app/services/tts_service.py:9` (runtime).
+- **3 sub-bugs en el mismo check**:
+  - **(a)** `Path("models/piper/") / "voice.onnx"` se resuelve contra `os.getcwd()`. Si uvicorn arranca desde la raíz del repo (no desde `backend/`), el `.exists()` retorna false aunque el modelo esté en `backend/models/piper/`.
+  - **(b)** Runtime hace `f"{settings.PIPER_MODEL_PATH}{voice}.onnx"` con concat de strings (sin separador). Si admin pone `PIPER_MODEL_PATH=models/piper` (sin `/` final), runtime invoca `models/pipavoice.onnx` (roto) pero el health-check con `Path /` join dice OK. Divergencia silenciosa.
+  - **(c)** Piper requiere TANTO `voice.onnx` COMO `voice.onnx.json` (sidecar de metadata). El check solo verifica el `.onnx`. Si el `.json` falta o se corrompió, health=OK pero TTS falla en runtime con `Piper TTS failed`.
+- **Fix recomendado**: extraer un helper compartido `_piper_model_path(voice: str) -> Path` que usen tanto `tts_service` como el health check. Verificar AMBOS archivos en el check. Resolver el path con `.expanduser().resolve()` para evitar el problema de CWD.
+- **Bonus**: arreglar el bug latente del runtime (string concat sin separador) en `tts_service.py:9`.
+
+### F4 — Payload persistido en `llm_last_test` omite `model` → stale chip post .env swap 🟠 MEDIUM
+
+- **Archivos**: `backend/app/services/admin/config_service.py:557-564` (omisión), `backend/app/schemas/admin.py:296-308` (schema `LLMLastTestInfo`), `frontend/src/pages/admin/Config.tsx:1403-1408` (interface `LLMLastTest`).
+- **Bug**: el comentario justifica la omisión como "evitar drift si admin cambia .env", pero crea peor problema: admin testea modelo X (OK), 2h después cambia `LLM_MODEL` en .env y reinicia, vuelve al panel y ve "Modelo: nuevoX" + chip "Última prueba: OK · hace 2h" → asume falsamente que el nuevo modelo está validado.
+- **Fix recomendado**: incluir `model` en el payload persistido + en el schema `LLMLastTestInfo` + en el frontend `LLMLastTest`. En el render, comparar `last_test.model` con `info.model`; si difieren mostrar warning visible: "Esta prueba fue contra `<old_model>`, no contra el modelo actual `<new_model>`. Vuelve a probar."
+- **Sub-fix alternativo**: si se hace F1 bien (router-side commit), incluir el resultado completo en el response del POST y que el frontend lo use sin segundo roundtrip (ver F8).
+
+### F5 — SystemStatusSection degradación silenciosa si falla `/admin/services-health` 🟠 MEDIUM
+
+- **Archivo**: `frontend/src/pages/admin/Config.tsx:1755` (fetchHealth + render).
+- **Bug**: cuando el fetch falla, `loading=false + data=null` → la tabla cae a render solo las 2 filas frontend-only (Versión + Service Worker) sin badge de error. Toast desaparece en 5s. Admin distraído ve "todo bien" cuando podría haber DB/LLM/Piper caídos. Único indicador subtle: footer text "Sin datos aún." vs timestamp normal.
+- **Fix recomendado**: cuando `data === null && !loading`, renderizar banner rojo arriba de la tabla "No se pudo cargar el estado de servicios. Pulsa 'Volver a comprobar' para reintentar." y aplicar `border-danger` al SectionCard.
+- **Verificación**: matar backend, refrescar página, confirmar que es imposible no notar el problema.
+
+### F6 — `formatRelativeTime` devuelve textos negativos con clock skew 🟡 LOW
+
+- **Archivo**: `frontend/src/pages/admin/Config.tsx:1655`.
+- **Bug**: si el reloj del cliente está ≥60s adelantado vs servidor, `Date.now() - new Date(iso)` da negativo. `Math.floor(-70/60)` retorna `-2`. El branch `if (sec < 60)` matchea para sec=-70 → "hace -70 s". Para skews mayores: "hace -1 min", "hace -2 min", etc. Daña confianza en el panel.
+- **Fix recomendado**: una línea al inicio: `const diffMs = Math.max(0, Date.now() - new Date(iso).getTime())`. Cero líneas adicionales.
+
+### F7 — `_PROCESS_START_TS` resetea con uvicorn `--reload` 🟡 LOW (cosmético)
+
+- **Archivo**: `backend/app/services/admin/config_service.py:611` (module-level), `:491` (uso en `get_services_health`).
+- **Bug**: `_PROCESS_START_TS = _time.monotonic()` se captura cuando el módulo es importado. Bajo `uvicorn --reload`, WatchFiles re-importa el módulo en cada edit → `_PROCESS_START_TS` se rebinda al monotonic actual → uptime reportado es ~0 aunque el proceso lleve horas vivo. Solo en dev. Contradice el framing "tiempo real" de la sección.
+- **Bonus**: el `try/except NameError` dentro del método es código muerto (el binding existe siempre tras import). Quitar.
+- **Fix recomendado**: usar lifespan startup hook de FastAPI para setear `_PROCESS_START_TS` una sola vez al boot real, o `psutil.Process(os.getpid()).create_time()` para uptime real del proceso (que es independiente de re-imports).
+
+### F8 — `runTest` descarta el response del POST y hace segundo roundtrip 🟡 LOW (UX)
+
+- **Archivo**: `frontend/src/pages/admin/Config.tsx:1493` (`runTest`).
+- **Bug**: POST `/admin/config/gemini/test` devuelve el resultado completo (ok, latency_ms, model, error). El handler lo descarta y hace un segundo GET `/admin/llm-info` para refrescar el chip. Si el segundo falla (502, red flaky), el admin ve "toast verde + toast rojo" simultáneos y el chip sigue stale.
+- **Fix recomendado** (2 opciones):
+  - **A** (frontend): usar la response del POST inmediatamente para hidratar local last_test (optimistic update), llamar loadInfo en background sin bloquear.
+  - **B** (backend): cambiar el response del POST para devolver `LLMInfoResponse` completo (1 sola roundtrip). Más limpio.
+
+### F9 — `_mask_api_key` revela demasiado para keys cortas 🟢 LOW (defensive)
+
+- **Archivo**: `backend/app/services/admin/config_service.py:312`.
+- **Bug**: `raw[-4:]` siempre toma 4 chars. Para keys de 5-11 chars (placeholders de test, fixtures locales), expone 4 chars de un total de 5-11. Para una key real de Gemini (~39 chars), expone 4/39 ≈ 10% — aceptable. Para `LLM_API_KEY=test1` (placeholder), expone 80%.
+- **Fix recomendado**: `if len(raw) < 12: return "●●●●●●", True` (mirroring AWS/Stripe console convention).
+
+### F10 — `_persist_last_test` UPSERT bypasses `repo._cache` invalidation 🟢 LOW (latente)
+
+- **Archivo**: `backend/app/services/admin/config_service.py:351` (UPSERT via raw SQL).
+- **Bug**: la UPSERT raw bypassea `SystemConfigRepository.update_value` que invalida su `_cache`. Hoy benigno porque ningún caller re-lee `llm_last_test` en el mismo request, pero si un refactor futuro hace `repo.get_value('llm_last_test')` después del ping, retornará el valor pre-UPSERT cacheado.
+- **Fix recomendado**: una línea tras la UPSERT — `self.repo._cache = None` (mismo patrón que `update_value`).
+
+---
+
+### Cómo retomar esta deuda
+
+Cuando vuelvas a abordar estos hallazgos:
+
+1. **Empezar SIEMPRE por F1** — es bloqueante de compliance + base para F4 (si F1 se hace bien, el router puede devolver el resultado completo y F4/F8 se simplifican).
+2. **F2 + F5** (recovery UI) — patrón compartido; resolverlos juntos.
+3. **F3** (Piper) — requiere tocar `tts_service.py` también, salir de Config si querés cerrar el ciclo.
+4. **F6, F7, F9, F10** — fixes de 1-5 líneas cada uno; agruparlos en un single "polish commit".
+
+Validación post-fix: re-ejecutar el code-review skill sobre los archivos tocados para confirmar que no se introducen regresiones nuevas.
+
 ## 12. Reglas de negocio cruzadas
 
 ### 12.1 Privacidad

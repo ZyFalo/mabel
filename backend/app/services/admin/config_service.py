@@ -263,6 +263,251 @@ class AdminConfigService:
 
     # --- LLM ping (provider-agnostic) ---
 
+    @staticmethod
+    def _mask_api_key(raw: str) -> tuple[str, bool]:
+        """Return (masked_form, is_configured).
+
+        Mask: 6 bullets + last 4 chars. Short keys (<5 chars) render as
+        bullets-only to avoid revealing the entire key.
+        """
+        if not raw:
+            return "(no configurada)", False
+        if len(raw) < 5:
+            return "●" * 6, True
+        tail = raw[-4:]
+        return f"●●●●●●{tail}", True
+
+    def _resolve_active_llm_model(self) -> str:
+        """Single source of truth for the model name surfaced to admins.
+
+        Mirrors the branch in `gemini_ping` so the LLM-info snapshot and
+        the ping result always report the SAME model string.
+        """
+        provider_kind = (settings.LLM_PROVIDER or "openai_compat").lower()
+        if provider_kind == "gemini_native":
+            return settings.GEMINI_MODEL
+        return settings.LLM_MODEL
+
+    async def get_llm_info(self) -> dict:
+        """Return a snapshot of LLM configuration + last_test info.
+
+        Backs the `GET /admin/llm-info` endpoint. Everything except
+        last_test is derived from process settings (read-only at runtime).
+        last_test is loaded from `system_config.llm_last_test` if present.
+        """
+        provider = (settings.LLM_PROVIDER or "openai_compat").lower()
+        provider_kind = provider
+        # base_url / timeout differ by provider; report the values that
+        # will actually be used by the active adapter.
+        if provider_kind == "gemini_native":
+            base_url = "(native Gemini SDK — no HTTP base url)"
+            timeout_ms = settings.GEMINI_TIMEOUT_MS
+            raw_key = settings.GEMINI_API_KEY
+        else:
+            base_url = settings.LLM_BASE_URL
+            timeout_ms = settings.LLM_TIMEOUT_MS
+            raw_key = settings.effective_llm_api_key
+        masked, configured = self._mask_api_key(raw_key)
+        last_test_raw = await self.repo.get_value("llm_last_test")
+        # Validate shape defensively: a malformed entry in BD shouldn't
+        # crash the panel; just report `last_test=None`.
+        last_test = None
+        if isinstance(last_test_raw, dict) and {"at", "ok", "latency_ms"} <= last_test_raw.keys():
+            last_test = last_test_raw
+
+        return {
+            "provider": provider,
+            "base_url": base_url,
+            "model": self._resolve_active_llm_model(),
+            "api_key_masked": masked,
+            "api_key_configured": configured,
+            "timeout_ms": timeout_ms,
+            "last_test": last_test,
+        }
+
+    async def _persist_last_test(self, payload: dict) -> None:
+        """UPSERT the `llm_last_test` row in `system_config`.
+
+        The first time the admin clicks "Probar conexión" the row
+        doesn't exist; subsequent clicks UPDATE it. Done with an
+        ON CONFLICT statement so we don't have to branch on existence.
+        Failures here are swallowed: a flaky write to system_config
+        shouldn't mask a successful ping result to the admin.
+        """
+        from sqlalchemy import text
+
+        try:
+            await self.db.execute(
+                text(
+                    """
+                    INSERT INTO system_config (key, value, description, updated_at)
+                    VALUES (:key, CAST(:value AS jsonb), :description, now())
+                    ON CONFLICT (key) DO UPDATE
+                       SET value = EXCLUDED.value,
+                           updated_at = now()
+                    """
+                ),
+                {
+                    "key": "llm_last_test",
+                    "value": _json_dumps(payload),
+                    "description": (
+                        "Resultado de la ultima prueba de conexion LLM "
+                        "(persistido para mostrar en /admin/config seccion 04)."
+                    ),
+                },
+            )
+            await self.db.commit()
+        except Exception:  # noqa: BLE001 — never fail a ping over telemetry
+            await self.db.rollback()
+
+    async def get_services_health(self) -> dict:
+        """Return real status of each backend dependency for /admin/config #05.
+
+        Probes (no side effects, no audit log):
+          - DB: simple SELECT 1 against the active session.
+          - LLM: surfaces `system_config.llm_last_test` (set by
+            `gemini_ping`); status="na" if no test has been run yet.
+          - Piper TTS: `shutil.which('piper')` + existence of the model
+            file at `PIPER_MODEL_PATH / PIPER_VOICE.onnx`.
+          - faster-whisper ASR: importability test.
+          - Backend uptime: time since process start (informational).
+
+        Each check returns {label, status, value, detail?}. The frontend
+        renders them as table rows with a color dot per status.
+        """
+        import importlib.util
+        import shutil
+        from pathlib import Path
+
+        from sqlalchemy import text
+
+        services: list[dict] = []
+
+        # --- DB ---
+        try:
+            await self.db.execute(text("SELECT 1"))
+            services.append(
+                {
+                    "label": "Base de datos",
+                    "status": "ok",
+                    "value": "Conectada",
+                    "detail": "PostgreSQL — SELECT 1 OK",
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            services.append(
+                {
+                    "label": "Base de datos",
+                    "status": "fail",
+                    "value": "No disponible",
+                    "detail": exc.__class__.__name__,
+                }
+            )
+
+        # --- LLM (reuses the cached last_test from the LLM section) ---
+        last_test_raw = await self.repo.get_value("llm_last_test")
+        if isinstance(last_test_raw, dict) and "ok" in last_test_raw:
+            ok = bool(last_test_raw.get("ok"))
+            latency_ms = last_test_raw.get("latency_ms", "?")
+            err = last_test_raw.get("error")
+            services.append(
+                {
+                    "label": "Proveedor LLM",
+                    "status": "ok" if ok else "fail",
+                    "value": "Operativo" if ok else f"Error: {err or 'desconocido'}",
+                    "detail": f"Última prueba: {latency_ms} ms · {last_test_raw.get('at', '?')}",
+                }
+            )
+        else:
+            services.append(
+                {
+                    "label": "Proveedor LLM",
+                    "status": "na",
+                    "value": "Sin pruebas previas",
+                    "detail": "Pulsa 'Probar conexión' en la sección 04",
+                }
+            )
+
+        # --- Piper TTS ---
+        piper_bin = shutil.which("piper")
+        model_filename = f"{settings.PIPER_VOICE}.onnx"
+        model_path = Path(settings.PIPER_MODEL_PATH) / model_filename
+        if not piper_bin:
+            services.append(
+                {
+                    "label": "TTS (Piper)",
+                    "status": "fail",
+                    "value": "Binario no encontrado",
+                    "detail": (
+                        "Ejecuta `bash scripts/setup-piper.sh` para instalar Piper "
+                        "y el modelo de voz."
+                    ),
+                }
+            )
+        elif not model_path.exists():
+            services.append(
+                {
+                    "label": "TTS (Piper)",
+                    "status": "warn",
+                    "value": f"Modelo '{settings.PIPER_VOICE}' no encontrado",
+                    "detail": (
+                        f"Binario en {piper_bin} pero falta el modelo en "
+                        f"{model_path}."
+                    ),
+                }
+            )
+        else:
+            services.append(
+                {
+                    "label": "TTS (Piper)",
+                    "status": "ok",
+                    "value": f"Voz: {settings.PIPER_VOICE}",
+                    "detail": f"Binario: {piper_bin}",
+                }
+            )
+
+        # --- ASR Whisper ---
+        whisper_spec = importlib.util.find_spec("faster_whisper")
+        if whisper_spec is None:
+            services.append(
+                {
+                    "label": "ASR (faster-whisper)",
+                    "status": "fail",
+                    "value": "Paquete no instalado",
+                    "detail": "Ejecuta `pip install faster-whisper` en el backend.",
+                }
+            )
+        else:
+            services.append(
+                {
+                    "label": "ASR (faster-whisper)",
+                    "status": "ok",
+                    "value": f"Modelo: {settings.WHISPER_MODEL}",
+                    "detail": "Paquete instalado. El modelo se descarga en la primera transcripción.",
+                }
+            )
+
+        # --- Uptime (process-level) ---
+        global _PROCESS_START_TS  # noqa: PLW0603 — module-level singleton
+        try:
+            uptime_seconds = _time.monotonic() - _PROCESS_START_TS
+        except NameError:
+            _PROCESS_START_TS = _time.monotonic()
+            uptime_seconds = 0.0
+        services.append(
+            {
+                "label": "Uptime del backend",
+                "status": "na",
+                "value": _format_uptime(uptime_seconds),
+                "detail": "Tiempo desde el último reinicio del proceso Python.",
+            }
+        )
+
+        return {
+            "checked_at": datetime.now(UTC),
+            "services": services,
+        }
+
     async def gemini_ping(self) -> dict:
         """Lightweight liveness check against the active LLM provider.
 
@@ -273,13 +518,14 @@ class AdminConfigService:
 
         Privacy: only metadata (latency, model, error class) is returned —
         the prompt `"ping"` and the response text are NOT persisted or logged.
+
+        After the request completes we UPSERT the result into
+        `system_config.llm_last_test` so the panel can show
+        last-success time + latency across reloads / restarts.
         """
-        # Report the model that the active provider will actually use, not
-        # the legacy GEMINI_MODEL setting.
         from app.services.llm import get_llm_provider
 
-        provider_kind = (settings.LLM_PROVIDER or "openai_compat").lower()
-        model = settings.GEMINI_MODEL if provider_kind == "gemini_native" else settings.LLM_MODEL
+        model = self._resolve_active_llm_model()
         start = _time.monotonic()
         try:
             adapter = get_llm_provider()
@@ -298,9 +544,50 @@ class AdminConfigService:
                 break
             latency_ms = int((_time.monotonic() - start) * 1000)
             if not collected_any:
-                return {"ok": False, "latency_ms": latency_ms, "model": model, "error": "empty_response"}
-            return {"ok": True, "latency_ms": latency_ms, "model": model, "error": None}
+                result = {"ok": False, "latency_ms": latency_ms, "model": model, "error": "empty_response"}
+            else:
+                result = {"ok": True, "latency_ms": latency_ms, "model": model, "error": None}
         except Exception as exc:  # noqa: BLE001 — surface upstream error class only
             latency_ms = int((_time.monotonic() - start) * 1000)
-            err = exc.__class__.__name__
-            return {"ok": False, "latency_ms": latency_ms, "model": model, "error": err}
+            result = {"ok": False, "latency_ms": latency_ms, "model": model, "error": exc.__class__.__name__}
+
+        # Persist a slim copy for the panel (timestamp + ok + latency + error).
+        # We do NOT include `model` here because the panel reads it from
+        # llm_info; duplicating would risk drift if the admin changes .env.
+        await self._persist_last_test(
+            {
+                "at": datetime.now(UTC).isoformat(),
+                "ok": result["ok"],
+                "latency_ms": result["latency_ms"],
+                "error": result["error"],
+            }
+        )
+        return result
+
+
+def _json_dumps(payload: dict) -> str:
+    """Local import-light JSON dumper used by `_persist_last_test`."""
+    import json
+
+    return json.dumps(payload)
+
+
+# Captured at module import time so `get_services_health` can report
+# "uptime since last restart" without depending on /proc or
+# Linux-specific APIs. Reset every time uvicorn reloads the worker.
+_PROCESS_START_TS: float = _time.monotonic()
+
+
+def _format_uptime(seconds: float) -> str:
+    """Human-readable duration: '4 h 12 min' / '3 d 5 h' / '47 s'."""
+    s = max(0, int(seconds))
+    if s < 60:
+        return f"{s} s"
+    m, s = divmod(s, 60)
+    if m < 60:
+        return f"{m} min {s} s"
+    h, m = divmod(m, 60)
+    if h < 24:
+        return f"{h} h {m} min"
+    d, h = divmod(h, 24)
+    return f"{d} d {h} h"

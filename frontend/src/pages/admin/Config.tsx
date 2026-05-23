@@ -1400,34 +1400,85 @@ function HotlinesSection({
 // Section 4 — API Gemini
 // ============================================================================
 
+interface LLMLastTest {
+  at: string
+  ok: boolean
+  latency_ms: number
+  error: string | null
+}
+
+interface LLMInfo {
+  provider: string
+  base_url: string
+  model: string
+  api_key_masked: string
+  api_key_configured: boolean
+  timeout_ms: number
+  last_test: LLMLastTest | null
+}
+
+/**
+ * `GeminiSection` muestra un snapshot read-only de la configuración LLM
+ * + un botón de prueba de conectividad. Todo se gestiona via `.env`
+ * (API key, provider, modelo, base URL, timeout) — esto NO es por
+ * decisión de UX sino por seguridad (las API keys son secretos y no
+ * pertenecen a la BD operacional). El panel sirve para:
+ *
+ *   1. Verificar de un vistazo qué proveedor / modelo está activo.
+ *   2. Saber si la API key está configurada (sin exponerla).
+ *   3. Disparar una prueba de conexión y persistirla.
+ *
+ * El resultado de la última prueba se guarda en
+ * `system_config.llm_last_test` para que sobreviva reloads.
+ */
 function GeminiSection() {
   const addToast = useToastStore((s) => s.addToast)
+  const [info, setInfo] = useState<LLMInfo | null>(null)
+  const [loadingInfo, setLoadingInfo] = useState(true)
   const [testing, setTesting] = useState(false)
-  const [result, setResult] = useState<GeminiTestResult | null>(null)
+
+  const loadInfo = useCallback(async () => {
+    try {
+      const res = await apiClient.get<LLMInfo>('/admin/llm-info')
+      setInfo(res.data ?? null)
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: formatApiError(err, 'No se pudo cargar la configuración LLM.'),
+      })
+    } finally {
+      setLoadingInfo(false)
+    }
+  }, [addToast])
+
+  useEffect(() => {
+    loadInfo()
+  }, [loadInfo])
 
   async function runTest() {
     setTesting(true)
-    setResult(null)
     try {
       const res = await apiClient.post<GeminiTestResult>('/admin/config/gemini/test')
-      setResult(res.data ?? null)
-      if (res.data?.ok) {
+      const data = res.data
+      if (data?.ok) {
         addToast({
           type: 'success',
-          message: `Gemini OK (${res.data.latency_ms} ms).`,
+          message: `Conexión OK (${data.latency_ms} ms).`,
         })
       } else {
         addToast({
           type: 'error',
-          message: res.data?.error
-            ? `Gemini no respondio: ${res.data.error}`
-            : 'Gemini no respondio correctamente.',
+          message: data?.error
+            ? `El proveedor no respondió correctamente: ${data.error}`
+            : 'El proveedor no respondió correctamente.',
         })
       }
+      // Refresh info so `last_test` updates from the BD-persisted value.
+      await loadInfo()
     } catch (err: unknown) {
       addToast({
         type: 'error',
-        message: formatApiError(err, 'Error al probar conexión con Gemini.'),
+        message: formatApiError(err, 'Error al probar la conexión LLM.'),
       })
     } finally {
       setTesting(false)
@@ -1437,99 +1488,229 @@ function GeminiSection() {
   return (
     <SectionCard
       index="04"
-      title="API Gemini"
-      description="Parametros del proveedor LLM. Configurables solo via variables de entorno."
+      title="Proveedor LLM"
+      description="Snapshot de la configuración del modelo de lenguaje. Solo lectura — para cambiar cualquier parámetro edita .env y reinicia el backend."
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="border border-gray-200 rounded-md p-3 bg-gray-50/40">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-primary/50">
-            Modelo
-          </p>
-          <p className="font-mono text-sm text-text-primary mt-1">
-            {result?.model ?? 'gemini-2.5-flash'}
-          </p>
-          <p className="text-[11px] text-text-primary/50 mt-1">
-            Configurable solo via reinicio (.env GEMINI_MODEL).
-          </p>
+      {loadingInfo || !info ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="animate-pulse h-16 rounded-md bg-gray-100"
+            />
+          ))}
         </div>
-        <div className="border border-gray-200 rounded-md p-3 bg-gray-50/40">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-primary/50">
-            Timeout
-          </p>
-          <p className="font-mono text-sm text-text-primary mt-1">30000 ms</p>
-          <p className="text-[11px] text-text-primary/50 mt-1">
-            Configurable solo via reinicio (.env GEMINI_TIMEOUT_MS).
-          </p>
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* Configuration grid — 5 cards in 2 columns */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <InfoTile
+              label="Proveedor activo"
+              value={info.provider}
+              envHint=".env LLM_PROVIDER"
+            />
+            <InfoTile
+              label="Modelo"
+              value={info.model}
+              envHint=".env LLM_MODEL"
+            />
+            <InfoTile
+              label="Endpoint"
+              value={info.base_url}
+              envHint=".env LLM_BASE_URL"
+              wrap
+            />
+            <InfoTile
+              label="API Key"
+              value={info.api_key_masked}
+              envHint=".env LLM_API_KEY / GEMINI_API_KEY"
+              accent={info.api_key_configured ? 'success' : 'danger'}
+            />
+            <InfoTile
+              label="Timeout"
+              value={`${info.timeout_ms.toLocaleString('es-CO')} ms`}
+              envHint=".env LLM_TIMEOUT_MS"
+            />
+            {/* 6th tile balances the 2-col grid */}
+            <div className="md:flex hidden" aria-hidden />
+          </div>
 
-      <div className="mt-5 border-t border-gray-100 pt-4 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          {result && (
-            <span
-              className={[
-                'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[12px] font-medium border',
-                result.ok
-                  ? 'bg-success/10 text-success border-success/30'
-                  : 'bg-danger/10 text-danger border-danger/30',
-              ].join(' ')}
-            >
-              <span
-                className={[
-                  'w-2 h-2 rounded-full',
-                  result.ok ? 'bg-success' : 'bg-danger',
-                ].join(' ')}
-                aria-hidden="true"
-              />
-              {result.ok ? 'Conexion OK' : 'Sin respuesta'}
-              <span className="font-mono text-text-primary/70">
-                {result.latency_ms} ms
-              </span>
-              {!result.ok && result.error && (
-                <span className="text-danger/80 max-w-[200px] truncate">· {result.error}</span>
+          {/* Last test + action bar */}
+          <div className="mt-5 border-t border-gray-100 pt-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              {info.last_test ? (
+                <span
+                  className={[
+                    'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[12px] font-medium border',
+                    info.last_test.ok
+                      ? 'bg-success/10 text-success border-success/30'
+                      : 'bg-danger/10 text-danger border-danger/30',
+                  ].join(' ')}
+                  title={`Última prueba: ${info.last_test.at}`}
+                >
+                  <span
+                    className={[
+                      'w-2 h-2 rounded-full',
+                      info.last_test.ok ? 'bg-success' : 'bg-danger',
+                    ].join(' ')}
+                    aria-hidden="true"
+                  />
+                  {info.last_test.ok ? 'Última prueba: OK' : 'Última prueba: error'}
+                  <span className="font-mono text-text-primary/70">
+                    {info.last_test.latency_ms.toLocaleString('es-CO')} ms
+                  </span>
+                  <span className="text-text-primary/50">
+                    · {formatRelativeTime(info.last_test.at)}
+                  </span>
+                  {!info.last_test.ok && info.last_test.error && (
+                    <span className="text-danger/80 max-w-[200px] truncate">
+                      · {info.last_test.error}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="text-[12px] text-text-primary/50 italic">
+                  Sin pruebas previas. Ejecuta una para registrar el estado.
+                </span>
               )}
-            </span>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={runTest}
-          disabled={testing}
-          className="inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold bg-accent text-white hover:bg-accent/90 disabled:opacity-60 transition-colors"
-        >
-          {testing ? 'Probando...' : 'Probar conexión'}
-        </button>
-      </div>
+            </div>
+            <button
+              type="button"
+              onClick={runTest}
+              disabled={testing}
+              // Outline / secondary styling: this is a diagnostic
+              // action (non-destructive, easily repeatable). Solid
+              // red was visually overloaded with destructive CTAs
+              // elsewhere in the panel ("Eliminar borrador",
+              // "Deshabilitar seleccionados"). Outline neutral makes
+              // the affordance clearly "safe to click".
+              className="inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold border border-text-primary/30 text-text-primary bg-white hover:bg-gray-50 disabled:opacity-60 transition-colors"
+            >
+              {testing ? 'Probando…' : 'Probar conexión'}
+            </button>
+          </div>
+        </>
+      )}
     </SectionCard>
   )
+}
+
+function InfoTile({
+  label,
+  value,
+  envHint,
+  accent,
+  wrap,
+}: {
+  label: string
+  value: string
+  envHint: string
+  accent?: 'success' | 'danger'
+  wrap?: boolean
+}) {
+  const valueColor =
+    accent === 'success'
+      ? 'var(--success-700)'
+      : accent === 'danger'
+        ? 'var(--danger-700)'
+        : 'var(--ink-900)'
+  return (
+    <div className="border border-gray-200 rounded-md p-3 bg-gray-50/40">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-primary/50">
+        {label}
+      </p>
+      <p
+        className="font-mono text-sm mt-1"
+        style={{
+          color: valueColor,
+          wordBreak: wrap ? 'break-all' : 'normal',
+        }}
+      >
+        {value}
+      </p>
+      <p className="text-[11px] text-text-primary/50 mt-1">{envHint}</p>
+    </div>
+  )
+}
+
+function formatRelativeTime(iso: string): string {
+  try {
+    const then = new Date(iso).getTime()
+    const now = Date.now()
+    const diffMs = now - then
+    if (Number.isNaN(diffMs)) return ''
+    const sec = Math.floor(diffMs / 1000)
+    if (sec < 5) return 'hace instantes'
+    if (sec < 60) return `hace ${sec} s`
+    const min = Math.floor(sec / 60)
+    if (min < 60) return `hace ${min} min`
+    const hr = Math.floor(min / 60)
+    if (hr < 24) return `hace ${hr} h`
+    const days = Math.floor(hr / 24)
+    return `hace ${days} d`
+  } catch {
+    return ''
+  }
 }
 
 // ============================================================================
 // Section 5 — Estado del sistema
 // ============================================================================
 
+interface ServiceCheck {
+  label: string
+  status: 'ok' | 'fail' | 'warn' | 'na'
+  value: string
+  detail?: string | null
+}
+
+interface ServicesHealth {
+  checked_at: string
+  services: ServiceCheck[]
+}
+
+/**
+ * `SystemStatusSection` lee `/admin/services-health` que el backend
+ * acaba de exponer y muestra el estado REAL de cada dependencia. La
+ * versión anterior hardcodeaba "Configurado" para TTS / ASR aunque
+ * el binario o el modelo no estuviera presente — ahora cada fila
+ * refleja la realidad del proceso.
+ *
+ * Además mostramos:
+ *   - Versión de la app (env `VITE_APP_VERSION`).
+ *   - Service Worker (PWA) — chequeo client-side (no requiere endpoint).
+ *   - Timestamp del último chequeo + "hace X" relativo para que el
+ *     admin sepa qué tan fresco es el dato.
+ */
 function SystemStatusSection() {
-  const [dbStatus, setDbStatus] = useState<'ok' | 'fail' | 'loading'>('loading')
+  const [data, setData] = useState<ServicesHealth | null>(null)
+  const [loading, setLoading] = useState(true)
   const [swActive, setSwActive] = useState<boolean>(false)
+  const addToast = useToastStore((s) => s.addToast)
 
   const appVersion = useMemo(() => {
     const v = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? '0.1.0'
     return v
   }, [])
 
-  const checkHealth = useCallback(async () => {
-    setDbStatus('loading')
+  const fetchHealth = useCallback(async () => {
+    setLoading(true)
     try {
-      await apiClient.get('/health')
-      setDbStatus('ok')
-    } catch {
-      setDbStatus('fail')
+      const res = await apiClient.get<ServicesHealth>('/admin/services-health')
+      setData(res.data ?? null)
+    } catch (err) {
+      addToast({
+        type: 'error',
+        message: formatApiError(err, 'No se pudo cargar el estado del sistema.'),
+      })
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }, [addToast])
 
   useEffect(() => {
-    checkHealth()
-  }, [checkHealth])
+    fetchHealth()
+  }, [fetchHealth])
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
@@ -1537,76 +1718,109 @@ function SystemStatusSection() {
     }
   }, [])
 
-  function StatusDot({ state }: { state: 'ok' | 'fail' | 'loading' | 'na' }) {
+  function StatusDot({
+    state,
+  }: {
+    state: 'ok' | 'fail' | 'warn' | 'loading' | 'na'
+  }) {
     const cls =
       state === 'ok'
         ? 'bg-success'
         : state === 'fail'
           ? 'bg-danger'
-          : state === 'loading'
-            ? 'bg-gray-300 animate-pulse'
-            : 'bg-gray-300'
+          : state === 'warn'
+            ? 'bg-warning'
+            : state === 'loading'
+              ? 'bg-gray-300 animate-pulse'
+              : 'bg-gray-300'
     return <span className={`w-2 h-2 rounded-full ${cls}`} aria-hidden="true" />
   }
 
-  const rows: Array<{
-    label: string
-    value: string
-    state: 'ok' | 'fail' | 'loading' | 'na'
-  }> = [
-    { label: 'Version de la app', value: appVersion, state: 'na' },
+  // Rows: backend-checked rows + frontend-only ones (version, SW).
+  // Order matters for UX: most-critical (DB/LLM) first, informational
+  // (uptime, version) at the bottom.
+  const backendRows = data?.services ?? []
+  const frontendRows: ServiceCheck[] = [
     {
-      label: 'Base de datos',
-      value:
-        dbStatus === 'ok'
-          ? 'Conectada'
-          : dbStatus === 'fail'
-            ? 'No disponible'
-            : 'Comprobando...',
-      state: dbStatus,
+      label: 'Versión de la app',
+      status: 'na',
+      value: appVersion,
+      detail: 'VITE_APP_VERSION (build-time)',
     },
-    { label: 'ASR (Whisper)', value: 'Configurado', state: 'na' },
-    { label: 'TTS (Piper)', value: 'Configurado', state: 'na' },
     {
       label: 'Service Worker (PWA)',
+      status: swActive ? 'ok' : 'na',
       value: swActive ? 'Activo' : 'No detectado',
-      state: swActive ? 'ok' : 'na',
+      detail: swActive
+        ? 'El navegador tiene el SW registrado y controlando esta pestaña.'
+        : 'Normal en desarrollo. En producción la PWA debe estar instalada.',
     },
   ]
+  const allRows = [...backendRows, ...frontendRows]
 
   return (
     <SectionCard
       index="05"
       title="Estado del sistema"
-      description="Diagnóstico rápido de servicios y versión desplegada."
+      description="Diagnóstico en tiempo real de servicios y versión desplegada."
     >
-      <div className="border border-gray-200 rounded-md overflow-hidden">
-        <table className="w-full text-sm">
-          <tbody>
-            {rows.map((row, i) => (
-              <tr
-                key={row.label}
-                className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}
-              >
-                <td className="px-4 py-3 text-text-primary/70 w-[260px]">{row.label}</td>
-                <td className="px-4 py-3 text-text-primary font-medium">
-                  <span className="inline-flex items-center gap-2">
-                    <StatusDot state={row.state} />
-                    {row.value}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-3 flex justify-end">
+      {loading && !data ? (
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div
+              key={i}
+              className="animate-pulse h-12 rounded bg-gray-100"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="border border-gray-200 rounded-md overflow-hidden">
+          <table className="w-full text-sm">
+            <tbody>
+              {allRows.map((row, i) => (
+                <tr
+                  key={row.label}
+                  className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}
+                  title={row.detail ?? undefined}
+                >
+                  <td className="px-4 py-3 text-text-primary/70 w-[260px] align-top">
+                    {row.label}
+                  </td>
+                  <td className="px-4 py-3 text-text-primary font-medium align-top">
+                    <div className="flex items-start gap-2">
+                      <span className="mt-1.5 shrink-0">
+                        <StatusDot state={row.status} />
+                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span>{row.value}</span>
+                        {row.detail && (
+                          <span className="text-[11px] text-text-primary/50 font-normal">
+                            {row.detail}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
+        <span className="text-[11px] text-text-primary/50">
+          {data
+            ? `Último chequeo: ${formatRelativeTime(data.checked_at)}`
+            : 'Sin datos aún.'}
+        </span>
         <button
           type="button"
-          onClick={checkHealth}
-          className="text-sm font-medium text-primary hover:underline"
+          onClick={fetchHealth}
+          disabled={loading}
+          className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-text-primary/30 text-text-primary bg-white hover:bg-gray-50 disabled:opacity-60 transition-colors"
         >
-          Volver a comprobar
+          {loading ? 'Comprobando…' : 'Volver a comprobar'}
         </button>
       </div>
     </SectionCard>

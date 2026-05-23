@@ -293,6 +293,75 @@ class GeminiTestResponse(BaseModel):
     error: str | None = None
 
 
+class LLMLastTestInfo(BaseModel):
+    """Snapshot of the most recent LLM connectivity test.
+
+    Persisted as `system_config.llm_last_test` JSON so the panel can
+    show last-test info across page reloads / backend restarts.
+    `at` is an ISO-8601 string at the wire boundary (Pydantic
+    serializes UTC datetime that way).
+    """
+
+    at: datetime
+    ok: bool
+    latency_ms: int
+    error: str | None = None
+
+
+class ServiceCheck(BaseModel):
+    """One service in the /admin/services-health snapshot.
+
+    `status` is constrained to keep the frontend's switch logic simple:
+      - "ok"     — service is healthy.
+      - "fail"   — service is misconfigured / unreachable / wrong version.
+      - "warn"   — service works but with caveats (e.g. fallback model).
+      - "na"     — informational row only, no checkable state (uptime,
+                   version strings, etc.).
+    """
+
+    label: str
+    status: str  # "ok" | "fail" | "warn" | "na"
+    value: str  # display string for the value column
+    detail: str | None = None  # tooltip / secondary line
+
+
+class ServicesHealthResponse(BaseModel):
+    """Aggregate response for GET /admin/services-health.
+
+    Replaces the previous frontend-only mock that hardcoded "Configurado"
+    for TTS/ASR even when the binary / model was missing. Now the
+    backend introspects each service and reports the real state.
+    """
+
+    checked_at: datetime
+    services: list[ServiceCheck]
+
+
+class LLMInfoResponse(BaseModel):
+    """Read-only snapshot of LLM configuration shown in /admin/config #04.
+
+    Every field except `last_test` comes from process-level settings
+    (`.env`) and requires a backend restart to change. The panel is
+    diagnostic only: API keys, base URLs, and provider/model selection
+    are infrastructure secrets / boot-time bindings, not operational
+    knobs. The `last_test` block is updated by `POST /admin/config/
+    gemini/test` and persisted in `system_config` so it survives
+    backend restarts.
+    """
+
+    provider: str
+    base_url: str
+    model: str
+    # Masked form: "●●●●●●a8f7" if configured, "(no configurada)" if empty.
+    # The raw key is NEVER returned over the wire — even to admins —
+    # to avoid leaking it via browser history, screen-sharing during
+    # demos, or HAR exports for debugging.
+    api_key_masked: str
+    api_key_configured: bool
+    timeout_ms: int
+    last_test: LLMLastTestInfo | None = None
+
+
 # --- Capability 3 (Fase 8.1): research-analytics-backend ---
 
 

@@ -28,6 +28,8 @@ from app.schemas.admin import (
     ConsentVersionCreate,
     ConsentVersionItem,
     GeminiTestResponse,
+    LLMInfoResponse,
+    ServicesHealthResponse,
     SystemConfigItem,
 )
 from app.services.admin.config_service import AdminConfigService
@@ -296,6 +298,42 @@ async def delete_admin_consent_version_draft(
     )
     await db.commit()
     # 204 No Content — no body returned.
+
+
+@router.get("/admin/services-health", response_model=ServicesHealthResponse)
+async def get_admin_services_health(
+    _: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> ServicesHealthResponse:
+    """Real-time snapshot of backend dependency health for #05.
+
+    Replaces the previous frontend-only mock that hardcoded "Configurado"
+    for TTS / ASR regardless of whether the binary or model was actually
+    present. Probes DB, LLM (via cached last_test), Piper, faster-whisper
+    and uptime. No audit log — pure metadata read with no side effects.
+    """
+    service = AdminConfigService(db)
+    return ServicesHealthResponse(**await service.get_services_health())
+
+
+@router.get("/admin/llm-info", response_model=LLMInfoResponse)
+async def get_admin_llm_info(
+    _: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> LLMInfoResponse:
+    """Read-only snapshot of the LLM configuration for /admin/config #04.
+
+    Returns provider / endpoint / model / api_key (masked) / timeout +
+    last_test info. Every field except last_test is sourced from process
+    settings (`.env`) — to change them, edit `.env` and restart the
+    backend. The API key is NEVER returned raw, only masked.
+
+    No audit log: this is a pure read of non-sensitive metadata (the
+    one sensitive field, the API key, is masked at the service layer).
+    """
+    service = AdminConfigService(db)
+    info = await service.get_llm_info()
+    return LLMInfoResponse(**info)
 
 
 @router.post("/admin/config/gemini/test", response_model=GeminiTestResponse)
