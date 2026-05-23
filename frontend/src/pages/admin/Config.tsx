@@ -43,6 +43,9 @@ interface GeminiTestResult {
   latency_ms: number
   model: string
   error?: string | null
+  // F8: backend now returns the persisted last_test snapshot in the
+  // same response so we can update the chip without a second GET.
+  last_test?: LLMLastTest | null
 }
 
 // ============================================================================
@@ -1404,6 +1407,11 @@ interface LLMLastTest {
   at: string
   ok: boolean
   latency_ms: number
+  // F4: `model` lets us detect drift between the model that was
+  // actually tested and the currently active one (`info.model`). If
+  // an admin edits `.env` and restarts between tests, the cached chip
+  // would otherwise falsely imply the new model is validated.
+  model?: string | null
   error: string | null
 }
 
@@ -1435,17 +1443,23 @@ function GeminiSection() {
   const addToast = useToastStore((s) => s.addToast)
   const [info, setInfo] = useState<LLMInfo | null>(null)
   const [loadingInfo, setLoadingInfo] = useState(true)
+  // F2: track load error separately so the render gate can distinguish
+  // "still loading" from "fetch failed and we have no data". Without
+  // this, a failed mount fell to the skeleton forever — the section
+  // looked stuck even though the request had finished with an error.
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
 
   const loadInfo = useCallback(async () => {
+    setLoadingInfo(true)
+    setLoadError(null)
     try {
       const res = await apiClient.get<LLMInfo>('/admin/llm-info')
       setInfo(res.data ?? null)
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: formatApiError(err, 'No se pudo cargar la configuración LLM.'),
-      })
+      const msg = formatApiError(err, 'No se pudo cargar la configuración LLM.')
+      setLoadError(msg)
+      addToast({ type: 'error', message: msg })
     } finally {
       setLoadingInfo(false)
     }
@@ -1473,8 +1487,18 @@ function GeminiSection() {
             : 'El proveedor no respondió correctamente.',
         })
       }
-      // Refresh info so `last_test` updates from the BD-persisted value.
-      await loadInfo()
+      // F8: hydrate the chip optimistically from the POST response so
+      // we don't need a second GET /admin/llm-info to refresh it.
+      // Use the functional `setInfo(prev => ...)` form so a concurrent
+      // `loadInfo()` (Reintentar, focus, future updaters) doesn't get
+      // overwritten by a stale closure-captured `info` snapshot. If
+      // the response brings `last_test` we merge it into whatever
+      // current `info` is; otherwise we fall back to re-fetching.
+      if (data?.last_test) {
+        setInfo((prev) => (prev ? { ...prev, last_test: data.last_test ?? null } : prev))
+      } else {
+        await loadInfo()
+      }
     } catch (err: unknown) {
       addToast({
         type: 'error',
@@ -1491,7 +1515,7 @@ function GeminiSection() {
       title="Proveedor LLM"
       description="Snapshot de la configuración del modelo de lenguaje. Solo lectura — para cambiar cualquier parámetro edita .env y reinicia el backend."
     >
-      {loadingInfo || !info ? (
+      {loadingInfo ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {[1, 2, 3, 4].map((i) => (
             <div
@@ -1499,6 +1523,38 @@ function GeminiSection() {
               className="animate-pulse h-16 rounded-md bg-gray-100"
             />
           ))}
+        </div>
+      ) : !info ? (
+        // F2: fetch finished but no data. The previous skeleton-forever
+        // behavior misled the admin into thinking it was still loading.
+        // Now we show a clear error block with a manual retry — the
+        // section visibly fails instead of pretending to work.
+        <div className="border border-danger/40 bg-danger/5 rounded-md p-4 flex flex-col gap-3">
+          <div className="flex items-start gap-2">
+            <span className="text-danger font-bold leading-none mt-0.5" aria-hidden="true">⚠</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-danger">
+                No se pudo cargar la configuración LLM.
+              </p>
+              {loadError && (
+                <p className="text-[12px] text-text-primary/70 mt-1 break-words">
+                  {loadError}
+                </p>
+              )}
+              <p className="text-[12px] text-text-primary/60 mt-1">
+                Verifica que el backend esté en línea y vuelve a intentarlo.
+              </p>
+            </div>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={loadInfo}
+              className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-danger/40 text-danger bg-white hover:bg-danger/10 transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
         </div>
       ) : (
         <>
@@ -1536,58 +1592,79 @@ function GeminiSection() {
           </div>
 
           {/* Last test + action bar */}
-          <div className="mt-5 border-t border-gray-100 pt-4 flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              {info.last_test ? (
-                <span
-                  className={[
-                    'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[12px] font-medium border',
-                    info.last_test.ok
-                      ? 'bg-success/10 text-success border-success/30'
-                      : 'bg-danger/10 text-danger border-danger/30',
-                  ].join(' ')}
-                  title={`Última prueba: ${info.last_test.at}`}
-                >
+          <div className="mt-5 border-t border-gray-100 pt-4 flex flex-col gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                {info.last_test ? (
                   <span
                     className={[
-                      'w-2 h-2 rounded-full',
-                      info.last_test.ok ? 'bg-success' : 'bg-danger',
+                      'inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[12px] font-medium border',
+                      info.last_test.ok
+                        ? 'bg-success/10 text-success border-success/30'
+                        : 'bg-danger/10 text-danger border-danger/30',
                     ].join(' ')}
-                    aria-hidden="true"
-                  />
-                  {info.last_test.ok ? 'Última prueba: OK' : 'Última prueba: error'}
-                  <span className="font-mono text-text-primary/70">
-                    {info.last_test.latency_ms.toLocaleString('es-CO')} ms
-                  </span>
-                  <span className="text-text-primary/50">
-                    · {formatRelativeTime(info.last_test.at)}
-                  </span>
-                  {!info.last_test.ok && info.last_test.error && (
-                    <span className="text-danger/80 max-w-[200px] truncate">
-                      · {info.last_test.error}
+                    title={`Última prueba: ${info.last_test.at}`}
+                  >
+                    <span
+                      className={[
+                        'w-2 h-2 rounded-full',
+                        info.last_test.ok ? 'bg-success' : 'bg-danger',
+                      ].join(' ')}
+                      aria-hidden="true"
+                    />
+                    {info.last_test.ok ? 'Última prueba: OK' : 'Última prueba: error'}
+                    <span className="font-mono text-text-primary/70">
+                      {info.last_test.latency_ms.toLocaleString('es-CO')} ms
                     </span>
-                  )}
-                </span>
-              ) : (
-                <span className="text-[12px] text-text-primary/50 italic">
-                  Sin pruebas previas. Ejecuta una para registrar el estado.
-                </span>
-              )}
+                    <span className="text-text-primary/50">
+                      · {formatRelativeTime(info.last_test.at)}
+                    </span>
+                    {!info.last_test.ok && info.last_test.error && (
+                      <span className="text-danger/80 max-w-[200px] truncate">
+                        · {info.last_test.error}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-[12px] text-text-primary/50 italic">
+                    Sin pruebas previas. Ejecuta una para registrar el estado.
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={runTest}
+                disabled={testing}
+                // Outline / secondary styling: this is a diagnostic
+                // action (non-destructive, easily repeatable). Solid
+                // red was visually overloaded with destructive CTAs
+                // elsewhere in the panel ("Eliminar borrador",
+                // "Deshabilitar seleccionados"). Outline neutral makes
+                // the affordance clearly "safe to click".
+                className="inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold border border-text-primary/30 text-text-primary bg-white hover:bg-gray-50 disabled:opacity-60 transition-colors"
+              >
+                {testing ? 'Probando…' : 'Probar conexión'}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={runTest}
-              disabled={testing}
-              // Outline / secondary styling: this is a diagnostic
-              // action (non-destructive, easily repeatable). Solid
-              // red was visually overloaded with destructive CTAs
-              // elsewhere in the panel ("Eliminar borrador",
-              // "Deshabilitar seleccionados"). Outline neutral makes
-              // the affordance clearly "safe to click".
-              className="inline-flex items-center px-4 py-2 rounded-md text-sm font-semibold border border-text-primary/30 text-text-primary bg-white hover:bg-gray-50 disabled:opacity-60 transition-colors"
-            >
-              {testing ? 'Probando…' : 'Probar conexión'}
-            </button>
+            {/* F4: drift warning — surfaces the stale-chip-after-.env-swap
+                case. If the last persisted test was run against a different
+                model than the one currently active, the "OK" badge is
+                misleading; we render a warning banner pushing the admin
+                to re-test. The comparison uses `==` (loose) for null/
+                undefined symmetry between legacy and modern payloads. */}
+            {info.last_test?.model &&
+              info.last_test.model !== info.model && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-md border border-warning/40 bg-warning/10 text-[12px] text-text-primary/80">
+                  <span className="text-warning font-bold leading-none mt-0.5" aria-hidden="true">⚠</span>
+                  <span>
+                    La última prueba fue contra{' '}
+                    <span className="font-mono text-text-primary">{info.last_test.model}</span>, no contra el modelo
+                    activo{' '}
+                    <span className="font-mono text-text-primary">{info.model}</span>. Vuelve a
+                    probar para confirmar que el modelo actual responde.
+                  </span>
+                </div>
+              )}
           </div>
         </>
       )}
@@ -1637,7 +1714,10 @@ function formatRelativeTime(iso: string): string {
   try {
     const then = new Date(iso).getTime()
     const now = Date.now()
-    const diffMs = now - then
+    // F6: floor at 0 so a client clock running ahead of the server
+    // doesn't render "hace -70 s" / "hace -2 min". Negative deltas
+    // collapse to "hace instantes" which is honest for our case.
+    const diffMs = Math.max(0, now - then)
     if (Number.isNaN(diffMs)) return ''
     const sec = Math.floor(diffMs / 1000)
     if (sec < 5) return 'hace instantes'
@@ -1685,6 +1765,13 @@ interface ServicesHealth {
 function SystemStatusSection() {
   const [data, setData] = useState<ServicesHealth | null>(null)
   const [loading, setLoading] = useState(true)
+  // F5: track fetch error separately. Without this, a failed
+  // /services-health request silently degraded the table to the two
+  // frontend-only rows (version + SW) with no indication that the
+  // backend probes (DB, LLM, Piper, Whisper, uptime) had not loaded.
+  // For a status page in a mental-health product, "looks fine" when
+  // the backend is unreachable is a dangerous lie.
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [swActive, setSwActive] = useState<boolean>(false)
   const addToast = useToastStore((s) => s.addToast)
 
@@ -1695,14 +1782,14 @@ function SystemStatusSection() {
 
   const fetchHealth = useCallback(async () => {
     setLoading(true)
+    setFetchError(null)
     try {
       const res = await apiClient.get<ServicesHealth>('/admin/services-health')
       setData(res.data ?? null)
     } catch (err) {
-      addToast({
-        type: 'error',
-        message: formatApiError(err, 'No se pudo cargar el estado del sistema.'),
-      })
+      const msg = formatApiError(err, 'No se pudo cargar el estado del sistema.')
+      setFetchError(msg)
+      addToast({ type: 'error', message: msg })
     } finally {
       setLoading(false)
     }
@@ -1774,6 +1861,35 @@ function SystemStatusSection() {
           ))}
         </div>
       ) : (
+        <>
+          {/* F5: banner rojo arriba de la tabla cuando el fetch falla.
+              CRÍTICO: el guard NO depende de `!data` — un retry fallido
+              después de un fetch exitoso previo dejaría `data` poblado
+              con un snapshot stale (DB/LLM/Piper potencialmente caídos
+              pero mostrando "OK") sin ningún indicador visible. El
+              banner debe verse SIEMPRE que el último fetch haya fallado,
+              y la copia se ajusta para distinguir "no se cargó nada"
+              de "los datos visibles pueden estar desactualizados". */}
+          {fetchError && (
+            <div className="mb-3 border border-danger/40 bg-danger/5 rounded-md p-3 flex items-start gap-2">
+              <span className="text-danger font-bold leading-none mt-0.5" aria-hidden="true">⚠</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-danger">
+                  {data
+                    ? 'El último intento de comprobación falló — los datos visibles pueden estar desactualizados.'
+                    : 'No se pudo cargar el estado de servicios del backend.'}
+                </p>
+                <p className="text-[12px] text-text-primary/70 mt-1 break-words">
+                  {fetchError}
+                </p>
+                <p className="text-[12px] text-text-primary/60 mt-1">
+                  {data
+                    ? 'Las filas debajo son el último snapshot exitoso. Pulsa "Volver a comprobar" para reintentar.'
+                    : 'Pulsa "Volver a comprobar" abajo para reintentar. Las filas visibles son solo del cliente y no reflejan el estado real del backend.'}
+                </p>
+              </div>
+            </div>
+          )}
         <div className="border border-gray-200 rounded-md overflow-hidden">
           <table className="w-full text-sm">
             <tbody>
@@ -1806,6 +1922,7 @@ function SystemStatusSection() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <div className="mt-3 flex items-center justify-between flex-wrap gap-2">

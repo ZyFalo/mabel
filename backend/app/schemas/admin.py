@@ -284,15 +284,6 @@ class ConsentVersionItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class GeminiTestResponse(BaseModel):
-    """Response for POST /admin/config/gemini/test."""
-
-    ok: bool
-    latency_ms: int
-    model: str
-    error: str | None = None
-
-
 class LLMLastTestInfo(BaseModel):
     """Snapshot of the most recent LLM connectivity test.
 
@@ -300,12 +291,36 @@ class LLMLastTestInfo(BaseModel):
     show last-test info across page reloads / backend restarts.
     `at` is an ISO-8601 string at the wire boundary (Pydantic
     serializes UTC datetime that way).
+
+    `model` is included (F4 fix) so the panel can detect the
+    "stale chip after .env swap" case: admin tests model X, edits
+    `.env` to switch to model Y, restarts; without the field the
+    chip "Última prueba: OK" would falsely imply Y was validated.
+    The frontend compares this field against `LLMInfoResponse.model`
+    and surfaces a warning when they differ.
     """
 
     at: datetime
     ok: bool
     latency_ms: int
+    model: str | None = None
     error: str | None = None
+
+
+class GeminiTestResponse(BaseModel):
+    """Response for POST /admin/config/gemini/test.
+
+    F8: includes `last_test` so the frontend can refresh the chip
+    without a second GET /admin/llm-info roundtrip. The persisted
+    snapshot is built server-side and mirrored in this field so the
+    UI stays in sync with what's in BD.
+    """
+
+    ok: bool
+    latency_ms: int
+    model: str
+    error: str | None = None
+    last_test: LLMLastTestInfo | None = None
 
 
 class ServiceCheck(BaseModel):

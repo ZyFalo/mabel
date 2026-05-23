@@ -109,5 +109,17 @@ class SystemConfigRepository:
         row.updated_at = datetime.now(UTC)
         await self.db.flush()
         # Invalidate local cache (next read re-fetches).
-        self._cache = None
+        self.invalidate()
         return row
+
+    def invalidate(self) -> None:
+        """Drop the local cache so the next read re-fetches from BD.
+
+        Public API so callers that mutate `system_config` outside of
+        `update_value` (e.g. raw SQL UPSERTs in admin services) can
+        opt in to the same cache-invalidation contract without
+        reaching into private state. If the cache representation
+        ever changes (TTL, per-key dict, shared module), only this
+        method has to be updated.
+        """
+        self._cache = None

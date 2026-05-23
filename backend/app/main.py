@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,8 +25,24 @@ from app.routers.session_router import router as session_router
 from app.routers.system_config_router import router as system_config_router
 from app.routers.tts_router import router as tts_router
 from app.routers.users_router import router as users_router
+from app.services.admin.config_service import mark_process_started
 
-app = FastAPI(title="Mabel IA", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI startup/shutdown hook.
+
+    Owns process-boot anchors that must NOT be tied to module import
+    time (e.g. `_PROCESS_START_TS` for the admin uptime tile in
+    `/admin/config` §05). The lifespan fires exactly once per worker
+    boot — survives test re-imports and tooling that might otherwise
+    rebind module-level singletons.
+    """
+    mark_process_started()
+    yield
+
+
+app = FastAPI(title="Mabel IA", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

@@ -267,12 +267,16 @@ class AdminConfigService:
     def _mask_api_key(raw: str) -> tuple[str, bool]:
         """Return (masked_form, is_configured).
 
-        Mask: 6 bullets + last 4 chars. Short keys (<5 chars) render as
-        bullets-only to avoid revealing the entire key.
+        Mask: 6 bullets + last 4 chars. Keys shorter than 12 chars
+        render as bullets-only — at that length, exposing 4 chars
+        leaks too much (≥33% of the key). Threshold mirrors AWS/Stripe
+        console conventions: real provider API keys are always far
+        longer than this, so legitimate keys still show the suffix;
+        only short placeholders / fixtures fall to bullets-only.
         """
         if not raw:
             return "(no configurada)", False
-        if len(raw) < 5:
+        if len(raw) < 12:
             return "●" * 6, True
         tail = raw[-4:]
         return f"●●●●●●{tail}", True
@@ -331,34 +335,65 @@ class AdminConfigService:
         The first time the admin clicks "Probar conexión" the row
         doesn't exist; subsequent clicks UPDATE it. Done with an
         ON CONFLICT statement so we don't have to branch on existence.
-        Failures here are swallowed: a flaky write to system_config
-        shouldn't mask a successful ping result to the admin.
+
+        D-12 compliance: this method NEVER commits or rolls back the
+        outer transaction (the router owns the single commit, where it
+        also writes the audit_log row). The UPSERT is wrapped in a
+        SAVEPOINT (`begin_nested`) so a flaky write here is isolated:
+        if the INSERT fails, only the SAVEPOINT is rolled back and the
+        parent transaction (carrying the eventual audit_log row) stays
+        usable. Without the SAVEPOINT, a PG error would poison the
+        session and the subsequent audit_log INSERT would fail too,
+        leaving an admin action with no audit trail (Ley 1581 risk).
+
+        F10: invalidates `repo._cache` after a successful UPSERT so any
+        downstream read inside the same request sees the new payload
+        instead of the pre-UPSERT cached value.
         """
         from sqlalchemy import text
 
         try:
-            await self.db.execute(
-                text(
-                    """
-                    INSERT INTO system_config (key, value, description, updated_at)
-                    VALUES (:key, CAST(:value AS jsonb), :description, now())
-                    ON CONFLICT (key) DO UPDATE
-                       SET value = EXCLUDED.value,
-                           updated_at = now()
-                    """
-                ),
-                {
-                    "key": "llm_last_test",
-                    "value": _json_dumps(payload),
-                    "description": (
-                        "Resultado de la ultima prueba de conexion LLM "
-                        "(persistido para mostrar en /admin/config seccion 04)."
+            async with self.db.begin_nested():
+                await self.db.execute(
+                    text(
+                        """
+                        INSERT INTO system_config (key, value, description, updated_at)
+                        VALUES (:key, CAST(:value AS jsonb), :description, now())
+                        ON CONFLICT (key) DO UPDATE
+                           SET value = EXCLUDED.value,
+                               updated_at = now()
+                        """
                     ),
-                },
+                    {
+                        "key": "llm_last_test",
+                        "value": _json_dumps(payload),
+                        "description": (
+                            "Resultado de la ultima prueba de conexion LLM "
+                            "(persistido para mostrar en /admin/config seccion 04)."
+                        ),
+                    },
+                )
+            # SAVEPOINT released successfully — invalidate cache so a
+            # subsequent `repo.get_value('llm_last_test')` in the same
+            # request returns the fresh payload (F10). Uses the
+            # repository's public `invalidate()` method instead of
+            # reaching into `_cache` directly so the contract holds if
+            # the cache representation is ever refactored.
+            self.repo.invalidate()
+        except Exception as exc:  # noqa: BLE001 — telemetry write must never break the ping
+            # SAVEPOINT auto-rolled back by the context manager; the
+            # parent transaction is intact. We swallow so a flaky
+            # telemetry write doesn't mask a successful ping result,
+            # but we log the exception class so the failure is at
+            # least observable in backend logs (otherwise a future
+            # bug here would be invisible — chip just stops updating
+            # with no signal anywhere).
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "llm_last_test UPSERT failed (rolled back to SAVEPOINT): %s",
+                exc.__class__.__name__,
             )
-            await self.db.commit()
-        except Exception:  # noqa: BLE001 — never fail a ping over telemetry
-            await self.db.rollback()
 
     async def get_services_health(self) -> dict:
         """Return real status of each backend dependency for /admin/config #05.
@@ -377,9 +412,10 @@ class AdminConfigService:
         """
         import importlib.util
         import shutil
-        from pathlib import Path
 
         from sqlalchemy import text
+
+        from app.services.tts_service import piper_model_files
 
         services: list[dict] = []
 
@@ -429,9 +465,15 @@ class AdminConfigService:
             )
 
         # --- Piper TTS ---
+        # F3 fix: usar el helper compartido `piper_model_files` (definido
+        # en tts_service.py) para que health check y runtime resuelvan
+        # exactamente el mismo path — incluyendo expansion absoluta vs
+        # CWD y el operador `/` en lugar de string-concat. Y verificar
+        # AMBOS archivos: el `.onnx` y el sidecar `.onnx.json` que
+        # Piper también requiere; sin uno de los dos, runtime falla
+        # aunque el health check reporte OK.
         piper_bin = shutil.which("piper")
-        model_filename = f"{settings.PIPER_VOICE}.onnx"
-        model_path = Path(settings.PIPER_MODEL_PATH) / model_filename
+        onnx_path, sidecar_path = piper_model_files()
         if not piper_bin:
             services.append(
                 {
@@ -444,7 +486,7 @@ class AdminConfigService:
                     ),
                 }
             )
-        elif not model_path.exists():
+        elif not onnx_path.exists():
             services.append(
                 {
                     "label": "TTS (Piper)",
@@ -452,7 +494,20 @@ class AdminConfigService:
                     "value": f"Modelo '{settings.PIPER_VOICE}' no encontrado",
                     "detail": (
                         f"Binario en {piper_bin} pero falta el modelo en "
-                        f"{model_path}."
+                        f"{onnx_path}."
+                    ),
+                }
+            )
+        elif not sidecar_path.exists():
+            services.append(
+                {
+                    "label": "TTS (Piper)",
+                    "status": "warn",
+                    "value": f"Falta el sidecar .onnx.json para '{settings.PIPER_VOICE}'",
+                    "detail": (
+                        f"El modelo {onnx_path.name} existe pero no su sidecar "
+                        f"{sidecar_path.name}. Piper requiere AMBOS archivos; sin "
+                        "el JSON la síntesis falla en runtime."
                     ),
                 }
             )
@@ -462,7 +517,7 @@ class AdminConfigService:
                     "label": "TTS (Piper)",
                     "status": "ok",
                     "value": f"Voz: {settings.PIPER_VOICE}",
-                    "detail": f"Binario: {piper_bin}",
+                    "detail": f"Binario: {piper_bin} · modelo: {onnx_path}",
                 }
             )
 
@@ -488,12 +543,17 @@ class AdminConfigService:
             )
 
         # --- Uptime (process-level) ---
-        global _PROCESS_START_TS  # noqa: PLW0603 — module-level singleton
-        try:
-            uptime_seconds = _time.monotonic() - _PROCESS_START_TS
-        except NameError:
-            _PROCESS_START_TS = _time.monotonic()
-            uptime_seconds = 0.0
+        # F7 fix: el `try/except NameError` que estaba aquí era código
+        # muerto (el binding existe siempre tras import del módulo).
+        # `_PROCESS_START_TS` se pinea ahora en `mark_process_started()`
+        # vía el lifespan hook de FastAPI (ver app/main.py) en lugar de
+        # depender del import time, que era frágil bajo cambios de
+        # estructura (un re-import en tests / herramientas resetea el
+        # singleton). Bajo `uvicorn --reload` el proceso entero se
+        # reinicia, así que el reset ahí es honesto: el dev SÍ tiene
+        # un proceso nuevo. Para uptime "real" del proceso habría que
+        # depender de `psutil`, que evitamos para no inflar el bundle.
+        uptime_seconds = _time.monotonic() - _PROCESS_START_TS
         services.append(
             {
                 "label": "Uptime del backend",
@@ -551,18 +611,27 @@ class AdminConfigService:
             latency_ms = int((_time.monotonic() - start) * 1000)
             result = {"ok": False, "latency_ms": latency_ms, "model": model, "error": exc.__class__.__name__}
 
-        # Persist a slim copy for the panel (timestamp + ok + latency + error).
-        # We do NOT include `model` here because the panel reads it from
-        # llm_info; duplicating would risk drift if the admin changes .env.
-        await self._persist_last_test(
-            {
-                "at": datetime.now(UTC).isoformat(),
-                "ok": result["ok"],
-                "latency_ms": result["latency_ms"],
-                "error": result["error"],
-            }
-        )
-        return result
+        # Persist the full snapshot for the panel. We include `model`
+        # (F4 fix) so the chip can detect drift after an admin edits
+        # `.env` and restarts: comparing `last_test.model` against
+        # `llm_info.model` catches the case where the cached chip says
+        # "Última prueba: OK" but the active model was swapped since.
+        # Without the field the admin would falsely assume the new
+        # model has been validated.
+        last_test_payload = {
+            "at": datetime.now(UTC).isoformat(),
+            "ok": result["ok"],
+            "latency_ms": result["latency_ms"],
+            "model": model,
+            "error": result["error"],
+        }
+        await self._persist_last_test(last_test_payload)
+        # F8: return the persisted snapshot alongside the ping result
+        # so the router can hand both to the frontend in one response —
+        # no second GET /admin/llm-info roundtrip needed to refresh
+        # the chip. The frontend hydrates `info.last_test` from this
+        # field optimistically.
+        return {**result, "last_test": last_test_payload}
 
 
 def _json_dumps(payload: dict) -> str:
@@ -572,10 +641,26 @@ def _json_dumps(payload: dict) -> str:
     return json.dumps(payload)
 
 
-# Captured at module import time so `get_services_health` can report
-# "uptime since last restart" without depending on /proc or
-# Linux-specific APIs. Reset every time uvicorn reloads the worker.
+# Set by `mark_process_started()` from the FastAPI lifespan startup
+# hook (see app/main.py). Captured at lifespan time — NOT import time —
+# so a stray re-import (test runners, tooling) doesn't reset it.
+# Default value is the import-time monotonic so that calling
+# `get_services_health` before lifespan completes never crashes; the
+# real value is pinned right after the worker boots.
 _PROCESS_START_TS: float = _time.monotonic()
+
+
+def mark_process_started() -> None:
+    """Pin the process start time. Call once from FastAPI lifespan.
+
+    F7 fix: previously `_PROCESS_START_TS` relied on the module being
+    imported exactly once per process — true in prod, fragile in dev
+    and tests where re-imports can silently reset the "uptime since"
+    anchor. The lifespan hook fires once per worker boot, which is
+    what we actually want.
+    """
+    global _PROCESS_START_TS  # noqa: PLW0603 — explicit module-level singleton
+    _PROCESS_START_TS = _time.monotonic()
 
 
 def _format_uptime(seconds: float) -> str:

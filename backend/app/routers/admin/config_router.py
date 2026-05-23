@@ -342,6 +342,15 @@ async def test_admin_gemini(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> GeminiTestResponse:
+    """Run an LLM connectivity ping and persist the result.
+
+    D-12 compliance: `gemini_ping` flushes the `llm_last_test` UPSERT
+    inside a SAVEPOINT but does NOT commit. This router writes the
+    audit_log row and then performs the SINGLE commit that persists
+    both the UPSERT and the audit log atomically. Before 2026-05-23
+    the service was committing the UPSERT separately, which split the
+    audit trail (Ley 1581 risk) — see docs/ADMIN_PANEL.md §11.ter F1.
+    """
     service = AdminConfigService(db)
     result = await service.gemini_ping()
 
@@ -362,4 +371,14 @@ async def test_admin_gemini(
         ip=_client_ip(request),
     )
     await db.commit()
-    return GeminiTestResponse(**result)
+    # F8: response carries `last_test` so the frontend can hydrate the
+    # chip without a second GET /admin/llm-info call. The service
+    # returns the same payload it persisted, so client and BD stay in
+    # sync after a single roundtrip.
+    return GeminiTestResponse(
+        ok=result["ok"],
+        latency_ms=result["latency_ms"],
+        model=result["model"],
+        error=result["error"],
+        last_test=result.get("last_test"),
+    )

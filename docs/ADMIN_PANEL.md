@@ -722,12 +722,24 @@ Tabla original:
 
 ## 11.ter Deuda técnica pendiente — Code-review 2026-05-23 (config secciones 04+05)
 
+> **DEUDA SALDADA 2026-05-23.** Los 10 hallazgos (F1-F10) fueron arreglados
+> en el mismo día. Se ejecutó un segundo code-review post-fix que detectó
+> 7 hallazgos derivados, de los cuales se resolvieron los 5 más serios
+> (Python 3.11 compat en `with_suffix`, F5 banner que no se mostraba con
+> data stale, encapsulación de `repo._cache` via `invalidate()` público,
+> log de excepción en lugar de `pass` silencioso, functional updater en
+> `setInfo`). Los 2 restantes (refactor a TypedDict para `last_test`, race
+> teórico de `.env` swap mid-ping) se aceptan como mejoras futuras no
+> bloqueantes. Esta sección se conserva como historial — la trazabilidad
+> de qué se arregló y por qué vale más que borrar el registro.
+
 Origen: code-review automático del commit que ingresó:
 - Sección 04 "Proveedor LLM" enriquecida (snapshot read-only + last_test persistido).
 - Sección 05 "Estado del sistema" con chequeo real backend (DB, LLM, Piper, faster-whisper, uptime) reemplazando el "Configurado" hardcoded.
 - Botones "Probar conexión" + "Volver a comprobar" restilados a outline neutral.
 
-**Estado:** 10 hallazgos detectados, **0 arreglados**, decisión deliberada de diferir todos para iterar contra el panel real antes de tocar arquitectura. Severidad ordenada de mayor a menor. **F1 es bloqueante para deploy** (compliance Ley 1581).
+**Estado original:** 10 hallazgos detectados, **0 arreglados**, decisión deliberada de diferir todos para iterar contra el panel real antes de tocar arquitectura. Severidad ordenada de mayor a menor. **F1 era bloqueante para deploy** (compliance Ley 1581).
+**Estado actual:** 10/10 resueltos + 5/7 derivados resueltos = panel listo para iterar más.
 
 ### F1 — D-12 commit violation en `_persist_last_test` 🔴 HIGH
 
