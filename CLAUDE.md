@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Mabel-IA** is an AI-powered virtual assistant for mental health psychoeducational support for students at Universidad Manuela Beltrán (UMB), Bogota, Colombia. Thesis project (Ingenieria de Software, 2025). Quasi-experimental study (pretest-posttest, 30 students).
+**Mabel-IA** is an AI-powered virtual assistant for mental health psychoeducational support for students at Universidad Manuela Beltrán (UMB), Bogota, Colombia. Thesis project (Ingenieria de Software, 2026). Quasi-experimental study (pretest-posttest, 30 students).
 
 **Current phase**: Fases 1-7 implemented (pilotable milestone reached). Fases 8-10 pending (admin panel, 3D avatar, testing/deployment).
 

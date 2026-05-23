@@ -37,6 +37,7 @@ from app.models.survey_response import SurveyResponse
 from app.models.user import User
 from app.repositories.empathy_rating_repository import EmpathyRatingRepository
 from app.repositories.survey_response_repository import SurveyResponseRepository
+from app.services.consent_eligibility import get_research_eligible_user_ids
 
 # Pilot study runs in Bogotá. All admin "today / last 30 days / per-day bucket"
 # semantics MUST be anchored to America/Bogota — anchoring to UTC produces a
@@ -302,6 +303,30 @@ class AdminMetricsService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.survey_repo = SurveyResponseRepository(db)
+        # Lazy cache of research-eligible user_ids for the current request.
+        # We resolve it once (single SQL roundtrip) and re-use across
+        # every method that pulls research/analytics data, so a single
+        # dashboard load doesn't fire 10× the same eligibility query.
+        # ``None`` means "not yet loaded"; an empty list means "no
+        # eligible users" and is intentionally distinct from "not yet
+        # loaded" so we can short-circuit correctly.
+        self._eligible_ids_cache: list[uuid.UUID] | None = None
+
+    async def _research_eligible_ids(self) -> list[uuid.UUID]:
+        """Lazy-load and cache the research-eligible user_id list."""
+        if self._eligible_ids_cache is None:
+            self._eligible_ids_cache = await get_research_eligible_user_ids(self.db)
+        return self._eligible_ids_cache
+
+    async def research_user_id_filter(self, user_id_col):
+        """Return an ``in_`` predicate against any user_id column.
+
+        Lets callers without a ``User`` join still apply the eligibility
+        constraint (e.g. queries on ``SessionModel`` that only need
+        ``SessionModel.user_id``). Same empty-list semantics.
+        """
+        ids = await self._research_eligible_ids()
+        return user_id_col.in_(ids)
 
     # -----------------------------------------------------------------------
     # Dashboard
@@ -470,14 +495,22 @@ class AdminMetricsService:
         to_date: date | None,
         cohort: str | None = None,
     ) -> dict[str, Any]:
+        # RESEARCH SURFACE — Tab A "Uso" describes participation patterns
+        # used in the thesis chapter. All four sub-aggregates restrict to
+        # research-eligible users (see consent_eligibility.py).
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
+        eligible_user_filter = await self.research_user_id_filter(SessionModel.user_id)
 
         # Active users per day (distinct user_id in sessions, Bogotá-day buckets)
         day_col = _bogota_day_trunc(SessionModel.started_at).label("day")
         active_users_stmt = (
             select(day_col, func.count(func.distinct(SessionModel.user_id)).label("count"))
-            .where(SessionModel.started_at >= from_dt, SessionModel.started_at <= to_dt)
+            .where(
+                SessionModel.started_at >= from_dt,
+                SessionModel.started_at <= to_dt,
+                eligible_user_filter,
+            )
             .group_by(day_col)
             .order_by(day_col)
         )
@@ -491,7 +524,11 @@ class AdminMetricsService:
         # Sessions per user distribution
         per_user_stmt = (
             select(SessionModel.user_id, func.count().label("count"))
-            .where(SessionModel.started_at >= from_dt, SessionModel.started_at <= to_dt)
+            .where(
+                SessionModel.started_at >= from_dt,
+                SessionModel.started_at <= to_dt,
+                eligible_user_filter,
+            )
             .group_by(SessionModel.user_id)
         )
         if cohort is not None:
@@ -514,7 +551,11 @@ class AdminMetricsService:
             select(func.count().label("c"))
             .select_from(Message)
             .join(SessionModel, Message.session_id == SessionModel.id)
-            .where(SessionModel.started_at >= from_dt, SessionModel.started_at <= to_dt)
+            .where(
+                SessionModel.started_at >= from_dt,
+                SessionModel.started_at <= to_dt,
+                eligible_user_filter,
+            )
             .group_by(Message.session_id)
         )
         if cohort is not None:
@@ -530,6 +571,7 @@ class AdminMetricsService:
             SessionModel.started_at >= from_dt,
             SessionModel.started_at <= to_dt,
             SessionModel.ended_at.is_not(None),
+            eligible_user_filter,
         )
         if cohort is not None:
             duration_stmt = duration_stmt.join(User, SessionModel.user_id == User.id).where(User.cohort == cohort)
@@ -562,15 +604,20 @@ class AdminMetricsService:
         to_date: date | None,
         cohort: str | None = None,
     ) -> dict[str, Any]:
+        # RESEARCH SURFACE — check-in mood / sleep / focus are core
+        # wellbeing variables of the thesis. Restrict every aggregate
+        # to research-eligible users (see consent_eligibility.py).
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
+        eligible_user_filter = await self.research_user_id_filter(SessionModel.user_id)
 
-        # Common filter: only sessions with completed check-in
+        # Common filter: only sessions with completed check-in + research-eligible owner
         completed_filter = (
             SessionModel.checkin_completed_at.is_not(None),
             SessionModel.checkin_completed_at >= from_dt,
             SessionModel.checkin_completed_at <= to_dt,
             SessionModel.checkin_payload.is_not(None),
+            eligible_user_filter,
         )
 
         def _apply_cohort(stmt):
@@ -672,17 +719,25 @@ class AdminMetricsService:
         to_date: date | None,
         cohort: str | None = None,
     ) -> dict[str, Any]:
+        # RESEARCH SURFACE — latency percentiles + token usage are
+        # thesis-tracked technical KPIs. We always join Message →
+        # SessionModel so we can filter by SessionModel.user_id against
+        # research-eligible ids (Message itself has no user_id column).
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
+        eligible_user_filter = await self.research_user_id_filter(SessionModel.user_id)
 
         def _apply_msg_cohort(stmt):
-            if cohort is None:
-                return stmt
-            return (
+            # ALWAYS join through SessionModel (required for the
+            # eligibility filter) + apply the research scope. Adds the
+            # optional cohort filter on top.
+            stmt = (
                 stmt.join(SessionModel, Message.session_id == SessionModel.id)
-                .join(User, SessionModel.user_id == User.id)
-                .where(User.cohort == cohort)
+                .where(eligible_user_filter)
             )
+            if cohort is not None:
+                stmt = stmt.join(User, SessionModel.user_id == User.id).where(User.cohort == cohort)
+            return stmt
 
         # Latency percentiles per day (assistant messages, Bogotá-day buckets)
         day_col = _bogota_day_trunc(Message.created_at).label("day")
@@ -803,27 +858,61 @@ class AdminMetricsService:
         type_result = await self.db.execute(type_stmt)
         guardrails_type_distribution = [{"event_type": t, "count": int(c)} for t, c in type_result.all()]
 
-        # Infraction rate (events / messages) — last 30 days, regardless of window
+        # Infraction rate (events / messages) — last 30 days, regardless of window.
+        # RESEARCH SURFACE — used in the thesis "guardrail effectiveness"
+        # section, so we restrict both numerator and denominator to
+        # research-eligible users. The per_day / type_distribution above
+        # remain operational (admins need them to triage active safety
+        # events even from non-consenting users).
+        #
+        # Numerator caveat (Evo 005b): `safety_events.user_id` is nullable
+        # (ON DELETE SET NULL preserves events from deleted accounts; the
+        # repository also allows `user_id=None` for system-generated
+        # events). A plain `IN(eligible_ids)` predicate is NULL-rejecting,
+        # which would silently drop those rows and under-report the rate.
+        # We use `IN(eligible_ids) OR user_id IS NULL` so anonymized /
+        # system events still count toward "how many infractions did the
+        # guardrail catch this month" — semantically correct since the
+        # numerator measures the guardrail's behavior, not the user's
+        # opt-in (and the message that triggered it was processed
+        # regardless of consent scope).
+        eligible_ids = await self._research_eligible_ids()
+        eligible_safety_filter = (
+            SafetyEvent.user_id.in_(eligible_ids) | SafetyEvent.user_id.is_(None)
+        )
+        eligible_msg_session_filter = await self.research_user_id_filter(SessionModel.user_id)
+
         thirty_days_ago = _utc_now() - timedelta(days=30)
-        events_30d_stmt = select(func.count()).select_from(SafetyEvent).where(SafetyEvent.created_at >= thirty_days_ago)
+        events_30d_stmt = (
+            select(func.count())
+            .select_from(SafetyEvent)
+            .where(SafetyEvent.created_at >= thirty_days_ago, eligible_safety_filter)
+        )
         if cohort is not None:
             events_30d_stmt = events_30d_stmt.join(User, SafetyEvent.user_id == User.id).where(User.cohort == cohort)
-        messages_30d_stmt = select(func.count()).select_from(Message).where(Message.created_at >= thirty_days_ago)
+        messages_30d_stmt = (
+            select(func.count())
+            .select_from(Message)
+            .join(SessionModel, Message.session_id == SessionModel.id)
+            .where(Message.created_at >= thirty_days_ago, eligible_msg_session_filter)
+        )
         if cohort is not None:
             messages_30d_stmt = (
-                messages_30d_stmt.join(SessionModel, Message.session_id == SessionModel.id)
-                .join(User, SessionModel.user_id == User.id)
+                messages_30d_stmt.join(User, SessionModel.user_id == User.id)
                 .where(User.cohort == cohort)
             )
         events_30d = int((await self.db.execute(events_30d_stmt)).scalar_one())
         messages_30d = int((await self.db.execute(messages_30d_stmt)).scalar_one())
         infraction_rate = (events_30d / messages_30d) if messages_30d > 0 else 0.0
 
-        # Top keywords (anonymized) — extract from safety_events.payload->>'keywords' (array)
+        # Top keywords (anonymized) — extract from safety_events.payload->>'keywords' (array).
+        # RESEARCH SURFACE — feeds thesis "what triggers safety filters"
+        # analysis. Restrict to consenting users' events.
         keywords_stmt = select(SafetyEvent.payload).where(
             SafetyEvent.created_at >= from_dt,
             SafetyEvent.created_at <= to_dt,
             SafetyEvent.payload.is_not(None),
+            eligible_safety_filter,
         )
         keywords_stmt = _apply_safety_cohort(keywords_stmt)
         keywords_result = await self.db.execute(keywords_stmt)
@@ -877,8 +966,12 @@ class AdminMetricsService:
         )
 
         # D-06: empathy data source is now `empathy_ratings`.
+        # RESEARCH SURFACE — Tab E "Estudio" is core thesis material;
+        # pass research-eligible ids so the empathy distribution and
+        # "pct ≥ 4" only count consenting users.
         empathy_repo = EmpathyRatingRepository(self.db)
-        empathy_stats = await empathy_repo.stats(cohort=cohort)
+        eligible_ids = await self._research_eligible_ids()
+        empathy_stats = await empathy_repo.stats(cohort=cohort, eligible_user_ids=eligible_ids)
         # Distribution shape from repo is [{bucket: "1".."5", count: int}].
         empathy_distribution = empathy_stats["distribution"]
         pct_empathy_4_or_above = empathy_stats["pct_4_or_above"]
@@ -920,8 +1013,17 @@ class AdminMetricsService:
         Anonymizes id-like columns via SHA-256 truncated to 16 hex chars.
         Never includes messages.content (D-03).
         """
+        # RESEARCH SURFACE — every CSV tab is for thesis analysis / pilot
+        # reporting. Restrict to research-eligible users (consent
+        # scope='uso_mejora_anon'). Pre-compute the three flavors of
+        # filter (by SessionModel.user_id, SafetyEvent.user_id,
+        # SurveyResponse.user_id) so each tab can apply the right one
+        # against its base table.
         from_d, to_d = _date_range(from_date, to_date)
         from_dt, to_dt = _to_dt(from_d), _to_dt(to_d, end=True)
+        eligible_session_filter = await self.research_user_id_filter(SessionModel.user_id)
+        eligible_safety_filter = await self.research_user_id_filter(SafetyEvent.user_id)
+        eligible_survey_filter = await self.research_user_id_filter(SurveyResponse.user_id)
 
         if tab == "usage":
             yield ["date", "session_id_hash", "user_id_hash", "started_at", "ended_at", "messages_count"]
@@ -937,6 +1039,7 @@ class AdminMetricsService:
                 .where(
                     SessionModel.started_at >= from_dt,
                     SessionModel.started_at <= to_dt,
+                    eligible_session_filter,
                 )
                 .group_by(SessionModel.id)
                 .order_by(SessionModel.started_at)
@@ -967,6 +1070,7 @@ class AdminMetricsService:
                     SessionModel.checkin_completed_at.is_not(None),
                     SessionModel.checkin_completed_at >= from_dt,
                     SessionModel.checkin_completed_at <= to_dt,
+                    eligible_session_filter,
                 )
                 .order_by(SessionModel.checkin_completed_at)
             )
@@ -993,6 +1097,8 @@ class AdminMetricsService:
                 "tokens_prompt",
                 "tokens_completion",
             ]
+            # Always join SessionModel to apply the eligibility filter
+            # (Message has no user_id of its own).
             stmt = (
                 select(
                     Message.id,
@@ -1002,19 +1108,17 @@ class AdminMetricsService:
                     Message.tokens_prompt,
                     Message.tokens_completion,
                 )
+                .join(SessionModel, Message.session_id == SessionModel.id)
                 .where(
                     Message.role == "assistant",
                     Message.created_at >= from_dt,
                     Message.created_at <= to_dt,
+                    eligible_session_filter,
                 )
                 .order_by(Message.created_at)
             )
             if cohort is not None:
-                stmt = (
-                    stmt.join(SessionModel, Message.session_id == SessionModel.id)
-                    .join(User, SessionModel.user_id == User.id)
-                    .where(User.cohort == cohort)
-                )
+                stmt = stmt.join(User, SessionModel.user_id == User.id).where(User.cohort == cohort)
             result = await self.db.execute(stmt)
             for mid, sid, when, lat, tp, tc in result.all():
                 yield [
@@ -1041,6 +1145,7 @@ class AdminMetricsService:
                 .where(
                     SafetyEvent.created_at >= from_dt,
                     SafetyEvent.created_at <= to_dt,
+                    eligible_safety_filter,
                 )
                 .order_by(SafetyEvent.created_at)
             )
@@ -1071,7 +1176,11 @@ class AdminMetricsService:
                 "score",
                 "administered_at",
             ]
-            stmt = select(SurveyResponse).order_by(SurveyResponse.administered_at.desc())
+            stmt = (
+                select(SurveyResponse)
+                .where(eligible_survey_filter)
+                .order_by(SurveyResponse.administered_at.desc())
+            )
             if cohort is not None:
                 stmt = stmt.join(User, SurveyResponse.user_id == User.id).where(User.cohort == cohort)
             surveys_result = await self.db.execute(stmt)
@@ -1098,10 +1207,17 @@ class AdminMetricsService:
         return int(value) if value is not None else 0
 
     async def _sessions_per_day(self, from_dt: datetime, to_dt: datetime, cohort: str | None = None) -> list[dict]:
+        # RESEARCH SURFACE — see consent_eligibility.py matrix. Only
+        # sessions from users who opted into `uso_mejora_anon` count.
         day_col = _bogota_day_trunc(SessionModel.started_at).label("day")
+        eligible_filter = await self.research_user_id_filter(SessionModel.user_id)
         stmt = (
             select(day_col, func.count().label("count"))
-            .where(SessionModel.started_at >= from_dt, SessionModel.started_at <= to_dt)
+            .where(
+                SessionModel.started_at >= from_dt,
+                SessionModel.started_at <= to_dt,
+                eligible_filter,
+            )
             .group_by(day_col)
             .order_by(day_col)
         )
@@ -1111,12 +1227,16 @@ class AdminMetricsService:
         return [{"date": _date_str(d), "count": int(c)} for d, c in result.all()]
 
     async def _mood_distribution(self, from_dt: datetime, to_dt: datetime, cohort: str | None = None) -> dict[str, int]:
+        # RESEARCH SURFACE — check-in mood values are personal wellbeing
+        # data; restrict to users who opted into research-scope use.
         mood_expr = cast(SessionModel.checkin_payload["mood"].astext, Float)
+        eligible_filter = await self.research_user_id_filter(SessionModel.user_id)
         stmt = select(mood_expr).where(
             SessionModel.checkin_completed_at.is_not(None),
             SessionModel.checkin_completed_at >= from_dt,
             SessionModel.checkin_completed_at <= to_dt,
             SessionModel.checkin_payload.is_not(None),
+            eligible_filter,
         )
         if cohort is not None:
             stmt = stmt.join(User, SessionModel.user_id == User.id).where(User.cohort == cohort)
@@ -1135,24 +1255,27 @@ class AdminMetricsService:
         return {"bajo": bajo, "medio": medio, "alto": alto}
 
     async def _latency_per_day(self, from_dt: datetime, to_dt: datetime, cohort: str | None = None) -> list[dict]:
+        # RESEARCH SURFACE — latency per day is a thesis-tracked metric
+        # (success criterion: median ≤ 20s). Restrict to research scope.
+        # We always JOIN through SessionModel because Message has no
+        # user_id, then constrain on SessionModel.user_id.
         day_col = _bogota_day_trunc(Message.created_at).label("day")
+        eligible_filter = await self.research_user_id_filter(SessionModel.user_id)
         stmt = (
             select(day_col, func.avg(Message.latency_ms).label("avg_ms"))
+            .join(SessionModel, Message.session_id == SessionModel.id)
             .where(
                 Message.role == "assistant",
                 Message.latency_ms.is_not(None),
                 Message.created_at >= from_dt,
                 Message.created_at <= to_dt,
+                eligible_filter,
             )
             .group_by(day_col)
             .order_by(day_col)
         )
         if cohort is not None:
-            stmt = (
-                stmt.join(SessionModel, Message.session_id == SessionModel.id)
-                .join(User, SessionModel.user_id == User.id)
-                .where(User.cohort == cohort)
-            )
+            stmt = stmt.join(User, SessionModel.user_id == User.id).where(User.cohort == cohort)
         result = await self.db.execute(stmt)
         return [{"date": _date_str(d), "avg_ms": int(a) if a is not None else 0} for d, a in result.all()]
 
@@ -1194,9 +1317,14 @@ class AdminMetricsService:
     # ----- Survey helpers (cohort-aware) ------------------------------------
 
     async def _sus_scores(self, cohort: str | None = None) -> list[float]:
+        # RESEARCH SURFACE — SUS is a thesis instrument. Restrict to
+        # research scope. We filter on SurveyResponse.user_id which is
+        # already the user's id; no User join required.
+        eligible_filter = await self.research_user_id_filter(SurveyResponse.user_id)
         stmt = select(SurveyResponse.score).where(
             SurveyResponse.instrument == "sus",
             SurveyResponse.score.is_not(None),
+            eligible_filter,
         )
         if cohort is not None:
             stmt = stmt.join(User, SurveyResponse.user_id == User.id).where(User.cohort == cohort)
@@ -1215,6 +1343,9 @@ class AdminMetricsService:
         """Return (paired_list, n_excluded) where n_excluded counts users with
         pre OR post but not both (Fase 8.1 D-05).
         """
+        # RESEARCH SURFACE — wellbeing pre/post is the core thesis
+        # comparison (Cohen's d). Only consenting users count.
+        eligible_filter = await self.research_user_id_filter(SurveyResponse.user_id)
         stmt = select(
             SurveyResponse.user_id,
             SurveyResponse.instrument,
@@ -1224,6 +1355,7 @@ class AdminMetricsService:
             SurveyResponse.instrument.in_(["wellbeing_pre", "wellbeing_post"]),
             SurveyResponse.score.is_not(None),
             SurveyResponse.user_id.is_not(None),
+            eligible_filter,
         )
         if cohort is not None:
             stmt = stmt.join(User, SurveyResponse.user_id == User.id).where(User.cohort == cohort)

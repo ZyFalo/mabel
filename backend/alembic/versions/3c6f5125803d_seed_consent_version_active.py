@@ -30,7 +30,7 @@ def upgrade() -> None:
 
 Proyecto: Mabel IA — Asistente Virtual de Apoyo Psicoeducativo
 Institucion: Universidad Manuela Beltran (UMB), Bogota, Colombia
-Investigadores: Equipo de Tesis — Ingenieria de Software, 2025
+Investigadores: Equipo de Tesis — Ingenieria de Software, 2026
 
 De acuerdo con la Ley 1581 de 2012 (Proteccion de Datos Personales) y el Decreto 1377 de 2013, se le informa que:
 

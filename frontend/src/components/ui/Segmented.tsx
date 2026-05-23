@@ -9,6 +9,13 @@ export interface SegmentedOption<T extends string> {
   value: T
   label: string
   icon?: SegmentedIcon
+  /**
+   * Per-option disable flag. The whole group stays interactive (other
+   * options remain clickable) but the disabled one gets opacity + cursor
+   * feedback and ignores clicks. Use this for placeholder options whose
+   * feature isn't shipped yet (e.g. "Avatar 2D — pendiente").
+   */
+  disabled?: boolean
 }
 
 interface SegmentedProps<T extends string> {
@@ -43,22 +50,38 @@ export default function Segmented<T extends string>({
       {options.map((opt) => {
         const Icon = opt.icon
         const isActive = opt.value === value
+        const isDisabled = Boolean(opt.disabled)
+        // `activeStyling` is the "selected pill" look (white bg, dark
+        // ink text, drop shadow). We suppress it when the option is
+        // both active AND disabled: rendering a disabled chip that
+        // still looks "selected" is confusing — the user can't click
+        // it to confirm, can't click other options to change away
+        // visually, and assistive tech reads "checked + disabled" which
+        // is contradictory. Better to show the muted style and let the
+        // user understand "this used to be your choice but isn't
+        // available right now". Reachable today because Onboarding's
+        // font_size Segmented has all options disabled but the default
+        // value 'normal' makes one of them isActive on first render.
+        const showActiveStyling = isActive && !isDisabled
         return (
           <button
             key={opt.value}
             type="button"
             role="radio"
             aria-checked={isActive}
-            onClick={() => onChange(opt.value)}
+            aria-disabled={isDisabled}
+            disabled={isDisabled}
+            onClick={() => !isDisabled && onChange(opt.value)}
             className={[
               'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium',
               'transition-all duration-150 ease-out',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mabel-600)]/40',
-              isActive ? 'shadow-sm' : 'hover:scale-[1.02]',
+              showActiveStyling ? 'shadow-sm' : isDisabled ? '' : 'hover:scale-[1.02]',
+              isDisabled ? 'cursor-not-allowed opacity-50' : '',
             ].join(' ')}
             style={{
-              backgroundColor: isActive ? '#fff' : 'transparent',
-              color: isActive ? 'var(--ink-900)' : 'var(--ink-500)',
+              backgroundColor: showActiveStyling ? '#fff' : 'transparent',
+              color: showActiveStyling ? 'var(--ink-900)' : 'var(--ink-500)',
             }}
           >
             {Icon ? <Icon className="h-4 w-4" aria-hidden="true" /> : null}

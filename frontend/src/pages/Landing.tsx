@@ -187,7 +187,7 @@ export default function Landing() {
             textAlign: 'center',
           }}
         >
-          Proyecto de tesis - Ingenieria de Software, UMB, Bogota, 2025.
+          Proyecto de tesis - Ingenieria de Software, UMB, Bogota, 2026.
         </p>
       </div>
     </AuthShell>

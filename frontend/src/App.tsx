@@ -84,13 +84,21 @@ export default function App() {
           <Route path="/403" element={<AccessDenied />} />
         </Route>
 
-        {/* Protected + ConsentGuard: student routes with sidebar layout */}
+        {/* Protected + ConsentGuard: student routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<ConsentGuard />}>
+            {/* Onboarding: ConsentGuard sí, pero SIN StudentLayout — el
+                flujo es full-screen guiado (3 pasos: brújula → voz →
+                accesibilidad) y mostrar el sidebar con links a /home,
+                chats activos, etc. permitiría al estudiante escaparse
+                a medio camino y nunca crear su fila en `preferences`.
+                Consistente con las pantallas hermanas pre-experiencia
+                (/login, /consent, /consent-required) que también van
+                sin sidebar. */}
+            <Route path="/onboarding" element={<Onboarding />} />
+
+            {/* All other student routes: sidebar + require preferences */}
             <Route element={<StudentLayout />}>
-              {/* Onboarding: inside ConsentGuard, outside OnboardingGuard */}
-              <Route path="/onboarding" element={<Onboarding />} />
-              {/* All other student routes: require preferences (OnboardingGuard) */}
               <Route element={<OnboardingGuard />}>
                 <Route path="/home" element={<Home />} />
                 {/* /settings is no longer a route — Settings is a global

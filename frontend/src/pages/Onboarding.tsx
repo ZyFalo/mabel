@@ -1,12 +1,27 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Type, MonitorSmartphone, Bot, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react'
 import Toggle from '../components/ui/Toggle'
 import Segmented from '../components/ui/Segmented'
 import NativeSelect from '../components/ui/NativeSelect'
+import InfoHint from '../components/admin/InfoHint'
 import { usePreferencesStore } from '../stores/preferencesStore'
 import { useToastStore } from '../stores/toastStore'
 import AuthShell from '../components/auth/AuthShell'
+
+// Small helper to render an option title with an inline info tooltip.
+// Keeps the JSX of each step readable by collapsing the `<p>title</p> +
+// <InfoHint />` pattern into one component.
+function OptionLabel({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
+        {title}
+      </p>
+      <InfoHint text={hint} />
+    </div>
+  )
+}
 
 const STEPS = ['Privacidad', 'Accesibilidad', 'Voz']
 
@@ -33,10 +48,35 @@ const DEFAULT_STATE: FormState = {
 export default function Onboarding() {
   const navigate = useNavigate()
   const updatePreferences = usePreferencesStore((s) => s.updatePreferences)
+  const { hasPreferences, loadPreferences, loading: prefsLoading } = usePreferencesStore()
   const addToast = useToastStore((s) => s.addToast)
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<FormState>(DEFAULT_STATE)
   const [saving, setSaving] = useState(false)
+
+  // Bounce users that already completed onboarding back to /home. The
+  // route is reachable via direct URL / browser back-button even when
+  // they have a preferences row, and `handleSave` would otherwise PUT
+  // DEFAULT_STATE (with all the locked-disabled fields) and silently
+  // overwrite whatever they had configured before. The redirect is a
+  // belt-and-suspenders complement to OnboardingGuard, which only
+  // covers the *other* student routes after this PR moved /onboarding
+  // out of StudentLayout.
+  useEffect(() => {
+    loadPreferences()
+  }, [loadPreferences])
+
+  if (prefsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (hasPreferences) {
+    return <Navigate to="/home" replace />
+  }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -206,9 +246,10 @@ export default function Onboarding() {
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
-                      Guardar historial de conversaciones
-                    </p>
+                    <OptionLabel
+                      title="Guardar historial de conversaciones"
+                      hint="Si está activado, tus mensajes quedan guardados de forma cifrada y puedes retomar la conversación más tarde. Si lo desactivas, cada sesión empieza en blanco y nada se persiste al cerrarla. También afecta a la investigación: los empathy ratings necesitan que el historial esté guardado."
+                    />
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Si está desactivado, los mensajes no se guardan después de cerrar la sesión.
                     </p>
@@ -231,9 +272,10 @@ export default function Onboarding() {
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
-                      Check-in emocional al inicio
-                    </p>
+                    <OptionLabel
+                      title="Check-in emocional al inicio"
+                      hint="Antes de empezar a hablar, Mabel te hará 3 preguntas rápidas (ánimo, sueño, foco). Eso le permite ajustar su tono y prioridades durante la conversación. Si lo desactivas, entras directo al chat sin preguntas previas."
+                    />
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Te preguntaremos cómo te sientes antes de iniciar la conversación.
                     </p>
@@ -267,6 +309,17 @@ export default function Onboarding() {
                 Ajusta la interfaz a tus necesidades.
               </p>
 
+              {/*
+                TODO: pendiente modelo 2D
+                Los 3 controles de accesibilidad (alto contraste, tamaño
+                fuente, subtítulos TTS) hoy guardan flags en BD pero NADIE
+                los aplica al DOM (no hay clase `.a11y-contrast` ni handler
+                de font-size en `<html>`, y los subtítulos dependen del
+                modelo de voz que aún no existe). Se dejan visibles pero
+                disabled para mantener la promesa visual del producto.
+                Detalle del trabajo a hacer cuando llegue el modelo 2D:
+                ver memoria `onboarding-pending-when-voice-avatar-lands.md`.
+              */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div
                   style={{
@@ -274,12 +327,14 @@ export default function Onboarding() {
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     gap: 16,
+                    opacity: 0.55,
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
-                      Alto contraste
-                    </p>
+                    <OptionLabel
+                      title="Alto contraste"
+                      hint="Refuerza el contraste entre texto y fondo en toda la interfaz para facilitar la lectura a personas con baja visión. Pendiente: se conectará al DOM cuando se integre el modelo 2D animado."
+                    />
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Aumenta el contraste de colores para mejor legibilidad.
                     </p>
@@ -288,30 +343,34 @@ export default function Onboarding() {
                     checked={form.contrast}
                     onChange={(v) => update('contrast', v)}
                     label="Alto contraste"
+                    disabled
                   />
                 </div>
 
                 <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
 
-                <div>
-                  <p
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: 'var(--ink-900)',
-                      margin: '0 0 10px',
-                    }}
-                  >
-                    Tamaño de fuente
-                  </p>
+                <div style={{ opacity: 0.55 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: 'var(--ink-900)',
+                        margin: 0,
+                      }}
+                    >
+                      Tamaño de fuente
+                    </p>
+                    <InfoHint text="Cambia el tamaño base del texto en toda la app (botones, mensajes, formularios). Pendiente: se conectará al DOM cuando se integre el modelo 2D animado." />
+                  </div>
                   <Segmented
                     ariaLabel="Tamaño de fuente"
                     value={form.font_size}
                     onChange={(v) => update('font_size', v)}
                     options={[
-                      { value: 'small', label: 'Pequeña', icon: Type },
-                      { value: 'normal', label: 'Normal', icon: Type },
-                      { value: 'large', label: 'Grande', icon: Type },
+                      { value: 'small', label: 'Pequeña', icon: Type, disabled: true },
+                      { value: 'normal', label: 'Normal', icon: Type, disabled: true },
+                      { value: 'large', label: 'Grande', icon: Type, disabled: true },
                     ]}
                   />
                 </div>
@@ -324,12 +383,14 @@ export default function Onboarding() {
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     gap: 16,
+                    opacity: 0.55,
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)', margin: 0 }}>
-                      Subtítulos TTS
-                    </p>
+                    <OptionLabel
+                      title="Subtítulos TTS"
+                      hint="Cuando Mabel hable en voz alta, resalta en su burbuja la palabra que está pronunciando — útil para seguir el ritmo y para personas con dificultad auditiva. Pendiente: depende del modelo de voz 2D animado."
+                    />
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
                       Resalta el texto mientras Mabel habla.
                     </p>
@@ -338,6 +399,7 @@ export default function Onboarding() {
                     checked={form.subtitles}
                     onChange={(v) => update('subtitles', v)}
                     label="Subtítulos"
+                    disabled
                   />
                 </div>
               </div>
@@ -363,22 +425,41 @@ export default function Onboarding() {
                 Configura cómo suena Mabel IA.
               </p>
 
+              {/*
+                TODO: pendiente modelo 2D
+                "Voz del asistente" hoy muestra IDs inventados (es-female-1,
+                es-female-2, es-male-1). El backend Piper solo conoce el
+                default `es_ES-mls_9972-low` (config.py:28) y hace fallback
+                silencioso, por lo que ninguna selección distinta a
+                "Por defecto" cambia nada. Se deja visible pero disabled
+                hasta integrar el modelo 2D con TTS multi-voz.
+
+                "Modo de interacción Inicial": la opción "Avatar 2D" se
+                deja visible pero disabled (no hay implementación todavía
+                en Chat.tsx). "Chat clásico" sigue activa.
+
+                Memoria: `onboarding-pending-when-voice-avatar-lands.md`.
+              */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <p
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: 'var(--ink-900)',
-                      margin: '0 0 10px',
-                    }}
-                  >
-                    Voz del asistente
-                  </p>
+                <div style={{ opacity: 0.55 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: 'var(--ink-900)',
+                        margin: 0,
+                      }}
+                    >
+                      Voz del asistente
+                    </p>
+                    <InfoHint text="Elige el timbre con el que Mabel responderá cuando hable en voz alta. Pendiente: las voces se activan al integrar el modelo 2D animado con TTS." />
+                  </div>
                   <NativeSelect
                     value={form.tts_voice}
                     onChange={(v) => update('tts_voice', v)}
                     ariaLabel="Voz del asistente"
+                    disabled
                   >
                     <option value="">Por defecto</option>
                     <option value="es-female-1">Femenina 1</option>
@@ -390,23 +471,26 @@ export default function Onboarding() {
                 <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
 
                 <div>
-                  <p
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: 'var(--ink-900)',
-                      margin: '0 0 10px',
-                    }}
-                  >
-                    Modo de interacción
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: 'var(--ink-900)',
+                        margin: 0,
+                      }}
+                    >
+                      Modo de interacción Inicial
+                    </p>
+                    <InfoHint text="Define con qué interfaz arranca cada conversación nueva: chat de texto clásico o un avatar 2D animado que habla y reacciona a tus respuestas. Podrás cambiar entre ambos durante la sesión. Pendiente: el avatar 2D se activa al integrar el modelo." />
+                  </div>
                   <Segmented
-                    ariaLabel="Modo de interacción"
+                    ariaLabel="Modo de interacción inicial"
                     value={form.preferred_chat_mode}
                     onChange={(v) => update('preferred_chat_mode', v)}
                     options={[
                       { value: 'chat', label: 'Chat clásico', icon: MonitorSmartphone },
-                      { value: 'avatar', label: 'Avatar 3D', icon: Bot },
+                      { value: 'avatar', label: 'Avatar 2D', icon: Bot, disabled: true },
                     ]}
                   />
                 </div>

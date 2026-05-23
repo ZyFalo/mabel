@@ -23,6 +23,7 @@ from app.models.user import User
 from app.repositories.empathy_rating_repository import EmpathyRatingRepository
 from app.services.admin.users_service import mask_email
 from app.services.audit_service import audit_log_action
+from app.services.consent_eligibility import get_research_eligible_user_ids
 
 
 async def _batch_preceding_user_messages(
@@ -92,16 +93,23 @@ class AdminEmpathyService:
         list and the UI counter showed only the in-memory length, which was
         misleading whenever the true pool exceeded the limit (or, in the
         pilot, equalled it exactly).
+
+        RESEARCH SURFACE — empathy ratings feed the thesis "empathic
+        tone ≥ 4/5 in 80%" criterion. Only messages from users who
+        opted into ``uso_mejora_anon`` are surfaced (see
+        ``consent_eligibility.py``).
         """
         # Clamp limit defensively (the router also enforces via Pydantic).
         clamped = max(1, min(int(limit), 100))
 
+        eligible_ids = await get_research_eligible_user_ids(self.db)
+
         total_pending = await self.repo.count_unrated_messages(
-            rater_id=rater_id, cohort=cohort
+            rater_id=rater_id, cohort=cohort, eligible_user_ids=eligible_ids
         )
 
         messages = await self.repo.list_unrated_messages(
-            rater_id=rater_id, cohort=cohort, limit=clamped
+            rater_id=rater_id, cohort=cohort, limit=clamped, eligible_user_ids=eligible_ids
         )
 
         if not messages:
@@ -198,12 +206,33 @@ class AdminEmpathyService:
         each other scored.
         """
         # 1. Pull every rating for messages whose author's cohort matches.
+        #    RESEARCH SURFACE — restrict to messages whose author opted
+        #    into research scope so a non-consenting user's message
+        #    never appears here even if some admin already rated it
+        #    (consent revoked after the rating, for example).
+        #
+        #    Known UX consequence (deliberate): the "Calificadas (N)"
+        #    counter in the admin panel will SHRINK when a previously-
+        #    consenting user revokes — the rater's own historical work
+        #    becomes invisible. This is the correct trade-off under Ley
+        #    1581/2012 purpose-limitation (we cannot continue surfacing
+        #    research-context data about a user who withdrew consent),
+        #    but it can look like a bug. If you ever want to preserve
+        #    the rater's audit-of-self view, the right pattern is a
+        #    separate "Mi histórico" surface that queries
+        #    `empathy_ratings.rater_id` directly without joining the
+        #    user-scope filter — that's the rater's own labor record,
+        #    distinct from the user's research-eligible data.
+        eligible_ids = await get_research_eligible_user_ids(self.db)
         stmt = (
             select(EmpathyRating, Message, SessionModel, User)
             .join(Message, EmpathyRating.message_id == Message.id)
             .join(SessionModel, Message.session_id == SessionModel.id)
             .join(User, SessionModel.user_id == User.id)
-            .where(Message.role == "assistant")
+            .where(
+                Message.role == "assistant",
+                SessionModel.user_id.in_(eligible_ids),
+            )
             .order_by(EmpathyRating.created_at.desc())
         )
         if cohort is not None:
@@ -315,5 +344,12 @@ class AdminEmpathyService:
 
     # ------------------------------------------------------------------ stats
     async def get_stats(self, cohort: str | None = None) -> dict:
-        """Return aggregate stats (delegates to repository)."""
-        return await self.repo.stats(cohort=cohort)
+        """Return aggregate stats (delegates to repository).
+
+        RESEARCH SURFACE — Tab E "Estudio" reads this for the empathy
+        distribution + "pct ≥ 4" thesis criterion. We pass the
+        eligibility list down so the repository's COUNT/AVG/distribution
+        all reflect consenting users only.
+        """
+        eligible_ids = await get_research_eligible_user_ids(self.db)
+        return await self.repo.stats(cohort=cohort, eligible_user_ids=eligible_ids)

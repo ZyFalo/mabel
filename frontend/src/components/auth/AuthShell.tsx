@@ -9,6 +9,13 @@ interface AuthShellProps {
   children: ReactNode
   /** When true, RIGHT panel uses max-w 640 (for legal text / onboarding). Defaults to 420. */
   wide?: boolean
+  /**
+   * When true, the LEFT gradient panel takes ~42% of the viewport instead of
+   * splitting 50/50. Used for pages with a content-heavy right column (e.g.
+   * the consent document) where leaving half the screen as decorative
+   * gradient looks empty on wide desktops.
+   */
+  compactHero?: boolean
 }
 
 /**
@@ -21,21 +28,36 @@ interface AuthShellProps {
  *
  * Mobile: left panel collapses to a top header strip with brand mark.
  */
-export default function AuthShell({ side, children, wide = false }: AuthShellProps) {
+export default function AuthShell({
+  side,
+  children,
+  wide = false,
+  compactHero = false,
+}: AuthShellProps) {
   return (
     <div
       style={{
         minHeight: '100vh',
         display: 'flex',
         background: '#fff',
-        overflow: 'hidden',
+        // `overflow-x: hidden` (not `overflow: hidden`) so vertical body
+        // scroll works on mobile when the form is taller than the viewport.
+        // The previous `overflow: hidden` clipped everything below the fold
+        // and the user couldn't reach the "Acepto y continuar" button on
+        // small screens. The decorative left-panel circles are contained
+        // by their own `overflow: hidden`, not by this root.
+        overflowX: 'hidden',
       }}
     >
-      {/* LEFT panel (>= md) */}
+      {/* LEFT panel (>= md). When `compactHero`, the panel is a fixed
+          ~42% of the viewport (with a soft cap) instead of `flex: 1`,
+          so the right column takes the lion's share on wide desktops
+          where the hero would otherwise be 50% of empty space. */}
       <div
         className="hidden md:flex"
         style={{
-          flex: 1,
+          flex: compactHero ? '0 0 42%' : 1,
+          maxWidth: compactHero ? 620 : undefined,
           padding: '48px 56px',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -137,25 +159,50 @@ export default function AuthShell({ side, children, wide = false }: AuthShellPro
         </div>
       </div>
 
-      {/* RIGHT panel — formulario */}
+      {/* RIGHT panel — formulario.
+          Layout decisions:
+          - `flex-direction: column` + `alignItems: center` (horizontal only)
+            avoids the classic flex centering bug where `alignItems: center`
+            with a child taller than the cross axis leaves the overflow
+            unreachable above the visible area. With column layout and
+            `margin: auto 0` on the child, the form centers vertically when
+            it fits and pushes to the top when it doesn't — scroll natural.
+          - `paddingTop: max(88px, ...)` reserves room for the mobile-only
+            fixed header (~64px tall). On desktop the left panel is rendered
+            in-flow so the 88px is just a regular top padding.
+          - No `overflowY: auto` here — let the document body scroll. With
+            the panel scrolling internally AND the root having `overflow:
+            hidden`, mobile was double-clipping and the user couldn't reach
+            the bottom of the form. */}
       <div
-        className="flex-1 fade-in"
+        // `pt-[…]` mobile = 88px (to clear the fixed mobile header) +
+        // `env(safe-area-inset-top)` for iOS standalone PWA.
+        // `md:pt-12` desktop = 48px, restoring the pre-mobile-fix top
+        // padding because the mobile header is `md:hidden` (no header
+        // to clear on desktop). Without the breakpoint gate, every auth
+        // page sat 40px too low on desktops — visible regression.
+        className="flex-1 fade-in pt-[calc(env(safe-area-inset-top)+88px)] md:pt-12"
         style={{
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          padding: '48px 24px',
-          paddingTop: 'max(48px, env(safe-area-inset-top))',
+          paddingLeft: 24,
+          paddingRight: 24,
+          paddingBottom: 48,
           background: '#fff',
-          overflowY: 'auto',
+          minHeight: '100vh',
+          boxSizing: 'border-box',
         }}
       >
         <div
           style={{
             width: '100%',
             maxWidth: wide ? 640 : 420,
-            // Add top spacing on mobile so the fixed top header doesn't overlap content
-            marginTop: 0,
+            // `margin: auto 0` collapses to 0 when the child overflows the
+            // panel (so the user can scroll), and centers vertically when
+            // it fits — same UX as the previous `alignItems: center` but
+            // without the unreachable-overflow trap.
+            margin: 'auto 0',
           }}
         >
           {children}

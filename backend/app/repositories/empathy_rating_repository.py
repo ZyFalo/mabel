@@ -62,14 +62,22 @@ class EmpathyRatingRepository:
     async def list_unrated_messages(
         self,
         rater_id: uuid.UUID,
+        *,
+        eligible_user_ids: list[uuid.UUID],
         cohort: str | None = None,
         limit: int = 20,
     ) -> list[Message]:
         """Return up to ``limit`` assistant messages NOT yet rated by ``rater_id``.
 
         - Only ``role='assistant'`` messages.
-        - If ``cohort`` is provided, JOIN sessions → users and filter
-          ``users.cohort = cohort``.
+        - ``eligible_user_ids`` is REQUIRED (research consent gate): every
+          caller must resolve and pass the research-eligible user list.
+          The empty list ``[]`` is a valid value and produces an empty
+          queue (semantically: nobody consented, nothing to rate).
+          Making this a required kwarg (no default) prevents a future
+          refactor from silently regressing to "show everyone".
+        - If ``cohort`` is provided, JOIN users and filter ``users.cohort
+          = cohort`` on top of the eligibility constraint.
         - Random sampling per D-07 (``ORDER BY random() LIMIT n``).
         """
         # NOT EXISTS subquery: no rating from this rater for the message.
@@ -78,14 +86,19 @@ class EmpathyRatingRepository:
             EmpathyRating.rater_id == rater_id,
         ).exists()
 
-        stmt = select(Message).where(Message.role == "assistant", not_rated)
-
-        if cohort is not None:
-            stmt = (
-                stmt.join(SessionModel, Message.session_id == SessionModel.id)
-                .join(User, SessionModel.user_id == User.id)
-                .where(User.cohort == cohort)
+        # We always JOIN SessionModel because the eligibility filter
+        # is unconditional now (required kwarg).
+        stmt = (
+            select(Message)
+            .join(SessionModel, Message.session_id == SessionModel.id)
+            .where(
+                Message.role == "assistant",
+                not_rated,
+                SessionModel.user_id.in_(eligible_user_ids),
             )
+        )
+        if cohort is not None:
+            stmt = stmt.join(User, SessionModel.user_id == User.id).where(User.cohort == cohort)
 
         stmt = stmt.order_by(func.random()).limit(limit)
 
@@ -95,28 +108,38 @@ class EmpathyRatingRepository:
     async def count_unrated_messages(
         self,
         rater_id: uuid.UUID,
+        *,
+        eligible_user_ids: list[uuid.UUID],
         cohort: str | None = None,
     ) -> int:
         """Return the TOTAL number of assistant messages this rater has yet
         to evaluate (no limit). Backs the "Cola pendiente (N)" counter so
         the UI can show progress honestly (e.g. "mostrando 12 de 12").
+
+        Honors the same filters as ``list_unrated_messages`` so the
+        counter and the queue stay consistent (you never see "12 pending"
+        and then nothing in the queue because the filter dropped them).
+
+        ``eligible_user_ids`` is REQUIRED — same fail-secure contract as
+        ``list_unrated_messages``.
         """
         not_rated = ~select(EmpathyRating.id).where(
             EmpathyRating.message_id == Message.id,
             EmpathyRating.rater_id == rater_id,
         ).exists()
 
-        stmt = select(func.count(Message.id)).where(
-            Message.role == "assistant", not_rated
-        )
-
-        if cohort is not None:
-            stmt = (
-                stmt.select_from(Message)
-                .join(SessionModel, Message.session_id == SessionModel.id)
-                .join(User, SessionModel.user_id == User.id)
-                .where(User.cohort == cohort)
+        stmt = (
+            select(func.count(Message.id))
+            .select_from(Message)
+            .join(SessionModel, Message.session_id == SessionModel.id)
+            .where(
+                Message.role == "assistant",
+                not_rated,
+                SessionModel.user_id.in_(eligible_user_ids),
             )
+        )
+        if cohort is not None:
+            stmt = stmt.join(User, SessionModel.user_id == User.id).where(User.cohort == cohort)
 
         result = await self.db.execute(stmt)
         return int(result.scalar() or 0)
@@ -149,7 +172,12 @@ class EmpathyRatingRepository:
         return result.scalar_one_or_none()
 
     # -------------------------------------------------------------------- stats
-    async def stats(self, cohort: str | None = None) -> dict:
+    async def stats(
+        self,
+        *,
+        eligible_user_ids: list[uuid.UUID],
+        cohort: str | None = None,
+    ) -> dict:
         """Aggregate stats over all ratings.
 
         Returns shape:
@@ -160,12 +188,23 @@ class EmpathyRatingRepository:
               "pct_4_or_above": float | None,
             }
 
-        When ``cohort`` is provided, the JOIN chain is
-        ``empathy_ratings → messages → sessions → users`` and is filtered by
-        ``users.cohort = cohort``.
+        ``eligible_user_ids`` is REQUIRED (fail-secure). ``cohort`` is
+        optional. Both filter the message author via the JOIN chain
+        ``empathy_ratings → messages → sessions → users``.
         """
-        base_filter = []
-        join_needed = cohort is not None
+        # Eligibility is always applied → always join the chain.
+        def _attach_chain(stmt):
+            """Apply the join chain + filters once for any aggregate."""
+            stmt = (
+                stmt.join(Message, EmpathyRating.message_id == Message.id)
+                .join(SessionModel, Message.session_id == SessionModel.id)
+                .where(SessionModel.user_id.in_(eligible_user_ids))
+            )
+            if cohort is not None:
+                stmt = stmt.join(User, SessionModel.user_id == User.id).where(
+                    User.cohort == cohort
+                )
+            return stmt
 
         # Aggregate: n, mean, count(score>=4)
         agg_stmt = select(
@@ -173,15 +212,7 @@ class EmpathyRatingRepository:
             func.avg(EmpathyRating.score).label("mean"),
             func.sum(case((EmpathyRating.score >= 4, 1), else_=0)).label("ge4"),
         )
-        if join_needed:
-            agg_stmt = (
-                agg_stmt.join(Message, EmpathyRating.message_id == Message.id)
-                .join(SessionModel, Message.session_id == SessionModel.id)
-                .join(User, SessionModel.user_id == User.id)
-                .where(User.cohort == cohort)
-            )
-        for c in base_filter:
-            agg_stmt = agg_stmt.where(c)
+        agg_stmt = _attach_chain(agg_stmt)
 
         agg_row = (await self.db.execute(agg_stmt)).one()
         n = int(agg_row.n or 0)
@@ -190,13 +221,7 @@ class EmpathyRatingRepository:
 
         # Distribution per score 1..5
         dist_stmt = select(EmpathyRating.score, func.count(EmpathyRating.id))
-        if join_needed:
-            dist_stmt = (
-                dist_stmt.join(Message, EmpathyRating.message_id == Message.id)
-                .join(SessionModel, Message.session_id == SessionModel.id)
-                .join(User, SessionModel.user_id == User.id)
-                .where(User.cohort == cohort)
-            )
+        dist_stmt = _attach_chain(dist_stmt)
         dist_stmt = dist_stmt.group_by(EmpathyRating.score)
 
         dist_rows = (await self.db.execute(dist_stmt)).all()

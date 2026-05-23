@@ -2,7 +2,7 @@
 
 > Asistente virtual de psicoeducacion en salud mental para estudiantes de la Universidad Manuela Beltran (UMB), Bogota, Colombia.
 
-Proyecto de tesis de grado — Ingenieria de Software, 2025-2026. Estudio cuasiexperimental (pretest-posttest) con 30 estudiantes.
+Proyecto de tesis de grado — Ingenieria de Software, 2026. Estudio cuasiexperimental (pretest-posttest) con 30 estudiantes.
 
 ## Tech Stack
 
@@ -252,7 +252,7 @@ DDL completo: `db/schema_postgresql.sql`
 
 ## Licencia
 
-Proyecto academico — Universidad Manuela Beltran, Bogota, Colombia, 2025-2026.
+Proyecto academico — Universidad Manuela Beltran, Bogota, Colombia, 2026.
 
 ## Equipo
 

@@ -755,6 +755,52 @@ Captura común: `actor_id`, `actor_role`, `action`, `target_type`, `target_id`, 
 - Backend: usa `datetime.now(UTC)` (aware) consistentemente.
 - Frontend: `formatDateTick` en `chartTheme.ts` parsea `YYYY-MM-DD` como fecha local para que "22-may" no aparezca como "21-may" en zona Bogotá (UTC-5).
 
+### 12.5 Consent-scope eligibility (research vs operacional)
+
+El campo `consents.scope` (`solo_uso` | `uso_mejora_anon`) dejó de ser decorativo: define qué datos entran a las superficies de investigación. Single source of truth: `backend/app/services/consent_eligibility.py` (`get_research_eligible_user_ids`).
+
+**Regla:** un usuario es research-eligible si su última fila no-revocada en `consents` tiene `scope = 'uso_mejora_anon'`. NO se exige que esa fila pertenezca a la `consent_version` activa actual — así, publicar una nueva versión no vacía el dashboard mientras los usuarios re-aceptan.
+
+#### Matriz de qué se filtra
+
+| Superficie | Endpoint / método | Filtrado por scope |
+|---|---|---|
+| `metrics_usage` (Tab A) | `AdminMetricsService.metrics_usage` | Sí |
+| `metrics_wellbeing` (Tab B) | `AdminMetricsService.metrics_wellbeing` | Sí |
+| `metrics_technical` (Tab C) | `AdminMetricsService.metrics_technical` | Sí |
+| `metrics_safety.infraction_rate` (Tab D) | parcial | Sí (research) |
+| `metrics_safety.top_keywords` (Tab D) | parcial | Sí (research) |
+| `metrics_safety.safety_events_per_day` (Tab D) | parcial | **No** (operacional — safety triage) |
+| `metrics_safety.guardrails_type_distribution` (Tab D) | parcial | **No** (operacional — safety triage) |
+| `metrics_study` (Tab E) | `AdminMetricsService.metrics_study` | Sí (vía `_sus_scores`, `_wellbeing_pair_data` y empathy_repo.stats con eligible_user_ids) |
+| `export_csv` (todas las tabs) | `AdminMetricsService.export_csv` | Sí |
+| `dashboard.sessions_per_day_30d` | `_sessions_per_day` | Sí |
+| `dashboard.mood_distribution_30d` | `_mood_distribution` | Sí |
+| `dashboard.latency_per_day_30d` | `_latency_per_day` | Sí |
+| `dashboard.sus_avg` | `_sus_scores` | Sí |
+| `dashboard.total_users` | inline | **No** (operacional) |
+| `dashboard.users_new_this_week` | inline | **No** (operacional) |
+| `dashboard.sessions_today` | inline | **No** (operacional) |
+| `dashboard.safety_events_24h` | inline | **No** (legal/safety) |
+| `dashboard.safety_events_active` | inline | **No** (legal/safety) |
+| `dashboard.reports_pending` | inline | **No** (legal/safety) |
+| `dashboard.latency_avg_ms` | inline | **No** (SLA operacional) |
+| `dashboard.safety_events_by_type_30d` | `_safety_events_by_type` | **No** (safety triage) |
+| `dashboard.guardrails_activations_14d` | `_guardrails_per_day` | **No** (safety triage) |
+| `dashboard.last_5_safety_events` | inline | **No** (safety triage) |
+| Empathy queue (cola) | `AdminEmpathyService.get_queue` | Sí |
+| Empathy lista calificadas | `AdminEmpathyService.list_rated` | Sí |
+| Empathy stats agregadas | `AdminEmpathyService.get_stats` → repo.stats | Sí |
+| `audit_logs` admin filter | `AuditLogsService.list` | **No** (legal — siempre todos) |
+| `safety_events` admin filter | `AdminSafetyEventsService.list` | **No** (legal — siempre todos) |
+| `message_reports` admin filter | `AdminReportsService.list` | **No** (legal — siempre todos) |
+| Chat del propio usuario | `chat_service.send_message` etc. | **No** (es su sesión — consent gobierna análisis, no entrega) |
+
+**Comportamiento al publicar nueva consent_version:**
+- Usuarios con consent v1.0 activo siguen contribuyendo bajo su scope previo hasta que re-aceptan.
+- Re-aceptar con un scope distinto cambia su elegibilidad inmediatamente.
+- Revocar quita inmediatamente al usuario de todas las superficies research.
+
 ---
 
 *Documento vivo. Cada sección se expande al validarse contra BD y mockups.*

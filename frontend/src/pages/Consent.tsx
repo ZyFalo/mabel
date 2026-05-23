@@ -1,9 +1,10 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lock, Shield, Check } from 'lucide-react'
+import { Lock, Shield, Check, RotateCcw, FileText } from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuthStore } from '../stores/authStore'
 import AuthShell from '../components/auth/AuthShell'
+import InfoHint from '../components/admin/InfoHint'
 
 interface ConsentVersion {
   id: string
@@ -11,6 +12,18 @@ interface ConsentVersion {
   title: string
   body: string
 }
+
+// Backend `/users/me/consent-status` returns one of these per
+// `ConsentService.get_consent_status` in backend/app/services/consent_service.py.
+// We only treat `new_version_required` specially here; the rest collapses to
+// the "first-time / re-acceptance" copy because semantically the user is
+// agreeing to the SAME document for the first time (no prior acceptance to
+// contrast against).
+type ConsentStatusValue =
+  | 'ok'
+  | 'no_consent'
+  | 'revoked'
+  | 'new_version_required'
 
 export default function Consent() {
   const navigate = useNavigate()
@@ -23,17 +36,36 @@ export default function Consent() {
   const [accepted, setAccepted] = useState(false)
   const [scrolledToEnd, setScrolledToEnd] = useState(false)
   const [error, setError] = useState('')
+  // Drives the copy contextual ("Hemos actualizado nuestras políticas..."
+  // vs the default first-acceptance copy). Loaded in parallel with the
+  // active version so the page renders the right framing on first paint.
+  const [consentStatus, setConsentStatus] = useState<ConsentStatusValue | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    apiClient
-      .get('/consent-versions/active')
-      .then((res) => setVersion(res.data))
-      .catch((err) => {
+    // Two parallel calls: the active version body + the user's current
+    // consent status. We don't await one to start the other — both are
+    // independent reads and shaving a round-trip matters here because
+    // this is the first thing a returning user sees on login.
+    Promise.allSettled([
+      apiClient.get('/consent-versions/active'),
+      apiClient.get('/users/me/consent-status'),
+    ]).then(([versionRes, statusRes]) => {
+      if (versionRes.status === 'fulfilled') {
+        setVersion(versionRes.value.data)
+      } else {
+        const err = versionRes.reason as { response?: { status?: number } }
         if (err.response?.status === 404) setNoVersion(true)
         else setError('Error al cargar el consentimiento')
-      })
-      .finally(() => setLoading(false))
+      }
+      if (statusRes.status === 'fulfilled') {
+        setConsentStatus(statusRes.value.data?.status ?? null)
+      }
+      // If consent-status failed (auth issue, transient 5xx) we keep
+      // `consentStatus = null` which falls back to the default copy —
+      // safer than guessing.
+      setLoading(false)
+    })
   }, [])
 
   const handleScroll = useCallback(() => {
@@ -42,6 +74,45 @@ export default function Consent() {
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20
     if (atBottom) setScrolledToEnd(true)
   }, [])
+
+  // Auto-pass the scroll gate when the text actually fits in the box.
+  // Without this, `scrolledToEnd` would stay `false` forever for a short
+  // consent body and the user could never enable the accept button.
+  // We recompute on:
+  //   - body change (`version?.body`)
+  //   - container resize (ResizeObserver on scrollRef)
+  // because between render and layout the dimensions can briefly be 0.
+  //
+  // Deliberate behavior per PO: if the text fits without scroll, the
+  // gate is auto-satisfied. The Consentimiento v1.0 body in the seed
+  // ALWAYS overflows the 320px box at typical viewport widths (~30-50
+  // wrapped lines × 21px), so this branch is dormant in practice. If
+  // a future short consent (e.g. a "cookies update" v2.x) is ever
+  // published and the PO wants to FORCE scroll-to-end attestation even
+  // for short texts, the right move is to add a `require_scroll`
+  // boolean on `consent_versions` and gate this auto-pass on it —
+  // don't unconditionally remove the auto-pass (that would silently
+  // brick the accept button for legitimately short documents).
+  useEffect(() => {
+    if (!version?.body) return
+    const el = scrollRef.current
+    if (!el) return
+
+    function checkFits() {
+      const node = scrollRef.current
+      if (!node) return
+      // `<=` (not `<`): when the body exactly fills the box, there's
+      // nothing to scroll to, so the gate should also pass.
+      if (node.scrollHeight <= node.clientHeight) {
+        setScrolledToEnd(true)
+      }
+    }
+
+    checkFits()
+    const ro = new ResizeObserver(checkFits)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [version?.body])
 
   async function handleSubmit(ev: FormEvent) {
     ev.preventDefault()
@@ -74,6 +145,14 @@ export default function Consent() {
     }
   }
 
+  // Two copy variants. `new_version_required` is the post-publication flow:
+  // the user already accepted some prior consent_version, the admin published
+  // a new one, and on next login they land here to re-accept. Framing it as
+  // "Hemos actualizado nuestras políticas" instead of "Consentimiento
+  // informado" tells them the document changed (not a new agreement they
+  // never saw) and reduces drop-off vs. a generic re-presentation.
+  const isUpdate = consentStatus === 'new_version_required'
+
   const sideHero = (
     <div>
       <div
@@ -91,7 +170,7 @@ export default function Consent() {
         }}
       >
         <Shield size={13} />
-        Ley 1581 de 2012
+        {isUpdate ? 'Actualización de políticas' : 'Ley 1581 de 2012'}
       </div>
       <h1
         style={{
@@ -103,12 +182,70 @@ export default function Consent() {
           fontFamily: 'var(--font-sans)',
         }}
       >
-        Consentimiento<br />informado.
+        {isUpdate ? (
+          <>
+            Hemos actualizado<br />nuestras políticas.
+          </>
+        ) : (
+          <>
+            Consentimiento<br />informado.
+          </>
+        )}
       </h1>
       <p style={{ fontSize: 15, opacity: 0.85, margin: 0, maxWidth: 400, lineHeight: 1.6 }}>
-        Antes de comenzar, es importante que conozcas cómo tratamos tu información. Lee con calma y
-        toma una decisión informada.
+        {isUpdate
+          ? 'Hemos actualizado el consentimiento que aceptaste antes. Revisa los cambios y acéptalos para seguir usando Mabel.'
+          : 'Antes de comenzar, es importante que conozcas cómo tratamos tu información. Lee con calma y toma una decisión informada.'}
       </p>
+
+      {/* Trust chips. Three concrete promises the user can verify on the
+          right-hand panel (versioned, ARCO rights, scope explicit). Keeps
+          the left column from feeling empty on wide desktops while
+          reinforcing the legal posture of the page. */}
+      <div
+        style={{
+          marginTop: 28,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          maxWidth: 400,
+        }}
+      >
+        {[
+          { Icon: FileText, label: 'Documento versionado y auditable' },
+          { Icon: RotateCcw, label: 'Puedes revocar tu consentimiento cuando quieras' },
+          { Icon: Check, label: 'Tú decides el alcance: solo uso o mejora anónima' },
+        ].map(({ Icon, label }) => (
+          <div
+            key={label}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              fontSize: 13,
+              opacity: 0.92,
+              lineHeight: 1.4,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                background: 'rgba(255,255,255,0.14)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Icon size={12} strokeWidth={2.25} />
+            </span>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 
@@ -139,7 +276,7 @@ export default function Consent() {
 
   if (noVersion) {
     return (
-      <AuthShell side={sideHero} wide>
+      <AuthShell side={sideHero} wide compactHero>
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
             <div
@@ -207,7 +344,7 @@ export default function Consent() {
   const canSubmit = scrolledToEnd && accepted && scope !== ''
 
   return (
-    <AuthShell side={sideHero} wide>
+    <AuthShell side={sideHero} wide compactHero>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <h2
@@ -220,7 +357,9 @@ export default function Consent() {
               fontFamily: 'var(--font-sans)',
             }}
           >
-            Consentimiento Informado
+            {isUpdate
+              ? 'Hemos actualizado nuestras políticas de privacidad'
+              : 'Consentimiento Informado'}
           </h2>
           {version && (
             <span
@@ -240,7 +379,9 @@ export default function Consent() {
         </div>
 
         <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 20px', lineHeight: 1.55 }}>
-          Lee con atención el documento. Debes desplazarte hasta el final antes de aceptar.
+          {isUpdate
+            ? 'Para seguir usando Mabel necesitamos que aceptes la nueva versión. Lee el documento completo antes de continuar.'
+            : 'Lee con atención el documento. Debes desplazarte hasta el final antes de aceptar.'}
         </p>
 
         {error && (
@@ -260,26 +401,37 @@ export default function Consent() {
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Legal text */}
+          {/* Legal text. Two-layer wrapper so the native scrollbar lives
+              INSIDE the rounded clip:
+                - outer  : border + radius + overflow:hidden (clipping mask)
+                - inner  : the actual scroll container (no radius, no border)
+              Before this split, the scrollbar ran past the top-right
+              border-radius and visually "poked out" of the box. */}
           <div style={{ position: 'relative', marginBottom: 22 }}>
             <div
-              ref={scrollRef}
-              onScroll={handleScroll}
               style={{
-                height: 320,
-                overflowY: 'auto',
-                padding: 16,
                 borderRadius: 12,
-                fontSize: 13,
-                lineHeight: 1.6,
-                whiteSpace: 'pre-wrap',
-                background: 'var(--ink-50)',
                 border: '1px solid var(--ink-200)',
-                color: 'var(--ink-700)',
-                fontFamily: 'var(--font-sans)',
+                overflow: 'hidden',
+                background: 'var(--ink-50)',
               }}
             >
-              {version?.body}
+              <div
+                ref={scrollRef}
+                onScroll={handleScroll}
+                style={{
+                  height: 320,
+                  overflowY: 'auto',
+                  padding: 16,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap',
+                  color: 'var(--ink-700)',
+                  fontFamily: 'var(--font-sans)',
+                }}
+              >
+                {version?.body}
+              </div>
             </div>
             {!scrolledToEnd && (
               <div
@@ -330,12 +482,18 @@ export default function Consent() {
                 {
                   value: 'solo_uso',
                   title: 'Solo uso',
-                  desc: 'Datos mínimos para el funcionamiento del sistema.',
+                  // Short copy under the title — what's visible always.
+                  desc: 'Tus datos solo se usan para que Mabel funcione contigo. Nada se incluye en análisis del estudio ni en métricas agregadas.',
+                  // Long copy revealed by the (i) tooltip — full transparency.
+                  hint:
+                    'Elegir "Solo uso" significa: tus mensajes, check-ins y respuestas a encuestas NO entran al panel del admin de métricas, NO se exportan a CSV de investigación, NO aparecen en la cola de calificación de empatía. Sí se procesan en runtime para responderte (eso es lo que da vida al chat) y sí quedan en los logs de seguridad y auditoría (requeridos por ley). Puedes cambiar a "Uso + mejora anónima" más adelante desde Ajustes.',
                 },
                 {
                   value: 'uso_mejora_anon',
                   title: 'Uso + mejora anónima',
-                  desc: 'Datos anonimizados para mejorar el servicio.',
+                  desc: 'Además de hacer funcionar a Mabel, autorizas que tus datos anonimizados nutran las métricas del estudio y la mejora del servicio.',
+                  hint:
+                    'Elegir "Uso + mejora anónima" añade tus datos (cifrados y sin identificarte por nombre/correo) al análisis de la investigación: métricas agregadas de uso, evolución de bienestar pre/post, calificación de la calidad empática de las respuestas y exportes CSV para la tesis. Tu nombre y correo nunca aparecen en estos análisis — los identificadores se enmascaran con un hash de 16 caracteres. Puedes revocar este permiso en cualquier momento desde Ajustes.',
                 },
               ].map((opt) => {
                 const on = scope === opt.value
@@ -362,15 +520,24 @@ export default function Consent() {
                       onChange={(e) => setScope(e.target.value)}
                       style={{ accentColor: 'var(--mabel-600)', marginTop: 2 }}
                     />
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div
                         style={{
-                          fontSize: 13.5,
-                          fontWeight: 600,
-                          color: on ? 'var(--mabel-700)' : 'var(--ink-900)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
                         }}
                       >
-                        {opt.title}
+                        <span
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: 600,
+                            color: on ? 'var(--mabel-700)' : 'var(--ink-900)',
+                          }}
+                        >
+                          {opt.title}
+                        </span>
+                        <InfoHint text={opt.hint} />
                       </div>
                       <div style={{ fontSize: 12.5, color: 'var(--ink-500)', marginTop: 3, lineHeight: 1.5 }}>
                         {opt.desc}

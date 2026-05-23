@@ -27,7 +27,7 @@ El **Agente 04 (Backend Developer)** asume la integración con Gemini, incluyend
 
 ## Contexto del Proyecto
 
-Mabel-IA es un asistente virtual con IA y tecnología NLP para apoyo de salud mental estudiantil en la Universidad Manuela Beltrán (UMB), Bogotá, Colombia. Proyecto de tesis de Ingeniería de Software, 2025.
+Mabel-IA es un asistente virtual con IA y tecnología NLP para apoyo de salud mental estudiantil en la Universidad Manuela Beltrán (UMB), Bogotá, Colombia. Proyecto de tesis de Ingeniería de Software, 2026.
 
 - **Fase actual:** Pre-desarrollo / diseño
 - **Stack:** FastAPI (Python) + React 18+ (Vite, TailwindCSS, Zustand) + PostgreSQL 16
