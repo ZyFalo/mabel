@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import apiClient from '../../api/client'
 import { useToastStore } from '../../stores/toastStore'
+import { formatApiError } from '../../utils/apiError'
 import { SEVERITY_LABELS } from '../../utils/severity'
 
 // ============================================================================
@@ -16,6 +17,15 @@ interface SystemConfigItem {
 interface HotlineEntry {
   name: string
   number: string
+}
+
+// Structured safety keyword. Mirrors the backend shape
+// `list[{keyword: str, critical: bool}]`. Critical=true entries force
+// severity 5 in the guardrails analyzer (auto-SOS); non-critical
+// accumulate +1 each up to 4. Admin controls both kw AND the flag.
+interface KeywordEntry {
+  keyword: string
+  critical: boolean
 }
 
 interface ConsentVersion {
@@ -71,14 +81,27 @@ function indexByKey(items: SystemConfigItem[]): Record<string, SystemConfigItem>
   return out
 }
 
-function asKeywordArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value
-      .filter((v): v is string => typeof v === 'string')
-      .map(normalizeKeyword)
-      .filter((v) => v.length > 0)
+function asKeywordArray(value: unknown): KeywordEntry[] {
+  // Backend currently writes the structured shape; legacy seed data
+  // (plain string list) is also accepted for the migration window.
+  if (!Array.isArray(value)) return []
+  const out: KeywordEntry[] = []
+  const seen = new Set<string>()
+  for (const entry of value) {
+    let kw = ''
+    let critical = false
+    if (typeof entry === 'string') {
+      kw = normalizeKeyword(entry)
+    } else if (entry && typeof entry === 'object') {
+      const e = entry as Record<string, unknown>
+      if (typeof e.keyword === 'string') kw = normalizeKeyword(e.keyword)
+      critical = Boolean(e.critical)
+    }
+    if (!kw || seen.has(kw)) continue
+    seen.add(kw)
+    out.push({ keyword: kw, critical })
   }
-  return []
+  return out
 }
 
 function asHotlineArray(value: unknown): HotlineEntry[] {
@@ -146,6 +169,53 @@ function SectionCard({
   )
 }
 
+// Collapsible body viewer for a consent_version. Renders the legal text
+// in a fixed-height scroll box so the admin can review what users
+// actually accepted/will accept. Used in 3 places (active, draft,
+// archived rows) inside the Consent section.
+function VersionBodyToggle({
+  version,
+  isExpanded,
+  onToggle,
+}: {
+  version: ConsentVersion
+  isExpanded: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="text-[12px] font-semibold text-primary hover:underline inline-flex items-center gap-1"
+        aria-expanded={isExpanded}
+        aria-controls={`consent-body-${version.id}`}
+      >
+        <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 150ms' }}>
+          ▶
+        </span>
+        {isExpanded ? 'Ocultar texto completo' : 'Ver texto completo'}
+        <span className="text-text-primary/40 font-normal">
+          ({version.body.length.toLocaleString('es-CO')} caracteres)
+        </span>
+      </button>
+      {isExpanded && (
+        <div
+          id={`consent-body-${version.id}`}
+          className="mt-2 border border-gray-200 rounded-md bg-white overflow-hidden"
+        >
+          <div
+            className="overflow-y-auto p-3 text-[12.5px] font-mono leading-relaxed whitespace-pre-wrap text-text-primary/85"
+            style={{ maxHeight: 280 }}
+          >
+            {version.body}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SaveButton({
   onClick,
   loading,
@@ -177,35 +247,54 @@ function ConsentSection() {
   const addToast = useToastStore((s) => s.addToast)
   const [active, setActive] = useState<ConsentVersion | null>(null)
   const [draft, setDraft] = useState<ConsentVersion | null>(null)
+  const [archived, setArchived] = useState<ConsentVersion[]>([])
   const [loading, setLoading] = useState(true)
+
+  // UI state: which version's body is expanded (collapsible "Ver texto").
+  // Single string instead of a Set because we only show one expanded
+  // at a time (compact layout); switching auto-collapses the previous.
+  const [expandedBodyId, setExpandedBodyId] = useState<string | null>(null)
 
   const [form, setForm] = useState({ version: '', title: '', body: '' })
   const [submitting, setSubmitting] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [confirmPublishId, setConfirmPublishId] = useState<string | null>(null)
+  // Two-step confirmation for delete (same UX pattern as publish):
+  // first click sets confirmDeleteId, second click actually deletes.
+  // Prevents accidental wipes of draft work.
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const loadVersions = useCallback(async () => {
     setLoading(true)
     try {
-      // Try a /admin/consent-versions endpoint first, fall back to public endpoint
-      let activeVersion: ConsentVersion | null = null
+      // `GET /admin/consent-versions` returns the full list (active +
+      // drafts + archived) WITH the body text — see
+      // `config_router.py:138`. The response is a bare array
+      // (`list[ConsentVersionItem]`), not wrapped. We accept either
+      // shape defensively so a future refactor that adds an `items`
+      // wrapper doesn't crash this UI.
+      const res = await apiClient.get<ConsentVersion[] | { items: ConsentVersion[] }>(
+        '/admin/consent-versions',
+      )
+      const data = res.data
+      const items: ConsentVersion[] = Array.isArray(data) ? data : (data?.items ?? [])
+
+      setActive(items.find((v) => v.status === 'active') ?? null)
+      setDraft(items.find((v) => v.status === 'draft') ?? null)
+      setArchived(items.filter((v) => v.status === 'archived'))
+    } catch {
+      // Endpoint failure (e.g. no admin role) — fall back to the public
+      // active version so the admin at least sees the current document
+      // body even if they can't list history.
       try {
-        const res = await apiClient.get<{ items: ConsentVersion[] }>('/admin/consent-versions')
-        const items = res.data?.items ?? []
-        activeVersion = items.find((v) => v.status === 'active') ?? null
-        const lastDraft = items.find((v) => v.status === 'draft') ?? null
-        setDraft(lastDraft)
+        const res = await apiClient.get<ConsentVersion>('/consent-versions/active')
+        setActive(res.data ?? null)
       } catch {
-        // Fallback: read the public active version
-        try {
-          const res = await apiClient.get<ConsentVersion>('/consent-versions/active')
-          activeVersion = res.data ?? null
-        } catch {
-          activeVersion = null
-        }
-        setDraft(null)
+        setActive(null)
       }
-      setActive(activeVersion)
+      setDraft(null)
+      setArchived([])
     } finally {
       setLoading(false)
     }
@@ -234,10 +323,9 @@ function ConsentSection() {
       setForm({ version: '', title: '', body: '' })
       addToast({ type: 'success', message: 'Borrador de consentimiento creado.' })
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
       addToast({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'No se pudo crear el borrador.',
+        message: formatApiError(err, 'No se pudo crear el borrador.'),
       })
     } finally {
       setSubmitting(false)
@@ -252,13 +340,29 @@ function ConsentSection() {
       setConfirmPublishId(null)
       await loadVersions()
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
       addToast({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'No se pudo publicar la versión.',
+        message: formatApiError(err, 'No se pudo publicar la versión.'),
       })
     } finally {
       setPublishing(false)
+    }
+  }
+
+  async function handleDeleteDraft(id: string) {
+    setDeleting(true)
+    try {
+      await apiClient.delete(`/admin/consent-versions/${id}`)
+      addToast({ type: 'success', message: 'Borrador eliminado.' })
+      setConfirmDeleteId(null)
+      await loadVersions()
+    } catch (err: unknown) {
+      addToast({
+        type: 'error',
+        message: formatApiError(err, 'No se pudo eliminar el borrador.'),
+      })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -285,6 +389,13 @@ function ConsentSection() {
                 <p className="text-[12px] text-text-primary/60">
                   Publicada: {formatDateTime(active.published_at ?? active.created_at)}
                 </p>
+                <VersionBodyToggle
+                  version={active}
+                  isExpanded={expandedBodyId === active.id}
+                  onToggle={() =>
+                    setExpandedBodyId((prev) => (prev === active.id ? null : active.id))
+                  }
+                />
               </div>
             ) : (
               <p className="text-sm text-text-primary/60 italic mt-2">
@@ -305,10 +416,28 @@ function ConsentSection() {
               <p className="text-[12px] text-text-primary/60 mt-0.5">
                 Creado: {formatDateTime(draft.created_at)}
               </p>
+              <VersionBodyToggle
+                version={draft}
+                isExpanded={expandedBodyId === draft.id}
+                onToggle={() =>
+                  setExpandedBodyId((prev) => (prev === draft.id ? null : draft.id))
+                }
+              />
               <div className="mt-3 border-t border-warning/20 pt-3">
                 <p className="text-[12px] text-text-primary/80">
                   Al publicar, todos los usuarios deberán re-aceptar el consentimiento informado.
                 </p>
+
+                {/* Action area: publish + delete coexist. The publish
+                    button is primary (warning color = "esto afecta a
+                    todos los usuarios"), delete is secondary (danger
+                    color, ghost style = "menos prominente, pero
+                    disponible"). Both use the two-step confirm pattern
+                    so a misclick on either doesn't trigger the
+                    destructive op. They share state machine: only ONE
+                    of confirmPublishId / confirmDeleteId can be set
+                    for a given draft at a time. Clicking either
+                    confirm cancels the other. */}
                 {confirmPublishId === draft.id ? (
                   <div className="flex flex-wrap items-center gap-2 mt-3">
                     <button
@@ -328,17 +457,85 @@ function ConsentSection() {
                       {publishing ? 'Publicando...' : 'Confirmar publicación'}
                     </button>
                   </div>
+                ) : confirmDeleteId === draft.id ? (
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="text-xs text-text-primary/70 hover:text-text-primary px-3 py-1.5"
+                      disabled={deleting}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDraft(draft.id)}
+                      disabled={deleting}
+                      className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-danger text-white hover:bg-danger/90 disabled:opacity-60 transition-colors"
+                    >
+                      {deleting ? 'Eliminando...' : 'Confirmar eliminación'}
+                    </button>
+                  </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmPublishId(draft.id)}
-                    className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-warning text-white hover:bg-warning/90 transition-colors"
-                  >
-                    Publicar versión
-                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteId(null)
+                        setConfirmPublishId(draft.id)
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold bg-warning text-white hover:bg-warning/90 transition-colors"
+                    >
+                      Publicar versión
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmPublishId(null)
+                        setConfirmDeleteId(draft.id)
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold border border-danger/40 text-danger bg-white hover:bg-danger/5 transition-colors"
+                    >
+                      Eliminar borrador
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
+          )}
+
+          {/* Archived versions — legal history. Each row shows metadata
+              + collapsible body so the admin can audit what text was in
+              force at any point in time. */}
+          {archived.length > 0 && (
+            <details className="border border-gray-200 rounded-md bg-white/40">
+              <summary className="cursor-pointer px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-text-primary/60 hover:bg-gray-50">
+                Versiones archivadas ({archived.length})
+              </summary>
+              <div className="px-4 pb-4 pt-1 flex flex-col gap-3 border-t border-gray-100">
+                {archived.map((v) => (
+                  <div
+                    key={v.id}
+                    className="border border-gray-200 rounded-md p-3 bg-gray-50/30"
+                  >
+                    <p className="text-sm font-semibold text-text-primary">
+                      v{v.version} — {v.title}
+                    </p>
+                    <p className="text-[12px] text-text-primary/60 mt-0.5">
+                      Publicada: {formatDateTime(v.published_at)} · Archivada al
+                      publicarse una nueva versión
+                    </p>
+                    <VersionBodyToggle
+                      version={v}
+                      isExpanded={expandedBodyId === v.id}
+                      onToggle={() =>
+                        setExpandedBodyId((prev) => (prev === v.id ? null : v.id))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
 
           {/* New version form */}
@@ -501,7 +698,7 @@ function GuardrailsSection({
   initialStudyLock,
   onChanged,
 }: {
-  initialKeywords: string[]
+  initialKeywords: KeywordEntry[]
   initialThreshold: number
   initialEnabled: boolean
   initialStudyLock: boolean
@@ -518,9 +715,13 @@ function GuardrailsSection({
   const [pendingOverride, setPendingOverride] = useState<null | (() => Promise<void>)>(null)
   const [overrideRunning, setOverrideRunning] = useState(false)
 
-  // Keywords
-  const [keywords, setKeywords] = useState<string[]>(initialKeywords)
+  // Keywords (structured: each entry carries its `critical` flag)
+  const [keywords, setKeywords] = useState<KeywordEntry[]>(initialKeywords)
   const [newKeyword, setNewKeyword] = useState('')
+  // New entries default to non-critical. The admin can toggle the
+  // newly-added chip's flag after creation. A "Crítica" pre-add toggle
+  // lives next to the Agregar button.
+  const [newKeywordCritical, setNewKeywordCritical] = useState(false)
   const [savingKeywords, setSavingKeywords] = useState(false)
 
   // Threshold
@@ -538,7 +739,11 @@ function GuardrailsSection({
   const keywordsDirty = useMemo(
     () =>
       keywords.length !== initialKeywords.length ||
-      keywords.some((k, i) => k !== initialKeywords[i]),
+      keywords.some(
+        (k, i) =>
+          k.keyword !== initialKeywords[i]?.keyword ||
+          k.critical !== initialKeywords[i]?.critical,
+      ),
     [keywords, initialKeywords],
   )
   const thresholdDirty = threshold !== initialThreshold
@@ -556,10 +761,9 @@ function GuardrailsSection({
       })
       onChanged()
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
       addToast({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'No se pudo actualizar el bloqueo de estudio.',
+        message: formatApiError(err, 'No se pudo actualizar el bloqueo de estudio.'),
       })
     } finally {
       setSavingLock(false)
@@ -588,8 +792,8 @@ function GuardrailsSection({
   }
 
   function handleLockedError(err: unknown, fallback: string) {
-    const e = err as { response?: { status?: number; data?: { detail?: string } } }
-    if (e?.response?.status === 423) {
+    const status = (err as { response?: { status?: number } })?.response?.status
+    if (status === 423) {
       addToast({
         type: 'error',
         message: 'Bloqueo de estudio activo: usa override explicito para modificar guardrails.',
@@ -597,7 +801,7 @@ function GuardrailsSection({
     } else {
       addToast({
         type: 'error',
-        message: e?.response?.data?.detail ?? fallback,
+        message: formatApiError(err, fallback),
       })
     }
   }
@@ -605,16 +809,23 @@ function GuardrailsSection({
   function addKeyword() {
     const v = normalizeKeyword(newKeyword)
     if (!v) return
-    if (keywords.includes(v)) {
+    if (keywords.some((k) => k.keyword === v)) {
       addToast({ type: 'warning', message: `"${v}" ya esta en la lista.` })
       return
     }
-    setKeywords((prev) => [...prev, v])
+    setKeywords((prev) => [...prev, { keyword: v, critical: newKeywordCritical }])
     setNewKeyword('')
+    setNewKeywordCritical(false)
   }
 
   function removeKeyword(kw: string) {
-    setKeywords((prev) => prev.filter((k) => k !== kw))
+    setKeywords((prev) => prev.filter((k) => k.keyword !== kw))
+  }
+
+  function toggleKeywordCritical(kw: string) {
+    setKeywords((prev) =>
+      prev.map((k) => (k.keyword === kw ? { ...k, critical: !k.critical } : k)),
+    )
   }
 
   async function patchKeywords(override: boolean) {
@@ -875,9 +1086,12 @@ function GuardrailsSection({
         <div className={lockedClass} aria-disabled={studyLock}>
           <p className="text-sm font-semibold text-text-primary">Palabras clave de seguridad</p>
           <p className="text-[12px] text-text-primary/60 mt-0.5">
-            Lista de terminos que activan revision manual o filtros de respuesta.
+            Lista de términos que activan revisión manual o filtros de respuesta.
+            Marca como <span className="font-semibold text-danger">crítica</span> a las
+            palabras que deben disparar el panel SOS automáticamente sin importar el
+            umbral (ej. ideación suicida).
           </p>
-          <div className="flex items-center gap-2 mt-3">
+          <div className="flex flex-wrap items-center gap-2 mt-3">
             <input
               type="text"
               value={newKeyword}
@@ -891,10 +1105,29 @@ function GuardrailsSection({
               disabled={studyLock}
               placeholder="Agregar palabra clave"
               className={[
-                'flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary',
+                'flex-1 min-w-[200px] border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary',
                 studyLock ? 'bg-gray-100 cursor-not-allowed' : '',
               ].join(' ')}
             />
+            <label
+              className={[
+                'inline-flex items-center gap-2 px-3 py-2 rounded-md border text-[12px] font-medium cursor-pointer select-none transition-colors',
+                newKeywordCritical
+                  ? 'bg-danger/10 border-danger/30 text-danger'
+                  : 'bg-white border-gray-300 text-text-primary/70 hover:bg-gray-50',
+                studyLock ? 'cursor-not-allowed opacity-60' : '',
+              ].join(' ')}
+              title="Si está marcada, esta palabra forzará severidad 5 (auto-SOS)."
+            >
+              <input
+                type="checkbox"
+                checked={newKeywordCritical}
+                onChange={(e) => setNewKeywordCritical(e.target.checked)}
+                disabled={studyLock}
+                className="accent-danger"
+              />
+              Crítica
+            </label>
             <button
               type="button"
               onClick={addKeyword}
@@ -914,28 +1147,67 @@ function GuardrailsSection({
                 Sin palabras clave registradas.
               </p>
             ) : (
-              keywords.map((kw) => (
-                <span
-                  key={kw}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent/10 text-accent border border-accent/20 text-[12px] font-medium"
-                >
-                  {kw}
-                  <button
-                    type="button"
-                    onClick={() => removeKeyword(kw)}
-                    className="w-4 h-4 inline-flex items-center justify-center rounded-full hover:bg-accent/20 text-[10px]"
-                    aria-label={`Eliminar ${kw}`}
+              keywords.map((kw) => {
+                // Two visual styles:
+                // - Critical: red background + lock icon + tooltip explaining
+                //   the entry forces severity 5. Toggling on the chip body
+                //   flips the flag.
+                // - Non-critical: accent (teal) background — same UX as
+                //   pre-refactor for familiar admins.
+                const baseStyle = kw.critical
+                  ? 'bg-danger/10 text-danger border-danger/30'
+                  : 'bg-accent/10 text-accent border-accent/20'
+                return (
+                  <span
+                    key={kw.keyword}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[12px] font-medium ${baseStyle}`}
+                    title={
+                      kw.critical
+                        ? 'Crítica: dispara severidad 5 automáticamente. Clic en el badge para desmarcarla.'
+                        : 'No crítica: suma +1 a la severidad (cap 4). Clic en el badge para marcarla como crítica.'
+                    }
                   >
-                    ×
-                  </button>
-                </span>
-              ))
+                    <button
+                      type="button"
+                      onClick={() => toggleKeywordCritical(kw.keyword)}
+                      disabled={studyLock}
+                      aria-label={
+                        kw.critical
+                          ? `Desmarcar ${kw.keyword} como crítica`
+                          : `Marcar ${kw.keyword} como crítica`
+                      }
+                      className={`inline-flex items-center gap-1 ${studyLock ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      {kw.critical && (
+                        <span aria-hidden="true" style={{ fontSize: 10 }}>
+                          ●
+                        </span>
+                      )}
+                      {kw.keyword}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeKeyword(kw.keyword)}
+                      disabled={studyLock}
+                      className={`w-4 h-4 inline-flex items-center justify-center rounded-full text-[10px] ${
+                        kw.critical ? 'hover:bg-danger/20' : 'hover:bg-accent/20'
+                      } ${studyLock ? 'cursor-not-allowed' : ''}`}
+                      aria-label={`Eliminar ${kw.keyword}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                )
+              })
             )}
           </div>
 
           <div className="flex items-center justify-between mt-4">
             <p className="text-[11px] text-text-primary/50 tabular-nums">
-              Total: {keywords.length}
+              Total: {keywords.length} ·{' '}
+              <span className="text-danger font-semibold">
+                {keywords.filter((k) => k.critical).length} crítica(s)
+              </span>
             </p>
             <SaveButton
               onClick={saveKeywords}
@@ -1024,10 +1296,9 @@ function HotlinesSection({
       addToast({ type: 'success', message: 'Lineas de crisis actualizadas.' })
       onChanged()
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
       addToast({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'No se pudo actualizar las lineas de crisis.',
+        message: formatApiError(err, 'No se pudo actualizar las lineas de crisis.'),
       })
     } finally {
       setSaving(false)
@@ -1154,10 +1425,9 @@ function GeminiSection() {
         })
       }
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
       addToast({
         type: 'error',
-        message: e?.response?.data?.detail ?? 'Error al probar conexión con Gemini.',
+        message: formatApiError(err, 'Error al probar conexión con Gemini.'),
       })
     } finally {
       setTesting(false)
@@ -1365,9 +1635,10 @@ export default function Config() {
         : (res.data?.items ?? [])
       setConfigMap(indexByKey(items))
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
-      const msg =
-        e?.response?.data?.detail ?? 'No se pudo cargar la configuración del sistema.'
+      const msg = formatApiError(
+        err,
+        'No se pudo cargar la configuración del sistema.',
+      )
       setErrorMsg(msg)
       addToast({ type: 'error', message: msg })
     } finally {

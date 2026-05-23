@@ -84,32 +84,38 @@ export default function App() {
           <Route path="/403" element={<AccessDenied />} />
         </Route>
 
-        {/* Protected + ConsentGuard: student routes */}
+        {/* Protected + RoleGuard(student) + ConsentGuard: student routes.
+            The RoleGuard wraps the consent flow because admins should
+            never see /onboarding, /home, /session/* etc. — the new
+            RoleGuard sends an admin who lands here to /admin instead
+            of the dead-end /403 (better UX, see RoleGuard.tsx). */}
         <Route element={<ProtectedRoute />}>
-          <Route element={<ConsentGuard />}>
-            {/* Onboarding: ConsentGuard sí, pero SIN StudentLayout — el
-                flujo es full-screen guiado (3 pasos: brújula → voz →
-                accesibilidad) y mostrar el sidebar con links a /home,
-                chats activos, etc. permitiría al estudiante escaparse
-                a medio camino y nunca crear su fila en `preferences`.
-                Consistente con las pantallas hermanas pre-experiencia
-                (/login, /consent, /consent-required) que también van
-                sin sidebar. */}
-            <Route path="/onboarding" element={<Onboarding />} />
+          <Route element={<RoleGuard role="student" />}>
+            <Route element={<ConsentGuard />}>
+              {/* Onboarding: ConsentGuard sí, pero SIN StudentLayout — el
+                  flujo es full-screen guiado (3 pasos: brújula → voz →
+                  accesibilidad) y mostrar el sidebar con links a /home,
+                  chats activos, etc. permitiría al estudiante escaparse
+                  a medio camino y nunca crear su fila en `preferences`.
+                  Consistente con las pantallas hermanas pre-experiencia
+                  (/login, /consent, /consent-required) que también van
+                  sin sidebar. */}
+              <Route path="/onboarding" element={<Onboarding />} />
 
-            {/* All other student routes: sidebar + require preferences */}
-            <Route element={<StudentLayout />}>
-              <Route element={<OnboardingGuard />}>
-                <Route path="/home" element={<Home />} />
-                {/* /settings is no longer a route — Settings is a global
-                    modal opened via Outlet context `openSettings(tab?)`.
-                    Legacy URLs redirect to /home so bookmarked /settings
-                    deeplinks at least land somewhere usable. */}
-                <Route path="/settings" element={<Navigate to="/home" replace />} />
-                <Route path="/session/:id/checkin" element={<CheckIn />} />
-                <Route path="/session/:id/chat" element={<Chat />} />
-                <Route path="/session/:id/end" element={<SessionEnd />} />
-                <Route path="/session/:id/detail" element={<SessionDetail />} />
+              {/* All other student routes: sidebar + require preferences */}
+              <Route element={<StudentLayout />}>
+                <Route element={<OnboardingGuard />}>
+                  <Route path="/home" element={<Home />} />
+                  {/* /settings is no longer a route — Settings is a global
+                      modal opened via Outlet context `openSettings(tab?)`.
+                      Legacy URLs redirect to /home so bookmarked /settings
+                      deeplinks at least land somewhere usable. */}
+                  <Route path="/settings" element={<Navigate to="/home" replace />} />
+                  <Route path="/session/:id/checkin" element={<CheckIn />} />
+                  <Route path="/session/:id/chat" element={<Chat />} />
+                  <Route path="/session/:id/end" element={<SessionEnd />} />
+                  <Route path="/session/:id/detail" element={<SessionDetail />} />
+                </Route>
               </Route>
             </Route>
           </Route>

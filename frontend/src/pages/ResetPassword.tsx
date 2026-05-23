@@ -85,6 +85,7 @@ export default function ResetPassword() {
   if (!valid) {
     return (
       <AuthShell
+        compactHero
         side={
           <div>
             <h1
@@ -172,6 +173,7 @@ export default function ResetPassword() {
 
   return (
     <AuthShell
+      compactHero
       side={
         <div>
           <h1

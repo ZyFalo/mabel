@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,7 +102,7 @@ class ConsentService:
                 existing,
                 revoked_at=None,
                 scope=scope,
-                accepted_at=datetime.now(timezone.utc),
+                accepted_at=datetime.now(UTC),
             )
             await self._audit_consent_change(
                 user_id=user_id,
@@ -140,7 +140,7 @@ class ConsentService:
             if existing.revoked_at is not None:
                 raise ValueError("ALREADY_REVOKED")
             consent = await self.consent_repo.update(
-                existing, revoked_at=datetime.now(timezone.utc)
+                existing, revoked_at=datetime.now(UTC)
             )
             await self._audit_consent_change(
                 user_id=user_id,
@@ -185,6 +185,22 @@ class ConsentService:
         await self.db.commit()
 
     async def get_consent_status(self, user_id: uuid.UUID) -> ConsentStatusResponse:
+        # NOTE: this helper does NOT discriminate by user.role. That is
+        # intentional and safe because callers already gate on role:
+        #
+        # - `middleware.auth.require_consent` short-circuits with
+        #   `if current_user.role == "admin": return current_user`
+        #   BEFORE calling this function, so admins never reach here in
+        #   the request-scoped auth path.
+        # - Admin routes (`/admin/*`) live outside `<ConsentGuard />`
+        #   in the React router (see frontend/src/App.tsx), so the
+        #   admin UI never calls `/users/me/consent-status` either.
+        #
+        # If a future caller invokes this directly for an admin user,
+        # behavior is "evaluate normally" — they'd get whatever
+        # consent state is stored. Operationally admins should have NO
+        # consent rows (cleaned 2026-05-23), so an admin would get
+        # `status='no_consent'`. That is correct fail-safe behavior.
         active_version = await self.version_repo.get_active()
         if not active_version:
             return ConsentStatusResponse(status="no_consent")

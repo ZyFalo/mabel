@@ -64,6 +64,7 @@ export default function Register() {
 
   return (
     <AuthShell
+      compactHero
       side={
         <div>
           <h1

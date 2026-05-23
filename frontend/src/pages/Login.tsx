@@ -51,6 +51,7 @@ export default function Login() {
 
   return (
     <AuthShell
+      compactHero
       side={
         <div>
           <h1

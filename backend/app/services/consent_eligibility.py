@@ -53,6 +53,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consent import Consent
+from app.models.user import User
 
 # Sentinel scope value that opts the user into research/analytics use.
 # Mirrors ``ConsentScope.uso_mejora_anon`` in schemas/consent.py and the
@@ -127,9 +128,23 @@ async def get_research_eligible_user_ids(db: AsyncSession) -> list[uuid.UUID]:
         .subquery()
     )
 
-    stmt = select(latest_consent_sq.c.user_id).where(
-        latest_consent_sq.c.rn == 1,
-        latest_consent_sq.c.scope == RESEARCH_SCOPE,
+    # Defensive role guard: even if a row in `consents` accidentally
+    # belongs to an admin (e.g. a historic registration when an admin
+    # went through the normal student flow, or a future SQL edit), we
+    # exclude them from research datasets. Admins are NEVER part of the
+    # study cohort by definition — they're operators of the system, not
+    # participants. Without this JOIN+filter, an admin who at some point
+    # had a non-revoked `uso_mejora_anon` row would leak into thesis
+    # aggregations. Belt-and-suspenders on top of the operational rule
+    # that admins shouldn't have consent rows in the first place.
+    stmt = (
+        select(latest_consent_sq.c.user_id)
+        .join(User, User.id == latest_consent_sq.c.user_id)
+        .where(
+            latest_consent_sq.c.rn == 1,
+            latest_consent_sq.c.scope == RESEARCH_SCOPE,
+            User.role != "admin",
+        )
     )
     result = await db.execute(stmt)
     return [row[0] for row in result.all()]

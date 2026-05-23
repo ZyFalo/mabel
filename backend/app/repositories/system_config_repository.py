@@ -25,13 +25,39 @@ class SystemConfigRepository:
         await self._ensure_cache()
         return self._cache.get(key)
 
-    async def get_safety_keywords(self) -> list[str]:
+    async def get_safety_keywords(self) -> list[dict]:
+        """Return safety_keywords as a list of structured entries.
+
+        Current shape: ``[{"keyword": str, "critical": bool}, ...]``.
+        Critical entries force severity=5 in `guardrails_service._analyze`.
+        Non-critical entries accumulate (+1 each, cap 4).
+
+        Backwards compatibility: if the stored value is the legacy
+        `list[str]` (no structure), we lift each string to
+        ``{"keyword": s, "critical": False}`` on read so callers always
+        see a uniform shape. Writes always go through the structured
+        path (see `validate_safety_keywords`).
+        """
         value = await self.get_value("safety_keywords")
-        if isinstance(value, list):
-            return value
         if isinstance(value, str):
-            return json.loads(value)
-        return []
+            value = json.loads(value)
+        if not isinstance(value, list):
+            return []
+        normalized: list[dict] = []
+        for entry in value:
+            if isinstance(entry, dict) and "keyword" in entry:
+                kw = entry.get("keyword")
+                if isinstance(kw, str) and kw:
+                    normalized.append(
+                        {
+                            "keyword": kw,
+                            "critical": bool(entry.get("critical", False)),
+                        }
+                    )
+            elif isinstance(entry, str) and entry:
+                # Legacy shape — promote to structured with critical=False.
+                normalized.append({"keyword": entry, "critical": False})
+        return normalized
 
     async def get_sos_threshold(self) -> int:
         value = await self.get_value("sos_severity_threshold")

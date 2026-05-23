@@ -357,9 +357,20 @@ export default function Consent() {
               fontFamily: 'var(--font-sans)',
             }}
           >
-            {isUpdate
-              ? 'Hemos actualizado nuestras políticas de privacidad'
-              : 'Consentimiento Informado'}
+            {/*
+              Show the admin-defined `version.title` (from BD) as the
+              page H2 so the user sees the actual document they're
+              about to accept (e.g. "Consentimiento Informado v2.0 —
+              Mabel IA"). The contextual "you're seeing this because
+              we updated the policies" framing lives in the side hero
+              (panel rojo) and in the subtitle below. Fallback to a
+              generic label when version hasn't loaded yet — keeps the
+              skeleton from flashing.
+            */}
+            {version?.title ??
+              (isUpdate
+                ? 'Hemos actualizado nuestras políticas de privacidad'
+                : 'Consentimiento Informado')}
           </h2>
           {version && (
             <span

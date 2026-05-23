@@ -25,8 +25,41 @@ SEED_DATA = [
     },
     {
         "key": "safety_keywords",
-        "value": json.dumps(["suicidio", "morir", "hacerme dano"]),
-        "description": "Keywords de deteccion de crisis",
+        # 100% data-driven (no hardcoded list in guardrails_service). Each
+        # entry: {"keyword": str, "critical": bool}. Critical entries
+        # force severity=5 (auto-SOS), non-critical accumulate +1 each
+        # (cap 4). Admin can edit every entry from /admin/config #02.
+        # Baseline list: combined recommendations from Crisis Text Line
+        # ES, 988 Lifeline (Spanish variants), and Colombian MinSalud
+        # linea 192. Includes both "daño" and "dano" for keyboard layouts
+        # that drop the ñ.
+        "value": json.dumps([
+            # --- Critical: suicide ideation (force severity=5) ---
+            {"keyword": "suicidio", "critical": True},
+            {"keyword": "suicidar", "critical": True},
+            {"keyword": "suicidarme", "critical": True},
+            {"keyword": "matarme", "critical": True},
+            # --- Critical: death wishes ---
+            {"keyword": "morir", "critical": True},
+            {"keyword": "morirme", "critical": True},
+            {"keyword": "no quiero vivir", "critical": True},
+            {"keyword": "no quiero seguir", "critical": True},
+            {"keyword": "quitarme la vida", "critical": True},
+            {"keyword": "acabar con mi vida", "critical": True},
+            {"keyword": "acabar conmigo", "critical": True},
+            # --- Critical: self-harm ---
+            {"keyword": "hacerme dano", "critical": True},
+            {"keyword": "hacerme daño", "critical": True},
+            {"keyword": "lastimarme", "critical": True},
+            {"keyword": "cortarme", "critical": True},
+            {"keyword": "autolesion", "critical": True},
+            {"keyword": "autolesionar", "critical": True},
+        ]),
+        "description": (
+            "Lista de palabras clave de seguridad. Cada entrada {keyword, "
+            "critical}: critical=true fuerza severidad 5 (auto-SOS); "
+            "critical=false suma +1 (cap 4). Gestionable desde el panel admin."
+        ),
     },
     {
         "key": "sos_severity_threshold",

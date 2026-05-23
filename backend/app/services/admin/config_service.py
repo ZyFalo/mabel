@@ -14,9 +14,11 @@ import re
 import time as _time
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -49,17 +51,63 @@ def validate_sos_hotline_numbers(value: Any) -> None:
 
 
 def validate_safety_keywords(value: Any) -> None:
+    """Validate the safety_keywords payload.
+
+    Shape (current): `list[{keyword: str, critical: bool}]`. Every entry
+    is an object with a non-empty lowercase keyword and an explicit
+    critical flag. Critical entries force severity=5 in
+    `guardrails_service._analyze` (auto-SOS). Non-critical entries
+    accumulate +1 each, capped at 4.
+
+    Legacy shape (`list[str]`) is also accepted for backwards
+    compatibility — converted on read by the repository to all entries
+    with `critical=False`. We don't ACCEPT writes in the legacy shape:
+    admins always send the structured form from the UI.
+    """
     if not isinstance(value, list):
         _invalid("safety_keywords must be a list")
+    # Safety floor: refuse to persist a list with zero critical entries.
+    # Without at least one critical keyword, `_analyze` can never produce
+    # severity=5 → the auto-SOS panel never opens for ideation. Pre-2026-05-23
+    # the code had a hardcoded `CRITICAL_KEYWORDS` set as defense-in-depth;
+    # we removed it to make the vocabulary 100% admin-managed, but that
+    # turned a misclick (delete-all + Save) into a silent safety regression
+    # for a mental-health product. This floor is the bare minimum guard:
+    # the admin is welcome to curate the list, just not to leave it empty
+    # or strip ALL critical flags.
+    if len(value) == 0:
+        _invalid(
+            "safety_keywords no puede estar vacia. Debe contener al menos "
+            "una entrada con critical=true para que la deteccion automatica "
+            "de ideacion siga activa."
+        )
     seen: set[str] = set()
-    for idx, kw in enumerate(value):
+    critical_count = 0
+    for idx, entry in enumerate(value):
+        if not isinstance(entry, dict):
+            _invalid(
+                f"keyword[{idx}] must be an object "
+                "{keyword: str, critical: bool}"
+            )
+        kw = entry.get("keyword")
+        critical = entry.get("critical")
         if not isinstance(kw, str) or not kw:
-            _invalid(f"keyword[{idx}] must be a non-empty string")
+            _invalid(f"keyword[{idx}].keyword must be a non-empty string")
         if kw != kw.lower():
-            _invalid(f"keyword[{idx}] must be lowercase")
+            _invalid(f"keyword[{idx}].keyword must be lowercase")
+        if not isinstance(critical, bool):
+            _invalid(f"keyword[{idx}].critical must be a boolean")
         if kw in seen:
             _invalid(f"duplicate keyword '{kw}'")
         seen.add(kw)
+        if critical:
+            critical_count += 1
+    if critical_count == 0:
+        _invalid(
+            "Debe haber al menos una palabra clave con critical=true. "
+            "Estas son las que disparan el panel SOS automaticamente "
+            "ante ideacion (severidad 5)."
+        )
 
 
 def validate_sos_severity_threshold(value: Any) -> None:
@@ -125,6 +173,64 @@ class AdminConfigService:
         await self.db.flush()
         await self.db.refresh(row)
         return row
+
+    async def delete_consent_version_draft(self, version_id: uuid.UUID) -> SimpleNamespace:
+        """Delete a consent_version that is still in 'draft' status.
+
+        Active and archived versions are NEVER deletable: they're part
+        of the legal trail. A draft, however, never reached any user —
+        deleting it is just discarding an abandoned admin edit.
+
+        Returns a SNAPSHOT (`SimpleNamespace`, NOT an ORM instance) of
+        the deleted row so the caller can audit-log identifying info
+        (version string + title) after the row is gone. Using a plain
+        namespace instead of a transient `ConsentVersion(id=...)` avoids
+        a latent SQLAlchemy identity-map collision: constructing a new
+        ORM instance with the same primary key as a row being deleted
+        in the same session works today by accident, but any future
+        event listener / cascade / refactor that touches the snapshot
+        could re-attach it and either raise IntegrityError on flush or
+        silently resurrect the draft. Plain namespace is safer because
+        SQLAlchemy never tracks it.
+
+        Raises:
+          ValueError("VERSION_NOT_FOUND") if the id does not exist.
+          ValueError("NOT_DRAFT") if the row is active or archived.
+          ValueError("HAS_REFERENCES") if a `consents` row references
+            this version (race: another admin published it between our
+            SELECT and our DELETE). The FK is ON DELETE RESTRICT so
+            Postgres rejects the delete; we translate to a structured
+            error the router maps to HTTP 409.
+        """
+        target_result = await self.db.execute(
+            select(ConsentVersion).where(ConsentVersion.id == version_id)
+        )
+        target = target_result.scalar_one_or_none()
+        if target is None:
+            raise ValueError("VERSION_NOT_FOUND")
+        if target.status != "draft":
+            raise ValueError("NOT_DRAFT")
+
+        # Snapshot BEFORE delete — pure data, not bound to the session.
+        snapshot = SimpleNamespace(
+            id=target.id,
+            version=target.version,
+            title=target.title,
+            body=target.body,
+            status=target.status,
+        )
+        await self.db.delete(target)
+        try:
+            await self.db.flush()
+        except IntegrityError as e:
+            # FK RESTRICT from consents.consent_version_id. Concurrent
+            # publish followed by user acceptance is the only realistic
+            # path to trigger this since drafts are unreachable to
+            # students. Rollback the pending delete and let the router
+            # map to HTTP 409 with a helpful message.
+            await self.db.rollback()
+            raise ValueError("HAS_REFERENCES") from e
+        return snapshot
 
     async def publish_consent_version(self, version_id: uuid.UUID) -> ConsentVersion:
         """Atomically archive the current active and promote `version_id` to active.

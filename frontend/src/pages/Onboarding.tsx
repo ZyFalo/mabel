@@ -105,7 +105,17 @@ export default function Onboarding() {
     }
   }
 
+  // Skip the CURRENT step — does not jump straight to /home. Advances
+  // by one. Only on the final step does it complete onboarding (PUTs
+  // whatever the form has so far, including any defaults the user
+  // didn't explicitly set). Earlier behavior was "Omitir = skip
+  // entire onboarding"; users complained that pressing it on step 1
+  // bypassed the other two pages they wanted to see.
   async function handleSkip() {
+    if (step < STEPS.length - 1) {
+      setStep(step + 1)
+      return
+    }
     setSaving(true)
     try {
       await updatePreferences({})
@@ -122,6 +132,7 @@ export default function Onboarding() {
   return (
     <AuthShell
       wide
+      compactHero
       side={
         <div>
           <div

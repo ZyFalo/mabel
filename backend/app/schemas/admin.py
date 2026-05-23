@@ -76,6 +76,12 @@ class UserAdminDetail(BaseModel):
     # Consent
     consent_status: str
     consent_version: str | None = None
+    # `consent_scope` was missing from the response shape until
+    # 2026-05-23: the frontend at UserDetail.tsx already read it (via
+    # `formatScope(user.consent.scope)`) but the field never arrived,
+    # so the "Alcance" cell always rendered "—" even when the user
+    # had a clear scope choice in BD.
+    consent_scope: str | None = None
     consent_accepted_at: datetime | None = None
     consent_revoked_at: datetime | None = None
 

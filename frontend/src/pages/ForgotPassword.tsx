@@ -27,6 +27,7 @@ export default function ForgotPassword() {
 
   return (
     <AuthShell
+      compactHero
       side={
         <div>
           <h1

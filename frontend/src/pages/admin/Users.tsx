@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import apiClient from '../../api/client'
 import DataTable, { DataTableColumn } from '../../components/admin/DataTable'
 import FilterBar from '../../components/admin/FilterBar'
@@ -7,8 +6,7 @@ import Pagination from '../../components/admin/Pagination'
 import BulkActionModal, {
   type BulkActionUser,
 } from '../../components/admin/BulkActionModal'
-import DisableUserModal from '../../components/admin/DisableUserModal'
-import EnableUserModal from '../../components/admin/EnableUserModal'
+import UserDetailDrawer from '../../components/admin/UserDetailDrawer'
 import { useToastStore } from '../../stores/toastStore'
 
 type StatusFilter = 'todos' | 'active' | 'disabled'
@@ -179,8 +177,6 @@ function StatusBadge({ disabled }: { disabled: boolean }) {
 }
 
 export default function Users() {
-  const navigate = useNavigate()
-
   const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -189,8 +185,13 @@ export default function Users() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const [disableTarget, setDisableTarget] = useState<UserAdminListItem | null>(null)
-  const [enableTarget, setEnableTarget] = useState<UserAdminListItem | null>(null)
+  // Drawer for inline user detail. The previous flow navigated to
+  // /admin/users/:id on row click (and toggled selection if there was
+  // an active multi-select). The new flow is uniform: clicking a row
+  // ALWAYS opens the side drawer with condensed info; selection is
+  // strictly the checkbox column. From the drawer there's a "Ver
+  // ficha completa" CTA that still routes to the full detail page.
+  const [drawerUserId, setDrawerUserId] = useState<string | null>(null)
 
   // Multi-select: rows currently checked by the admin (by user.id). Stored as
   // a Set for O(1) lookup. Admins are never selectable (the row's checkbox
@@ -266,13 +267,6 @@ export default function Users() {
   useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
-
-  // Opens the EnableUserModal for the row. The modal owns the PATCH +
-  // toast lifecycle (mirrors DisableUserModal); we just refresh the list
-  // when it reports success via `onEnabled`.
-  function openEnableModal(user: UserAdminListItem) {
-    setEnableTarget(user)
-  }
 
   const handleResetFilters = useCallback(() => {
     setFilters(DEFAULT_FILTERS)
@@ -590,83 +584,14 @@ export default function Users() {
         accessor: (row) => <StatusBadge disabled={!!row.disabled_at} />,
         className: 'w-[110px]',
       },
-      {
-        key: 'actions',
-        header: 'Acciones',
-        accessor: (row) => {
-          const isAdmin = row.role === 'admin'
-          const isDisabled = !!row.disabled_at
-          // Admins never expose a disable/enable button — protects the
-          // staff account from being locked out by another admin.
-          if (isAdmin) {
-            return <span className="text-[11px] text-text-primary/30">—</span>
-          }
-          if (isDisabled) {
-            // No spinner inline: EnableUserModal owns the busy state and
-            // dispatches the success toast. The cell simply opens it.
-            return (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  openEnableModal(row)
-                }}
-                style={{
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  color: 'var(--success-700)',
-                  background: 'transparent',
-                  border: '1px solid var(--success-200)',
-                  padding: '4px 12px',
-                  borderRadius: 9999,
-                  cursor: 'pointer',
-                  transition:
-                    'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
-                }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.background = 'var(--success-50)')
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.background = 'transparent')
-                }
-              >
-                Activar
-              </button>
-            )
-          }
-          return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                setDisableTarget(row)
-              }}
-              style={{
-                fontSize: 11.5,
-                fontWeight: 600,
-                color: 'var(--danger-700)',
-                background: 'transparent',
-                border: '1px solid var(--danger-200)',
-                padding: '4px 12px',
-                borderRadius: 9999,
-                cursor: 'pointer',
-                transition: 'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
-              }}
-              onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLElement).style.background = 'var(--danger-50)'
-                ;(e.currentTarget as HTMLElement).style.color = 'var(--danger-700)'
-              }}
-              onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLElement).style.background = 'transparent'
-                ;(e.currentTarget as HTMLElement).style.color = 'var(--danger-700)'
-              }}
-            >
-              Deshabilitar
-            </button>
-          )
-        },
-        className: 'w-[120px]',
-      },
+      // NOTE: the per-row "Acciones" column (Activar / Deshabilitar
+      // pills) was removed as part of refactor A1. All lifecycle
+      // actions (enable, disable, delete) now flow through the
+      // sticky bulk-action bar that appears when one or more rows
+      // are selected via the checkbox column. That eliminates the
+      // duplicate path that confused admins (per-row pill vs bulk
+      // dropdown both doing the same thing) and frees ~120px of
+      // horizontal space for higher-value columns.
     ],
     // `enablingId` flips the spinner state on the "Activar" cell — re-bake
     // the columns when it changes so the disabled state stays in sync.
@@ -977,8 +902,8 @@ export default function Users() {
                 lineHeight: 1.3,
               }}
             >
-              Click sobre una fila para alternar la selección. Limpia la
-              selección para abrir el detalle de un usuario.
+              Marca filas con el checkbox para incluirlas en la acción.
+              Haz click en una fila para ver su detalle en el panel lateral.
             </span>
           </div>
 
@@ -1266,17 +1191,23 @@ export default function Users() {
         rows={data?.items ?? []}
         loading={loading}
         rowKey={(row) => row.id}
-        // UX: si hay selección activa, click sobre una fila TOGGLE su
-        // estado (patrón Gmail) en lugar de navegar al detalle —
-        // evita perder la selección por accidente al apuntar mal el
-        // checkbox. Para administradores (no seleccionables) seguimos
-        // navegando al detalle aunque haya selección activa.
+        // UX: click sobre una fila de ESTUDIANTE abre el drawer lateral
+        // con el detalle resumido del usuario. La selección multi-row
+        // se hace exclusivamente con la columna de checkbox — separar
+        // ambos comportamientos (selección vs navegación) evita el
+        // doble-rol que antes tenía el click de fila y que confundía
+        // a admins nuevos. Desde el drawer se puede saltar a la ficha
+        // completa con un CTA explícito.
+        //
+        // Las filas de admin son no-clickeables: abrir el drawer para
+        // un admin (a) escribe un audit_log `view_user` permanente
+        // sobre otro admin (ruido sin valor de compliance), y (b)
+        // muestra "Sin consentimiento" porque admins no tienen filas
+        // en `consents` (cleanup 2026-05-23) — UX confusa y contradice
+        // el principio "admins no participan del flujo de consent".
         onRowClick={(row) => {
-          if (selectedIds.size > 0 && row.role !== 'admin') {
-            toggleRow(row.id)
-            return
-          }
-          navigate(`/admin/users/${row.id}`)
+          if (row.role === 'admin') return
+          setDrawerUserId(row.id)
         }}
         emptyMessage={
           activeFilterCount > 0
@@ -1297,33 +1228,17 @@ export default function Users() {
         }}
       />
 
-      {/* Disable modal */}
-      {disableTarget && (
-        <DisableUserModal
-          open={!!disableTarget}
-          userId={disableTarget.id}
-          onClose={() => setDisableTarget(null)}
-          onDisabled={() => {
-            // Refresh list after success; success toast is dispatched inside the modal
-            fetchUsers()
-            setDisableTarget(null)
-          }}
-        />
-      )}
+      {/* Inline detail drawer (replaces both the per-row navigation
+          to /admin/users/:id and the legacy "click row to toggle
+          selection" behavior). Selection is now strictly via the
+          checkbox column; clicking elsewhere on the row opens the
+          drawer. The full detail page is still reachable via the
+          "Ver ficha completa" CTA inside the drawer. */}
+      <UserDetailDrawer
+        userId={drawerUserId}
+        onClose={() => setDrawerUserId(null)}
+      />
 
-      {/* Enable modal */}
-      {enableTarget && (
-        <EnableUserModal
-          open={!!enableTarget}
-          userId={enableTarget.id}
-          userLabel={enableTarget.display_name?.trim() || enableTarget.email_masked}
-          onClose={() => setEnableTarget(null)}
-          onEnabled={() => {
-            fetchUsers()
-            setEnableTarget(null)
-          }}
-        />
-      )}
 
       {/* Bulk lifecycle action modal */}
       {bulkActionMode && (

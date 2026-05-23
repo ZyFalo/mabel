@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.middleware.auth import require_admin
 from app.models.user import User
+from app.repositories.system_config_repository import SystemConfigRepository
 from app.schemas.admin import (
     ConfigUpdateRequest,
     ConsentVersionCreate,
@@ -29,7 +30,6 @@ from app.schemas.admin import (
     GeminiTestResponse,
     SystemConfigItem,
 )
-from app.repositories.system_config_repository import SystemConfigRepository
 from app.services.admin.config_service import AdminConfigService
 from app.services.audit_service import audit_log_action
 
@@ -228,6 +228,74 @@ async def publish_admin_consent_version(
     await db.commit()
     await db.refresh(row)
     return ConsentVersionItem.model_validate(row)
+
+
+@router.delete(
+    "/admin/consent-versions/{version_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_admin_consent_version_draft(
+    version_id: uuid.UUID,
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Hard-delete a draft consent_version.
+
+    Only drafts can be deleted. Trying to delete an active or archived
+    version returns HTTP 409 — both are legal artifacts that must
+    persist (active because users are bound by it; archived because
+    auditors need to know what text was in force in the past).
+
+    The audit_log row is emitted BEFORE the delete commit so the
+    `target_id` still resolves at the moment of writing; after commit
+    that id will be dangling, which is acceptable for an
+    intentionally-discarded draft.
+    """
+    service = AdminConfigService(db)
+    try:
+        snapshot = await service.delete_consent_version_draft(version_id)
+    except ValueError as e:
+        msg = str(e)
+        if msg == "VERSION_NOT_FOUND":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Version de consentimiento no encontrada",
+            ) from e
+        if msg == "NOT_DRAFT":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Solo se pueden eliminar borradores. Las versiones activas o "
+                    "archivadas son parte del registro legal y no se pueden borrar."
+                ),
+            ) from e
+        if msg == "HAS_REFERENCES":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "No se puede eliminar este borrador porque otro admin lo "
+                    "publicó mientras tanto y ya hay usuarios que lo aceptaron."
+                ),
+            ) from e
+        raise
+
+    await audit_log_action(
+        db,
+        actor_id=current_user.id,
+        actor_role="admin",
+        action="change_config",
+        target_type="consent_version",
+        target_id=snapshot.id,
+        details={
+            "operation": "delete_draft",
+            "version": snapshot.version,
+            "title": snapshot.title,
+        },
+        ip=_client_ip(request),
+    )
+    await db.commit()
+    # 204 No Content — no body returned.
 
 
 @router.post("/admin/config/gemini/test", response_model=GeminiTestResponse)

@@ -14,6 +14,7 @@ export default function ConsentRejected() {
 
   return (
     <AuthShell
+      compactHero
       side={
         <div>
           <h1

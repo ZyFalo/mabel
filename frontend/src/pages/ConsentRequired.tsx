@@ -81,6 +81,7 @@ export default function ConsentRequired() {
 
   return (
     <AuthShell
+      compactHero
       side={
         <div>
           <h1

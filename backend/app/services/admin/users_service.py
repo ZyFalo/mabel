@@ -12,8 +12,8 @@ Privacy/audit rules:
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time, timezone
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, date, datetime, time, timezone
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,11 +134,11 @@ class AdminUsersService:
             conditions.append(User.disabled_at.is_not(None))
         if created_from is not None:
             conditions.append(
-                User.created_at >= datetime.combine(created_from, time.min, tzinfo=timezone.utc)
+                User.created_at >= datetime.combine(created_from, time.min, tzinfo=UTC)
             )
         if created_to is not None:
             conditions.append(
-                User.created_at <= datetime.combine(created_to, time.max, tzinfo=timezone.utc)
+                User.created_at <= datetime.combine(created_to, time.max, tzinfo=UTC)
             )
         if cohort is not None:
             conditions.append(User.cohort == cohort)
@@ -290,6 +290,7 @@ class AdminUsersService:
             cohort=user.cohort,
             consent_status=cs,
             consent_version=consent_version_label,
+            consent_scope=latest_consent.scope if latest_consent else None,
             consent_accepted_at=latest_consent.accepted_at if latest_consent else None,
             consent_revoked_at=latest_consent.revoked_at if latest_consent else None,
             save_history=save_history,
@@ -337,7 +338,7 @@ class AdminUsersService:
         if user.disabled_at is not None:
             raise ValueError("ALREADY_DISABLED")
 
-        user.disabled_at = datetime.now(timezone.utc)
+        user.disabled_at = datetime.now(UTC)
         user.disabled_reason = reason
 
         # Audit log INSIDE the same transaction (D-12).
