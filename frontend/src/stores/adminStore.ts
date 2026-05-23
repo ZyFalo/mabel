@@ -6,6 +6,12 @@ interface AdminState {
   activeSafetyEvents: number
   polling: boolean
   intervalId: number | null
+  // Mobile drawer (responsive 2026-05-23): el sidebar fijo de 220px no
+  // cabe en mobile. En <768px se vuelve un drawer overlay controlado
+  // por este flag. El hamburger del AdminHeader lo toggle.
+  mobileNavOpen: boolean
+  toggleMobileNav: () => void
+  closeMobileNav: () => void
   fetchOnce: () => Promise<void>
   startPolling: () => void
   stopPolling: () => void
@@ -18,6 +24,9 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   activeSafetyEvents: 0,
   polling: false,
   intervalId: null,
+  mobileNavOpen: false,
+  toggleMobileNav: () => set((s) => ({ mobileNavOpen: !s.mobileNavOpen })),
+  closeMobileNav: () => set({ mobileNavOpen: false }),
 
   fetchOnce: async () => {
     try {

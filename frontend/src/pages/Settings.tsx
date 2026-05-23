@@ -60,17 +60,25 @@ const SECTIONS: SectionDef[] = [
     title: 'Privacidad',
     subtitle: 'Datos y consentimiento',
   },
-  {
-    id: 'accessibility',
-    icon: <Eye size={16} />,
-    title: 'Accesibilidad',
-    subtitle: 'Personalizar experiencia',
-  },
+  // Tab "Accesibilidad" oculta del menu (audit 2026-05-23): sus 3
+  // controles originales — contrast, font_size, subtitles — estaban
+  // incompletos. contrast/font_size nunca tuvieron handler de DOM y
+  // subtitles depende del TTS, asi que se movio a la tab Voz junto al
+  // resto de toggles relacionados. La TabId sigue en VALID_TABS para
+  // no crashear bookmarks viejos (Settings cae a Privacy si llega).
+  // Si reactivamos contrast/font_size, descomentar aqui y la seccion
+  // AccesibilidadSection (que se mantiene en el archivo).
+  // {
+  //   id: 'accessibility',
+  //   icon: <Eye size={16} />,
+  //   title: 'Accesibilidad',
+  //   subtitle: 'Personalizar experiencia',
+  // },
   {
     id: 'voice',
     icon: <Volume2 size={16} />,
     title: 'Voz',
-    subtitle: 'TTS y voz del asistente',
+    subtitle: 'Modo voz, TTS y subtitulos',
   },
   {
     id: 'account',
@@ -108,6 +116,10 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
   // Local form state for each section
   const [saveHistory, setSaveHistory] = useState(false)
   const [checkinEnabled, setCheckinEnabled] = useState(true)
+  // Voice gating (paquete 2026-05-23): voice_enabled master + sub
+  // voice_mode_enabled. Defaults a TRUE para no romper cuentas pre-existentes.
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [voiceModeEnabled, setVoiceModeEnabled] = useState(true)
   const [contrast, setContrast] = useState(false)
   const [fontSize, setFontSize] = useState<'small' | 'normal' | 'large'>(
     'normal',
@@ -166,7 +178,12 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
       )
       setSubtitles(acc?.subtitles !== false)
       setTtsVoice(preferences.tts_voice || '')
-      setTtsEnabled(acc?.tts_enabled !== false)
+      // OPT-IN para autoplay TTS en chat texto (bug 2026-05-23: antes
+      // era opt-out, leia mensajes sin permiso a usuarios nuevos).
+      setTtsEnabled(acc?.tts_enabled === true)
+      // Voice gating — defaults TRUE para no romper usuarios legacy.
+      setVoiceEnabled(acc?.voice_enabled !== false)
+      setVoiceModeEnabled(acc?.voice_mode_enabled !== false)
       setChatMode(preferences.preferred_chat_mode)
     }
   }, [preferences])
@@ -206,11 +223,22 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
   // Close handler — delegates to parent.
   const handleClose = onClose
 
+  // Click en el backdrop. Solo dispara si el click fue DIRECTO sobre el
+  // backdrop (no bubbleado desde submodales/contenido). Sin esta guard,
+  // cerrar un submodal (DeleteAccount, RevokeConsent, etc.) cerraba
+  // tambien el Settings padre porque el evento subia por el DOM hasta
+  // el outer div con onClick={handleClose}. Bug reportado 2026-05-23.
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return
+    if (anySubModalOpen) return
+    handleClose()
+  }
+
   // Esc shortcut: only fires when Settings is open AND no sub-modal is
   // active. Sub-modals (DeleteAccount, RevokeConsent, ChangePassword,
-  // ArcoExport) handle their own Esc keypresses; we don't want a single
-  // Esc to collapse two layers at once.
-  const anySubModalOpen = showDelete || showRevoke || showArco || showPassword
+  // ArcoExport, ConfirmHideHistory) handle their own Esc keypresses.
+  const anySubModalOpen =
+    showDelete || showRevoke || showArco || showPassword || showHideHistory
   useKeyboardShortcuts(open && !anySubModalOpen ? { esc: handleClose } : {})
 
   // -------------------------------------------------------------------------
@@ -364,7 +392,14 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
         preferred_chat_mode: chatMode,
         accessibility: {
           ...((preferences?.accessibility as Record<string, unknown>) || {}),
+          // Voice gating (audit 2026-05-23)
+          voice_enabled: voiceEnabled,
+          voice_mode_enabled: voiceModeEnabled,
+          // Autoplay TTS en chat texto
           tts_enabled: ttsEnabled,
+          // Subtitles — se movio aqui desde la seccion Accesibilidad
+          // porque solo tiene sentido si hay TTS.
+          subtitles,
         },
       })
       addToast({ type: 'success', message: 'Cambios guardados' })
@@ -398,12 +433,12 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
         justifyContent: 'center',
         padding: 24,
       }}
-      onClick={handleClose}
+      onClick={handleBackdropClick}
       role="presentation"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="scale-in"
+        className="scale-in settings-modal-shell"
         role="dialog"
         aria-modal="true"
         aria-label="Ajustes"
@@ -418,8 +453,9 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
           border: '1px solid var(--ink-200)',
         }}
       >
-        {/* LEFT 280px sidebar */}
+        {/* LEFT 280px sidebar — en mobile se vuelve barra superior */}
         <div
+          className="settings-sidebar"
           style={{
             width: 280,
             flexShrink: 0,
@@ -430,6 +466,7 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
           }}
         >
           <div
+            className="settings-sidebar-header"
             style={{
               padding: '20px 18px 14px',
               borderBottom: '1px solid var(--ink-200)',
@@ -448,6 +485,7 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
               Ajustes
             </div>
             <div
+              className="settings-sidebar-header-title"
               style={{
                 fontSize: 18,
                 fontWeight: 700,
@@ -460,6 +498,7 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
           </div>
           <nav
             aria-label="Secciones de configuracion"
+            className="settings-nav-list"
             style={{
               flex: 1,
               overflowY: 'auto',
@@ -484,6 +523,7 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
 
         {/* RIGHT content area */}
         <div
+          className="settings-content-area"
           style={{
             flex: 1,
             display: 'flex',
@@ -494,6 +534,7 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
         >
           {/* Breadcrumb header */}
           <div
+            className="settings-breadcrumb-header"
             style={{
               padding: '16px 28px',
               borderBottom: '1px solid var(--ink-200)',
@@ -517,6 +558,7 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
 
           {/* Content scrollable */}
           <div
+            className="settings-content-inner"
             style={{
               flex: 1,
               overflowY: 'auto',
@@ -550,8 +592,14 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
 
               {activeTab === 'voice' && (
                 <VozSection
+                  voiceEnabled={voiceEnabled}
+                  setVoiceEnabled={setVoiceEnabled}
+                  voiceModeEnabled={voiceModeEnabled}
+                  setVoiceModeEnabled={setVoiceModeEnabled}
                   ttsEnabled={ttsEnabled}
                   setTtsEnabled={setTtsEnabled}
+                  subtitles={subtitles}
+                  setSubtitles={setSubtitles}
                   ttsVoice={ttsVoice}
                   setTtsVoice={setTtsVoice}
                   chatMode={chatMode}
@@ -878,8 +926,18 @@ function AccesibilidadSection({
 // ---------------------------------------------------------------------------
 
 interface VozSectionProps {
+  voiceEnabled: boolean
+  setVoiceEnabled: (v: boolean) => void
+  voiceModeEnabled: boolean
+  setVoiceModeEnabled: (v: boolean) => void
   ttsEnabled: boolean
   setTtsEnabled: (v: boolean) => void
+  subtitles: boolean
+  setSubtitles: (v: boolean) => void
+  // Campos LATENTES — el form sigue cargando/guardando estos valores
+  // por compatibilidad con la BD pero no se renderizan en el UI hasta
+  // que existan voces multiples (ttsVoice) o auto-open en avatar
+  // (chatMode). Ver comentario abajo en el bloque comentado.
   ttsVoice: string
   setTtsVoice: (v: string) => void
   chatMode: 'chat' | 'avatar'
@@ -890,12 +948,19 @@ interface VozSectionProps {
 }
 
 function VozSection({
+  voiceEnabled,
+  setVoiceEnabled,
+  voiceModeEnabled,
+  setVoiceModeEnabled,
   ttsEnabled,
   setTtsEnabled,
-  ttsVoice,
-  setTtsVoice,
-  chatMode,
-  setChatMode,
+  subtitles,
+  setSubtitles,
+  // Latentes — no usados en el render hoy, ver bloque comentado abajo
+  ttsVoice: _ttsVoice,
+  setTtsVoice: _setTtsVoice,
+  chatMode: _chatMode,
+  setChatMode: _setChatMode,
   previewPlaying,
   previewVoice,
   onSave,
@@ -904,58 +969,110 @@ function VozSection({
     <section>
       <SectionHeader
         title="Voz"
-        desc="Configura la sintesis de voz y el modo de interaccion."
+        desc="Decide si quieres oir a Mabel y como prefieres interactuar."
       />
-      <Toggle
-        checked={ttsEnabled}
-        onChange={setTtsEnabled}
-        label="TTS activado"
-        hint="Reproducir respuestas con voz sintetizada. Puedes silenciar puntualmente en el chat."
-      />
-      <div style={{ paddingTop: 22 }}>
-        <SettingsField
-          label="Voz del asistente"
-          hint="Elige la voz para reproduccion. Usa Preview para escuchar un fragmento breve."
-        >
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-              flexWrap: 'wrap',
-            }}
-          >
-            <NativeSelect
-              value={ttsVoice}
-              onChange={setTtsVoice}
-              ariaLabel="Voz del asistente"
-            >
-              <option value="">Por defecto</option>
-              <option value="es-female-1">Femenina 1</option>
-              <option value="es-female-2">Femenina 2</option>
-              <option value="es-male-1">Masculina 1</option>
-            </NativeSelect>
-            <PrimaryButton onClick={previewVoice} disabled={previewPlaying}>
-              {previewPlaying ? 'Reproduciendo...' : 'Preview'}
-            </PrimaryButton>
-          </div>
-        </SettingsField>
 
-        <SettingsField
-          label="Modo de interaccion"
-          hint="Chat clasico o avatar 3D animado."
-        >
-          <Segmented<'chat' | 'avatar'>
-            value={chatMode}
-            onChange={setChatMode}
+      {/* Master: voice_enabled */}
+      <Toggle
+        checked={voiceEnabled}
+        onChange={setVoiceEnabled}
+        label="Voz de Mabel"
+        hint="Permite que Mabel responda con voz sintetizada. Si lo desactivas, todas las respuestas seran solo texto y no podras entrar al modo voz 2D."
+      />
+
+      {/* Preview de la voz — util para que la persona escuche un sample
+          antes de decidir si activa el TTS en chat texto. Funciona solo
+          si voice_enabled = true. */}
+      <div
+        style={{
+          marginTop: 10,
+          opacity: voiceEnabled ? 1 : 0.5,
+          pointerEvents: voiceEnabled ? 'auto' : 'none',
+        }}
+      >
+        <PrimaryButton onClick={previewVoice} disabled={previewPlaying || !voiceEnabled}>
+          {previewPlaying ? 'Reproduciendo...' : 'Probar voz'}
+        </PrimaryButton>
+      </div>
+
+      {/* voice_mode_enabled — gated */}
+      <div
+        style={{
+          paddingTop: 22,
+          opacity: voiceEnabled ? 1 : 0.5,
+          pointerEvents: voiceEnabled ? 'auto' : 'none',
+        }}
+      >
+        <Toggle
+          checked={voiceEnabled && voiceModeEnabled}
+          onChange={setVoiceModeEnabled}
+          label="Modo voz 2D"
+          hint="Muestra el boton 'Hablar' en la cabecera del chat para entrar al modo conversacion por voz con avatar 2D animado de Mabel."
+        />
+      </div>
+
+      {/* tts_enabled — autoplay en chat texto, gated */}
+      <div
+        style={{
+          paddingTop: 22,
+          opacity: voiceEnabled ? 1 : 0.5,
+          pointerEvents: voiceEnabled ? 'auto' : 'none',
+        }}
+      >
+        <Toggle
+          checked={voiceEnabled && ttsEnabled}
+          onChange={setTtsEnabled}
+          label="Mabel lee sus respuestas en chat texto"
+          hint="Cuando Mabel responde en el chat de texto, su mensaje se reproduce automaticamente en voz alta sin que tengas que pedirlo."
+        />
+      </div>
+
+      {/* subtitles — movido desde Accesibilidad, gated */}
+      <div
+        style={{
+          paddingTop: 22,
+          opacity: voiceEnabled ? 1 : 0.5,
+          pointerEvents: voiceEnabled ? 'auto' : 'none',
+        }}
+      >
+        <Toggle
+          checked={voiceEnabled && subtitles}
+          onChange={setSubtitles}
+          label="Resaltar palabras mientras Mabel habla"
+          hint="En cualquier mensaje que se reproduzca por voz, resalta en su burbuja la palabra que esta pronunciando ahora mismo — util para seguir el ritmo y para baja audicion."
+        />
+      </div>
+
+      {/*
+        CONTROLES LATENTES (audit 2026-05-23) — se descomentan cuando:
+        a) Tengamos varias voces Piper instaladas (hoy solo
+           es_ES-mls_9972-low). El selector mostraba IDs ficticios
+           (es-female-1, es-female-2, es-male-1) que el backend ignoraba.
+        b) Implementemos auto-open en avatar: hoy preferred_chat_mode
+           ='avatar' se guarda pero ChatStore.createSession siempre
+           abre en /chat. El segmented daba la ilusion de un toggle
+           operativo cuando en realidad no hacia nada.
+
+        El form sigue cargando y guardando ambos campos para no romper
+        el shape del POST /preferences ni el endpoint admin que los lee.
+
+        <SettingsField label="Voz del asistente" hint="Elige el timbre...">
+          <NativeSelect value={_ttsVoice} onChange={_setTtsVoice} ariaLabel="Voz del asistente">
+            <option value="">Por defecto</option>
+            <option value="es-female-1">Femenina 1</option>
+            ...
+          </NativeSelect>
+        </SettingsField>
+        <SettingsField label="Modo de interaccion" hint="Chat clasico o avatar.">
+          <Segmented value={_chatMode} onChange={_setChatMode}
             options={[
               { value: 'chat', label: 'Chat clasico' },
-              { value: 'avatar', label: 'Avatar 3D' },
+              { value: 'avatar', label: 'Avatar 2D' },
             ]}
-            ariaLabel="Modo de interaccion"
           />
         </SettingsField>
-      </div>
+      */}
+
       <SaveBar onClick={onSave} />
     </section>
   )

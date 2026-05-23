@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { useAdminStore } from '../../stores/adminStore'
 
 const SECTION_LABELS: Record<string, string> = {
   '/admin': 'Dashboard',
@@ -79,6 +80,7 @@ function getInitials(name?: string | null, email?: string | null): string {
 export default function AdminHeader() {
   const navigate = useNavigate()
   const location = useLocation()
+  const toggleMobileNav = useAdminStore((s) => s.toggleMobileNav)
   const { user, logout } = useAuthStore()
 
   function handleLogout() {
@@ -102,6 +104,28 @@ export default function AdminHeader() {
         padding: '0 24px',
       }}
     >
+      {/* Mobile hamburger — solo visible <768px via CSS. Toggle del
+          drawer del sidebar admin. Desktop usa sidebar fijo y no
+          renderea este boton (display: none). */}
+      <button
+        type="button"
+        onClick={toggleMobileNav}
+        className="admin-mobile-hamburger"
+        aria-label="Abrir menu lateral"
+        style={{
+          display: 'none', // CSS @media lo muestra en mobile
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--ink-700)',
+          cursor: 'pointer',
+          padding: '8px',
+          marginRight: 4,
+          borderRadius: 8,
+        }}
+      >
+        <Menu size={20} />
+      </button>
+
       {/* Left: breadcrumb */}
       <nav
         aria-label="Ubicación"

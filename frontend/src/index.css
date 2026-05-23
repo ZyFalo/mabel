@@ -383,3 +383,104 @@ button, input, select, textarea {
     display: none;
   }
 }
+
+/* ============================================================
+   Settings modal — responsive (<768px). Desktop sin cambios.
+   El sidebar de 280px no cabe en mobile, asi que se transforma en
+   barra superior horizontal scrolleable + el contenido pasa debajo.
+   ============================================================ */
+@media (max-width: 768px) {
+  .settings-modal-shell {
+    flex-direction: column !important;
+    height: 100% !important;
+    width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+  }
+  .settings-sidebar {
+    width: 100% !important;
+    flex-shrink: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--ink-200) !important;
+    flex-direction: column !important;
+  }
+  .settings-sidebar-header {
+    padding: 14px 16px 10px !important;
+    border-bottom: 1px solid var(--ink-200) !important;
+  }
+  .settings-sidebar-header-title {
+    font-size: 16px !important;
+  }
+  .settings-nav-list {
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 8px 10px !important;
+    gap: 6px !important;
+    scrollbar-width: thin;
+  }
+  /* Cada item del nav en mobile se vuelve un pill compacto */
+  .settings-nav-list > * {
+    flex-shrink: 0 !important;
+  }
+  .settings-content-area {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+  .settings-breadcrumb-header {
+    padding: 12px 16px !important;
+  }
+  .settings-content-inner {
+    padding: 16px !important;
+  }
+}
+
+/* Sub-modales de Settings ya son responsive por su `width: min(100%, 480px)`.
+   No requieren CSS extra. */
+
+/* ============================================================
+   Admin panel — responsive (<768px). Desktop sin cambios.
+   El sidebar fijo de 220px no cabe en mobile, se vuelve drawer
+   overlay slide-in controlado por hamburger en AdminHeader.
+   ============================================================ */
+.admin-mobile-backdrop {
+  display: none;
+}
+@media (max-width: 768px) {
+  /* Sidebar: pasa de columna inline a drawer fixed con slide */
+  .admin-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 60 !important;
+    transform: translateX(-100%);
+    transition: transform 0.22s var(--ease-out);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  }
+  .admin-layout-root[data-admin-nav-open="true"] .admin-sidebar {
+    transform: translateX(0);
+  }
+  /* Backdrop debajo del drawer cuando esta abierto */
+  .admin-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(26, 17, 16, 0.5);
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.18s var(--ease-out);
+  }
+  /* Hamburger visible solo en mobile */
+  .admin-mobile-hamburger {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Header con menos padding en mobile */
+  header.shrink-0 {
+    padding: 0 14px !important;
+  }
+}
+

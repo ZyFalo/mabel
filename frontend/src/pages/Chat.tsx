@@ -111,6 +111,12 @@ export default function Chat() {
   // evita regresion en usuarios que dependian de ellos.
   const subtitlesEnabled = acc?.subtitles !== false
   const ttsVoice = preferences?.tts_voice || undefined
+  // Voice mode gate: master (`voice_enabled`) controla TODO, sub
+  // (`voice_mode_enabled`) controla la visibilidad del boton "Hablar"
+  // y el acceso a la ruta /voice. Defaults a TRUE para no romper
+  // usuarios pre-existentes que aun no pasaron por el nuevo onboarding.
+  const voiceEnabled = acc?.voice_enabled !== false
+  const voiceModeEnabled = voiceEnabled && acc?.voice_mode_enabled !== false
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder()
   const { playTts, stopTts, isMuted, toggleMute } = useTts()
@@ -488,9 +494,10 @@ export default function Chat() {
           <SosButton onClick={openCrisis} />
 
           {/* Modo voz — abre la pantalla de avatar 2D animado. Solo
-              visible en sesiones activas (las terminadas son read-only,
-              entrar al voice no tiene sentido). */}
-          {!sessionEnded && id && (
+              visible en sesiones activas (terminadas son read-only) Y
+              cuando el usuario tiene voz + modo voz habilitados en sus
+              preferencias. */}
+          {!sessionEnded && id && voiceModeEnabled && (
             <button
               type="button"
               onClick={() => navigate(`/session/${id}/voice`)}

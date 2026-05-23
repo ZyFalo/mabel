@@ -92,7 +92,7 @@ export default function AdminSidebar() {
 
   return (
     <aside
-      className="shrink-0 flex flex-col h-full"
+      className="shrink-0 flex flex-col h-full admin-sidebar"
       style={{
         width: 220,
         background: 'var(--ink-900)',

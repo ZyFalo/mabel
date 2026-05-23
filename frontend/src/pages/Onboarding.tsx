@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Type, MonitorSmartphone, Bot, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react'
 import Toggle from '../components/ui/Toggle'
-import Segmented from '../components/ui/Segmented'
-import NativeSelect from '../components/ui/NativeSelect'
 import InfoHint from '../components/admin/InfoHint'
 import { usePreferencesStore } from '../stores/preferencesStore'
 import { useToastStore } from '../stores/toastStore'
 import AuthShell from '../components/auth/AuthShell'
+// NOTE: imports retirados del UI activo pero conservados como referencia
+// para cuando reactivemos `contrast`, `font_size`, `tts_voice` selector
+// y `preferred_chat_mode` (avatar): Type, MonitorSmartphone, Bot,
+// Segmented, NativeSelect.
 
 // Small helper to render an option title with an inline info tooltip.
 // Keeps the JSX of each step readable by collapsing the `<p>title</p> +
@@ -23,14 +25,30 @@ function OptionLabel({ title, hint }: { title: string; hint: string }) {
   )
 }
 
-const STEPS = ['Privacidad', 'Accesibilidad', 'Voz']
+// El paso "Accesibilidad" se elimino del UI porque sus 3 controles
+// (contrast, font_size, subtitles) tenian implementacion incompleta:
+// contrast/font_size no aplicaban al DOM y subtitles depende de TTS
+// (ahora vive en el paso de Voz junto a los toggles relacionados).
+// Tambien retiramos del UI: tts_voice selector (solo tenemos 1 voz
+// Piper) y preferred_chat_mode segmented (avatar default-open no
+// implementado). Todos los campos siguen guardandose en BD por si
+// los reactivamos despues — solo desaparecen de la pantalla.
+const STEPS = ['Privacidad', 'Voz y experiencia']
 
 interface FormState {
   save_history: boolean
   checkin_enabled: boolean
+  // Voice & experience (paso 2 — todos guardados en accessibility JSONB
+  // salvo preferred_chat_mode que es columna propia)
+  voice_enabled: boolean         // master: permite que Mabel hable via TTS
+  voice_mode_enabled: boolean    // muestra el boton "Hablar" y la ruta /voice
+  tts_enabled: boolean           // autoplay TTS en el chat de texto
+  subtitles: boolean             // resalta palabras mientras Mabel habla
+  // Campos LATENTES — no se muestran en UI hoy pero el form los
+  // mantiene para no romper la forma del POST a /preferences. Cuando
+  // los reactivemos solo hay que volver a renderizar el control.
   contrast: boolean
   font_size: string
-  subtitles: boolean
   tts_voice: string
   preferred_chat_mode: 'chat' | 'avatar'
 }
@@ -38,9 +56,12 @@ interface FormState {
 const DEFAULT_STATE: FormState = {
   save_history: false,
   checkin_enabled: true,
+  voice_enabled: true,
+  voice_mode_enabled: true,
+  tts_enabled: false,            // OPT-IN: bug 2026-05-23, no autoplay sin consentimiento explicito
+  subtitles: true,
   contrast: false,
   font_size: 'normal',
-  subtitles: true,
   tts_voice: '',
   preferred_chat_mode: 'chat',
 }
@@ -89,9 +110,15 @@ export default function Onboarding() {
         save_history: form.save_history,
         checkin_enabled: form.checkin_enabled,
         accessibility: {
+          // Keys ACTIVAS (visibles en el UI del paso 2):
+          voice_enabled: form.voice_enabled,
+          voice_mode_enabled: form.voice_mode_enabled,
+          tts_enabled: form.tts_enabled,
+          subtitles: form.subtitles,
+          // Keys LATENTES — guardadas para no perder el shape JSONB
+          // cuando reactivemos los controles.
           contrast: form.contrast,
           font_size: form.font_size,
-          subtitles: form.subtitles,
         },
         tts_voice: form.tts_voice || null,
         preferred_chat_mode: form.preferred_chat_mode,
@@ -301,7 +328,10 @@ export default function Onboarding() {
             </div>
           )}
 
-          {/* Step 2: Accesibilidad */}
+          {/* Step 2: Voz y experiencia.
+              4 toggles con jerarquia: voice_enabled es el master; los
+              otros 3 quedan visibles pero disabled si voice_enabled=off
+              porque carecen de sentido sin TTS. */}
           {step === 1 && (
             <div>
               <h2
@@ -314,195 +344,122 @@ export default function Onboarding() {
                   letterSpacing: '-0.015em',
                 }}
               >
-                Accesibilidad
+                Voz y experiencia
               </h2>
               <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 22px', lineHeight: 1.55 }}>
-                Ajusta la interfaz a tus necesidades.
+                Decide si quieres oir a Mabel y como prefieres interactuar.
               </p>
 
-              {/*
-                TODO: pendiente modelo 2D
-                Los 3 controles de accesibilidad (alto contraste, tamaño
-                fuente, subtítulos TTS) hoy guardan flags en BD pero NADIE
-                los aplica al DOM (no hay clase `.a11y-contrast` ni handler
-                de font-size en `<html>`, y los subtítulos dependen del
-                modelo de voz que aún no existe). Se dejan visibles pero
-                disabled para mantener la promesa visual del producto.
-                Detalle del trabajo a hacer cuando llegue el modelo 2D:
-                ver memoria `onboarding-pending-when-voice-avatar-lands.md`.
-              */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Master: voice_enabled */}
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     gap: 16,
-                    opacity: 0.55,
                   }}
                 >
                   <div style={{ flex: 1 }}>
                     <OptionLabel
-                      title="Alto contraste"
-                      hint="Refuerza el contraste entre texto y fondo en toda la interfaz para facilitar la lectura a personas con baja visión. Pendiente: se conectará al DOM cuando se integre el modelo 2D animado."
+                      title="Voz de Mabel"
+                      hint="Permite que Mabel responda con voz sintetizada. Si lo desactivas, todas las respuestas seran solo texto y no podras entrar al modo voz 2D."
                     />
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
-                      Aumenta el contraste de colores para mejor legibilidad.
+                      Activa la voz de Mabel — base para los siguientes ajustes.
                     </p>
                   </div>
                   <Toggle
-                    checked={form.contrast}
-                    onChange={(v) => update('contrast', v)}
-                    label="Alto contraste"
-                    disabled
+                    checked={form.voice_enabled}
+                    onChange={(v) => update('voice_enabled', v)}
+                    label="Voz de Mabel"
                   />
                 </div>
 
                 <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
 
-                <div style={{ opacity: 0.55 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                    <p
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: 'var(--ink-900)',
-                        margin: 0,
-                      }}
-                    >
-                      Tamaño de fuente
-                    </p>
-                    <InfoHint text="Cambia el tamaño base del texto en toda la app (botones, mensajes, formularios). Pendiente: se conectará al DOM cuando se integre el modelo 2D animado." />
-                  </div>
-                  <Segmented
-                    ariaLabel="Tamaño de fuente"
-                    value={form.font_size}
-                    onChange={(v) => update('font_size', v)}
-                    options={[
-                      { value: 'small', label: 'Pequeña', icon: Type, disabled: true },
-                      { value: 'normal', label: 'Normal', icon: Type, disabled: true },
-                      { value: 'large', label: 'Grande', icon: Type, disabled: true },
-                    ]}
-                  />
-                </div>
-
-                <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
-
+                {/* voice_mode_enabled — gated */}
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     gap: 16,
-                    opacity: 0.55,
+                    opacity: form.voice_enabled ? 1 : 0.5,
                   }}
                 >
                   <div style={{ flex: 1 }}>
                     <OptionLabel
-                      title="Subtítulos TTS"
-                      hint="Cuando Mabel hable en voz alta, resalta en su burbuja la palabra que está pronunciando — útil para seguir el ritmo y para personas con dificultad auditiva. Pendiente: depende del modelo de voz 2D animado."
+                      title="Modo voz 2D"
+                      hint="Muestra el boton 'Hablar' en la cabecera del chat para entrar al modo conversacion por voz con avatar 2D animado de Mabel."
                     />
                     <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
-                      Resalta el texto mientras Mabel habla.
+                      Habilita el modo conversacion con avatar animado.
                     </p>
                   </div>
                   <Toggle
-                    checked={form.subtitles}
+                    checked={form.voice_enabled && form.voice_mode_enabled}
+                    onChange={(v) => update('voice_mode_enabled', v)}
+                    label="Modo voz 2D"
+                    disabled={!form.voice_enabled}
+                  />
+                </div>
+
+                <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
+
+                {/* tts_enabled (autoplay en chat texto) — gated */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    opacity: form.voice_enabled ? 1 : 0.5,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <OptionLabel
+                      title="Mabel lee sus respuestas en chat texto"
+                      hint="Cuando Mabel responde en el chat de texto, su mensaje se reproduce automaticamente en voz alta sin que tengas que pedirlo."
+                    />
+                    <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
+                      Autoplay TTS en el chat de texto (opcional).
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={form.voice_enabled && form.tts_enabled}
+                    onChange={(v) => update('tts_enabled', v)}
+                    label="Autoplay TTS"
+                    disabled={!form.voice_enabled}
+                  />
+                </div>
+
+                <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
+
+                {/* subtitles — gated */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    opacity: form.voice_enabled ? 1 : 0.5,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <OptionLabel
+                      title="Resaltar palabras mientras Mabel habla"
+                      hint="En cualquier mensaje de Mabel que se reproduzca por voz, resalta en su burbuja la palabra que esta pronunciando ahora mismo — util para seguir el ritmo y para baja audicion."
+                    />
+                    <p style={{ fontSize: 12.5, color: 'var(--ink-500)', margin: '4px 0 0', lineHeight: 1.5 }}>
+                      Subtitulos con highlight palabra por palabra.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={form.voice_enabled && form.subtitles}
                     onChange={(v) => update('subtitles', v)}
-                    label="Subtítulos"
-                    disabled
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Voz */}
-          {step === 2 && (
-            <div>
-              <h2
-                style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  margin: '0 0 6px',
-                  color: 'var(--ink-900)',
-                  fontFamily: 'var(--font-sans)',
-                  letterSpacing: '-0.015em',
-                }}
-              >
-                Voz
-              </h2>
-              <p style={{ fontSize: 13.5, color: 'var(--ink-500)', margin: '0 0 22px', lineHeight: 1.55 }}>
-                Configura cómo suena Mabel IA.
-              </p>
-
-              {/*
-                TODO: pendiente modelo 2D
-                "Voz del asistente" hoy muestra IDs inventados (es-female-1,
-                es-female-2, es-male-1). El backend Piper solo conoce el
-                default `es_ES-mls_9972-low` (config.py:28) y hace fallback
-                silencioso, por lo que ninguna selección distinta a
-                "Por defecto" cambia nada. Se deja visible pero disabled
-                hasta integrar el modelo 2D con TTS multi-voz.
-
-                "Modo de interacción Inicial": la opción "Avatar 2D" se
-                deja visible pero disabled (no hay implementación todavía
-                en Chat.tsx). "Chat clásico" sigue activa.
-
-                Memoria: `onboarding-pending-when-voice-avatar-lands.md`.
-              */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ opacity: 0.55 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                    <p
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: 'var(--ink-900)',
-                        margin: 0,
-                      }}
-                    >
-                      Voz del asistente
-                    </p>
-                    <InfoHint text="Elige el timbre con el que Mabel responderá cuando hable en voz alta. Pendiente: las voces se activan al integrar el modelo 2D animado con TTS." />
-                  </div>
-                  <NativeSelect
-                    value={form.tts_voice}
-                    onChange={(v) => update('tts_voice', v)}
-                    ariaLabel="Voz del asistente"
-                    disabled
-                  >
-                    <option value="">Por defecto</option>
-                    <option value="es-female-1">Femenina 1</option>
-                    <option value="es-female-2">Femenina 2</option>
-                    <option value="es-male-1">Masculina 1</option>
-                  </NativeSelect>
-                </div>
-
-                <div style={{ height: 1, background: 'var(--ink-100)' }} aria-hidden />
-
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                    <p
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: 'var(--ink-900)',
-                        margin: 0,
-                      }}
-                    >
-                      Modo de interacción Inicial
-                    </p>
-                    <InfoHint text="Define con qué interfaz arranca cada conversación nueva: chat de texto clásico o un avatar 2D animado que habla y reacciona a tus respuestas. Podrás cambiar entre ambos durante la sesión. Pendiente: el avatar 2D se activa al integrar el modelo." />
-                  </div>
-                  <Segmented
-                    ariaLabel="Modo de interacción inicial"
-                    value={form.preferred_chat_mode}
-                    onChange={(v) => update('preferred_chat_mode', v)}
-                    options={[
-                      { value: 'chat', label: 'Chat clásico', icon: MonitorSmartphone },
-                      { value: 'avatar', label: 'Avatar 2D', icon: Bot, disabled: true },
-                    ]}
+                    label="Subtitulos"
+                    disabled={!form.voice_enabled}
                   />
                 </div>
               </div>

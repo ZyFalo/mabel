@@ -28,6 +28,7 @@ import {
 import apiClient from '../api/client'
 import { useChatStore } from '../stores/chatStore'
 import { useToastStore } from '../stores/toastStore'
+import { usePreferencesStore } from '../stores/preferencesStore'
 import useAudioRecorder from '../hooks/useAudioRecorder'
 import useTts from '../hooks/useTts'
 import MabelAvatar, { type AvatarState } from '../components/voice/MabelAvatar'
@@ -49,6 +50,23 @@ export default function Voice() {
   const { isRecording, startRecording, stopRecording, error: micError } =
     useAudioRecorder()
   const { playTts, stopTts, isMuted, toggleMute } = useTts()
+
+  // Route guard: si el usuario llega a /voice con sus preferencias
+  // diciendo que NO quiere modo voz (master `voice_enabled` off o
+  // sub `voice_mode_enabled` off), lo redirigimos al chat de texto.
+  // Defaults a permitir para no romper sesiones legacy.
+  const preferences = usePreferencesStore((s) => s.preferences)
+  const accForGate = preferences?.accessibility as Record<string, unknown> | null
+  const voiceEnabled = accForGate?.voice_enabled !== false
+  const voiceModeEnabled =
+    voiceEnabled && accForGate?.voice_mode_enabled !== false
+
+  useEffect(() => {
+    if (!preferences) return // todavia cargando, esperar
+    if (!voiceModeEnabled && id) {
+      navigate(`/session/${id}/chat`, { replace: true })
+    }
+  }, [voiceModeEnabled, preferences, id, navigate])
 
   const [state, setState] = useState<AvatarState>('idle')
   const [elapsed, setElapsed] = useState(0)
