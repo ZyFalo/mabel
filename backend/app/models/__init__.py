@@ -10,6 +10,7 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.preference import Preference
 from app.models.safety_event import SafetyEvent
 from app.models.session import Session
+from app.models.session_rating import SessionRating
 from app.models.survey_response import SurveyResponse
 from app.models.system_config import SystemConfig
 from app.models.user import User
@@ -27,6 +28,7 @@ __all__ = [
     "Preference",
     "SafetyEvent",
     "Session",
+    "SessionRating",
     "SurveyResponse",
     "SystemConfig",
     "User",

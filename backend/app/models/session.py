@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,6 +18,21 @@ class Session(Base):
             "user_id",
             unique=True,
             postgresql_where=text("ended_at IS NULL"),
+        ),
+        # Mig 012: indice parcial para la query del sidebar
+        # (`list_by_user` filtra `WHERE hidden_at IS NULL`).
+        Index(
+            "idx_sessions_user_visible",
+            "user_id",
+            text("started_at DESC"),
+            postgresql_where=text("hidden_at IS NULL"),
+        ),
+        # Mig 012: solo valores controlados para hidden_reason. NULL
+        # admitido (sesion no oculta).
+        CheckConstraint(
+            "hidden_reason IS NULL OR hidden_reason IN "
+            "('user_toggle_off', 'user_per_session', 'admin_action')",
+            name="ck_sessions_hidden_reason",
         ),
     )
 
@@ -37,6 +52,13 @@ class Session(Base):
     checkin_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     checkin_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     avatar_used: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Mig 012: soft-hide controlado por el usuario (toggle save_history
+    # off, o quitar individual desde el menu 3-puntos del sidebar).
+    # NULL = visible normal. NOT NULL = oculta del usuario, pero
+    # permanece en BD para metricas / investigacion segun consentimiento.
+    # Detalle completo en docs/DATA_RETENTION_POLICY.md.
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hidden_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user = relationship("User", back_populates="sessions")
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")

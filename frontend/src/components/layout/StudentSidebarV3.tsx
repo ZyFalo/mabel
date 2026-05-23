@@ -6,9 +6,12 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
+  EyeOff,
   MessageCircle,
+  MoreVertical,
   Plus,
   Search,
+  Trash2,
 } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -18,6 +21,8 @@ import { SkeletonText } from '../ui/Skeleton'
 import UmbAvatar from '../ui/UmbAvatar'
 import UserMenu from './UserMenu'
 import SessionSearchModal from '../chat/SessionSearchModal'
+import ConfirmDeleteSessionModal from '../chat/ConfirmDeleteSessionModal'
+import apiClient from '../../api/client'
 import type { TabId as SettingsTabId } from '../../pages/Settings'
 
 interface StudentSidebarV3Props {
@@ -226,64 +231,209 @@ interface SessionRowProps {
   session: SessionItem
   active: boolean
   onClick: () => void
+  onHide: (s: SessionItem) => void
+  onRequestDelete: (s: SessionItem) => void
 }
-function SessionRow({ session, active, onClick }: SessionRowProps) {
+function SessionRow({ session, active, onClick, onHide, onRequestDelete }: SessionRowProps) {
   const title = session.topic_hint || `Sesion ${formatRelative(session.started_at)}`
+  const [hovered, setHovered] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+
+  // Cerrar menú al click fuera o Escape.
+  useEffect(() => {
+    if (!menuOpen) return
+    function onDocClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+
+  // Mostrar el botón 3-puntos cuando hover sobre la fila o cuando el
+  // menú está abierto (para que no desaparezca al mover el mouse hacia
+  // las opciones).
+  const showMenuButton = hovered || menuOpen
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        width: '100%',
-        display: 'block',
-        padding: '8px 10px',
-        textAlign: 'left',
-        background: active ? 'var(--mabel-50)' : 'transparent',
-        color: active ? 'var(--mabel-700)' : 'var(--ink-700)',
-        border: 'none',
-        borderRadius: 8,
-        cursor: 'pointer',
-        fontFamily: 'var(--font-sans)',
-        transition: 'background var(--dur-fast) var(--ease-out)',
-      }}
-      onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.background = 'var(--ink-100)'
-      }}
-      onMouseLeave={(e) => {
-        if (!active) e.currentTarget.style.background = 'transparent'
-      }}
+    <div
+      ref={wrapperRef}
+      style={{ position: 'relative' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      <div
+      <button
+        type="button"
+        onClick={onClick}
         style={{
-          fontSize: 13,
-          fontWeight: 600,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
+          width: '100%',
+          display: 'block',
+          padding: '8px 10px',
+          paddingRight: 36, // espacio reservado para el botón 3-puntos
+          textAlign: 'left',
+          background: active ? 'var(--mabel-50)' : 'transparent',
+          color: active ? 'var(--mabel-700)' : 'var(--ink-700)',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'pointer',
+          fontFamily: 'var(--font-sans)',
+          transition: 'background var(--dur-fast) var(--ease-out)',
+        }}
+        onMouseEnter={(e) => {
+          if (!active) e.currentTarget.style.background = 'var(--ink-100)'
+        }}
+        onMouseLeave={(e) => {
+          if (!active) e.currentTarget.style.background = 'transparent'
         }}
       >
-        {title}
-      </div>
-      <div
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            fontSize: 11,
+            color: active ? 'var(--mabel-700)' : 'var(--ink-400)',
+            marginTop: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          <Clock size={10} />
+          <span style={{ whiteSpace: 'nowrap' }}>
+            {formatRelative(session.started_at)} · {formatDuration(session.started_at, session.ended_at)}
+          </span>
+        </div>
+      </button>
+
+      {/* Botón 3-puntos: visible al hover o cuando el menú está abierto.
+          Click abre el menú sin propagar al botón padre (que navegaría
+          a la sesión). */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          setMenuOpen((v) => !v)
+        }}
+        aria-label="Opciones de esta conversación"
+        aria-expanded={menuOpen}
         style={{
-          fontSize: 11,
-          color: active ? 'var(--mabel-700)' : 'var(--ink-400)',
-          marginTop: 2,
-          display: 'flex',
+          position: 'absolute',
+          top: 6,
+          right: 6,
+          width: 24,
+          height: 24,
+          borderRadius: 6,
+          background: menuOpen ? 'var(--ink-200)' : 'transparent',
+          border: 'none',
+          color: 'var(--ink-500)',
+          cursor: 'pointer',
+          display: showMenuButton ? 'flex' : 'none',
           alignItems: 'center',
-          gap: 4,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
+          justifyContent: 'center',
+          transition: 'background var(--dur-fast) var(--ease-out)',
+        }}
+        onMouseEnter={(e) => {
+          if (!menuOpen) e.currentTarget.style.background = 'var(--ink-200)'
+        }}
+        onMouseLeave={(e) => {
+          if (!menuOpen) e.currentTarget.style.background = 'transparent'
         }}
       >
-        <Clock size={10} />
-        <span style={{ whiteSpace: 'nowrap' }}>
-          {formatRelative(session.started_at)} · {formatDuration(session.started_at, session.ended_at)}
-        </span>
-      </div>
-    </button>
+        <MoreVertical size={14} />
+      </button>
+
+      {/* Menú flotante con las dos opciones aprobadas por el agente
+          ético (2026-05-23): copy literal honesto vs eufemismos. */}
+      {menuOpen && (
+        <div
+          role="menu"
+          className="scale-in"
+          style={{
+            position: 'absolute',
+            top: 32,
+            right: 6,
+            zIndex: 50,
+            minWidth: 220,
+            background: '#fff',
+            border: '1px solid var(--ink-200)',
+            borderRadius: 10,
+            boxShadow: 'var(--shadow-lg, 0 10px 30px -8px rgba(0,0,0,0.15))',
+            padding: '4px 0',
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenuOpen(false)
+              onHide(session)
+            }}
+            style={menuItemStyle()}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-50)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <EyeOff size={14} />
+            Quitar de mi barra lateral
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenuOpen(false)
+              onRequestDelete(session)
+            }}
+            style={menuItemStyle(true)}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--danger-50, #FEF2F2)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <Trash2 size={14} />
+            Eliminar definitivamente
+          </button>
+        </div>
+      )}
+    </div>
   )
+}
+
+function menuItemStyle(danger = false): React.CSSProperties {
+  return {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '9px 14px',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 13,
+    color: danger ? 'var(--danger-700, #B91C1C)' : 'var(--ink-700)',
+    fontWeight: 500,
+    textAlign: 'left',
+    transition: 'background var(--dur-fast) var(--ease-out)',
+    fontFamily: 'var(--font-sans)',
+  }
 }
 
 // ----- Main component ----------------------------------------------------
@@ -302,10 +452,65 @@ export default function StudentSidebarV3({
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const profileButtonRef = useRef<HTMLButtonElement | null>(null)
-  const { sessions, loadSessions, createSession, isLoadingSessions, saveHistoryEnabled } =
+  const { sessions, loadSessions, isLoadingSessions, saveHistoryEnabled } =
     useChatStore()
   const preferences = usePreferencesStore((s) => s.preferences)
   const addToast = useToastStore((s) => s.addToast)
+
+  // Estado del flujo "eliminar sesión" — el modal de confirmación se
+  // dispara desde el menú 3-puntos. Mantenemos `pendingDelete` para
+  // saber qué sesión confirmar y `submittingDelete` para deshabilitar
+  // el botón mientras el DELETE está en vuelo.
+  const [pendingDelete, setPendingDelete] = useState<SessionItem | null>(null)
+  const [submittingDelete, setSubmittingDelete] = useState(false)
+
+  async function handleHideSession(s: SessionItem) {
+    // Soft hide: la sesión deja de aparecer en el sidebar pero queda
+    // en BD. Re-fetch para reflejar la lista nueva (con índice parcial
+    // del backend, no debería traerla más).
+    try {
+      await apiClient.patch(`/sessions/${s.id}/hide`)
+      addToast({
+        type: 'success',
+        message: 'Conversación quitada de tu barra lateral',
+      })
+      // Si estabas viendo esta sesión, navegar al Home (ya no la verás
+      // en el listado, mejor sacar al usuario del estado huérfano).
+      if (params.id === s.id) navigate('/home')
+      await loadSessions()
+    } catch {
+      addToast({
+        type: 'error',
+        message: 'No pudimos ocultar la conversación. Intenta de nuevo.',
+      })
+    }
+  }
+
+  function handleRequestDelete(s: SessionItem) {
+    setPendingDelete(s)
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return
+    setSubmittingDelete(true)
+    try {
+      await apiClient.delete(`/sessions/${pendingDelete.id}`)
+      addToast({
+        type: 'success',
+        message: 'Conversación eliminada definitivamente',
+      })
+      if (params.id === pendingDelete.id) navigate('/home')
+      await loadSessions()
+      setPendingDelete(null)
+    } catch {
+      addToast({
+        type: 'error',
+        message: 'No pudimos eliminar la conversación. Intenta de nuevo.',
+      })
+    } finally {
+      setSubmittingDelete(false)
+    }
+  }
 
   useEffect(() => {
     loadSessions()
@@ -316,27 +521,19 @@ export default function StudentSidebarV3({
       ? preferences.save_history
       : saveHistoryEnabled
 
-  async function handleNewSession() {
+  function handleNewSession() {
+    // Lazy session creation (2026-05-23): el sidebar "Nueva sesión"
+    // ya NO crea sesión en BD. Navega al Home para que el estudiante
+    // decida cómo arrancar (mensaje directo o check-in primero). La
+    // sesión nace solo cuando hay acción real: submit del check-in o
+    // primer mensaje. Esto evita el patrón previo donde cada click
+    // en "Nueva sesión" creaba una sesión que muchas veces quedaba
+    // sin uso, ensuciando el sidebar y las métricas.
     if (onNewChat) {
       onNewChat()
       return
     }
-    try {
-      const result = await createSession()
-      if (result.previous_session_closed) {
-        addToast({
-          type: 'info',
-          message: 'Sesion anterior finalizada automaticamente',
-        })
-      }
-      if (result.checkin_opt_in) {
-        navigate(`/session/${result.id}/checkin`)
-      } else {
-        navigate(`/session/${result.id}/chat`)
-      }
-    } catch {
-      addToast({ type: 'error', message: 'Error al crear sesion' })
-    }
+    navigate('/home')
   }
 
   function handleSessionClick(s: SessionItem) {
@@ -587,6 +784,8 @@ export default function StudentSidebarV3({
                     session={s}
                     active={params.id === s.id}
                     onClick={() => handleSessionClick(s)}
+                    onHide={handleHideSession}
+                    onRequestDelete={handleRequestDelete}
                   />
                 ))}
               </div>
@@ -713,6 +912,19 @@ export default function StudentSidebarV3({
         </button>
       )}
     </aside>
+    {/* Modal de confirmación hard-delete. Vive a nivel del Fragment
+        para que no se vea afectado por el overflow/transform del
+        aside (sin esto, el modal puede recortarse). */}
+    <ConfirmDeleteSessionModal
+      open={pendingDelete !== null}
+      sessionTitle={
+        pendingDelete?.topic_hint ||
+        (pendingDelete ? `Sesión ${formatRelative(pendingDelete.started_at)}` : '')
+      }
+      onCancel={() => setPendingDelete(null)}
+      onConfirm={handleConfirmDelete}
+      submitting={submittingDelete}
+    />
     </>
   )
 }

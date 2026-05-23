@@ -19,6 +19,10 @@ interface DashboardKpis {
   reports_pending: number
   latency_avg_ms: number | null
   sus_avg: number | null
+  // KPI nuevo 2026-05-23 (mig 011): rating de corazones promedio en
+  // los últimos 30d. null cuando nadie ha calificado todavía.
+  rating_avg_30d?: number | null
+  rating_count_30d?: number
 }
 
 interface SeriesPoint {
@@ -31,8 +35,21 @@ interface MoodDistributionPoint {
   count: number
 }
 
-// Backend may return either an array or {bajo, medio, alto} object
-type MoodDistribution = MoodDistributionPoint[] | { bajo: number; medio: number; alto: number }
+// Backend may return either an array or el objeto de 5 buckets de
+// caritas (2026-05-23). Mantenemos compat con el shape antiguo
+// {bajo, medio, alto} para responder a backends viejos durante
+// hot-reload, pero el shape primario actual es {muy_mal, mal,
+// neutral, bien, excelente}.
+type MoodDistribution =
+  | MoodDistributionPoint[]
+  | { bajo?: number; medio?: number; alto?: number }
+  | {
+      muy_mal?: number
+      mal?: number
+      neutral?: number
+      bien?: number
+      excelente?: number
+    }
 
 interface SafetyTypePoint {
   event_type?: string
@@ -127,6 +144,10 @@ interface DashboardResponse {
   reports_pending?: number
   latency_avg_ms?: number | null
   sus_avg?: number | null
+  // KPI nuevo 2026-05-23 (mig 011) — rating de corazones promedio
+  // de los ultimos 30d. null si nadie ha calificado.
+  rating_avg_30d?: number | null
+  rating_count_30d?: number
   // Series
   sessions_per_day_30d?: SeriesPoint[]
   sessions_per_day?: SeriesPoint[]
@@ -176,6 +197,8 @@ function pickKpis(d: DashboardResponse): DashboardKpis {
     reports_pending: d.reports_pending ?? 0,
     latency_avg_ms: d.latency_avg_ms ?? null,
     sus_avg: d.sus_avg ?? null,
+    rating_avg_30d: d.rating_avg_30d ?? null,
+    rating_count_30d: d.rating_count_30d ?? 0,
   }
 }
 
@@ -279,28 +302,61 @@ export default function Dashboard() {
     [data],
   )
 
+  // Distribucion del animo agrupada por las 5 caritas del formulario
+  // actual (2026-05-23). Si el backend devuelve el shape antiguo
+  // (bajo/medio/alto) lo expandimos lo mejor posible al de 5 buckets
+  // — durante hot-reload puede coexistir y no queremos romper el
+  // render.
   const moodData = useMemo(() => {
     const raw = data?.mood_distribution_30d
-    const labels: Record<string, string> = {
-      '0-3': 'Bajo (0-3)',
-      '4-6': 'Medio (4-6)',
-      '7-10': 'Alto (7-10)',
-      bajo: 'Bajo (0-3)',
-      medio: 'Medio (4-6)',
-      alto: 'Alto (7-10)',
-    }
     if (!raw) return []
-    // Backend may return either an array [{bucket, count}] or an object {bajo, medio, alto}
+
+    // Definicion ordenada de las 5 caritas para que el bar chart las
+    // rendera en orden semantico (peor → mejor) y no alfabetico.
+    const buckets: Array<{ key: string; label: string }> = [
+      { key: 'muy_mal', label: 'Muy mal' },
+      { key: 'mal', label: 'Mal' },
+      { key: 'neutral', label: 'Neutral' },
+      { key: 'bien', label: 'Bien' },
+      { key: 'excelente', label: 'Excelente' },
+    ]
+
     if (Array.isArray(raw)) {
+      // Si viene como array [{bucket, count}], asumimos que las keys
+      // ya son las nuevas o legacy y mapeamos al label correspondiente.
+      const lookup: Record<string, string> = {
+        muy_mal: 'Muy mal',
+        mal: 'Mal',
+        neutral: 'Neutral',
+        bien: 'Bien',
+        excelente: 'Excelente',
+        bajo: 'Mal',
+        medio: 'Neutral',
+        alto: 'Bien',
+        '0-3': 'Mal',
+        '4-6': 'Neutral',
+        '7-10': 'Bien',
+      }
       return raw.map((b) => ({
-        bucket: labels[b.bucket] ?? b.bucket,
+        bucket: lookup[b.bucket] ?? b.bucket,
         count: b.count,
       }))
     }
+
+    // Shape objeto. Soporta tanto el nuevo (muy_mal/mal/...) como el
+    // legacy (bajo/medio/alto) durante la transicion.
+    const obj = raw as Record<string, number | undefined>
+    if ('muy_mal' in obj || 'excelente' in obj) {
+      return buckets.map((b) => ({
+        bucket: b.label,
+        count: obj[b.key] ?? 0,
+      }))
+    }
+    // Fallback legacy: mapeamos al subset que aplica.
     return [
-      { bucket: labels.bajo, count: raw.bajo ?? 0 },
-      { bucket: labels.medio, count: raw.medio ?? 0 },
-      { bucket: labels.alto, count: raw.alto ?? 0 },
+      { bucket: 'Mal', count: obj.bajo ?? 0 },
+      { bucket: 'Neutral', count: obj.medio ?? 0 },
+      { bucket: 'Bien', count: obj.alto ?? 0 },
     ]
   }, [data])
 
@@ -541,6 +597,20 @@ export default function Dashboard() {
           info="System Usability Scale agregada de todas las respuestas SUS. 70 es 'aceptable' en la literatura; 80+ es 'bueno'. Vacío hasta que se ingesten respuestas del piloto."
         />
         <MetricCard
+          label="Calificación promedio"
+          value={
+            kpis?.rating_avg_30d == null
+              ? '—'
+              : `${kpis.rating_avg_30d.toFixed(2)} / 5`
+          }
+          hint={
+            kpis?.rating_count_30d && kpis.rating_count_30d > 0
+              ? `${kpis.rating_count_30d} corazones en 30 d`
+              : 'Sin calificaciones todavía'
+          }
+          info="Promedio de las calificaciones de corazones (1-5, más es mejor) que los estudiantes asignaron a sus conversaciones en los últimos 30 días. Es el indicador de satisfacción más directo desde el lado del usuario."
+        />
+        <MetricCard
           label="Nuevos esta semana"
           value={loading && !kpis ? '—' : (kpis?.users_new_this_week ?? 0).toLocaleString('es-CO')}
           hint="Altas en los últimos 7 días"
@@ -568,8 +638,8 @@ export default function Dashboard() {
 
         <ChartCard
           title="Distribución de ánimo"
-          subtitle="Check-ins de los últimos 30 días"
-          info="Cuántos estudiantes reportaron cada rango de ánimo (escala 0-10) en sus check-ins recientes. Permite ver si predomina malestar o bienestar agregado."
+          subtitle="Check-ins de los últimos 30 días · 5 caritas"
+          info="Cuántos estudiantes reportaron cada uno de los 5 niveles de ánimo (Muy mal · Mal · Neutral · Bien · Excelente) en sus check-ins recientes. Permite ver si predomina malestar o bienestar agregado. Los datos legacy del slider 0-10 se agrupan en el bucket de carita más cercano."
         >
           <BarChartWrapper
             data={moodData}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { Copy, Flag, MoreVertical, Lock } from 'lucide-react'
 import CheckinContextPopover from '../components/chat/CheckinContextPopover'
+import HeartRating from '../components/chat/HeartRating'
 import UmbAvatar from '../components/ui/UmbAvatar'
 import SosButton from '../components/ui/SosButton'
 import type { StudentOutletContext } from '../types/studentOutlet'
@@ -83,6 +84,18 @@ export default function Chat() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const moreMenuRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  // Estado del "primera respuesta de Mabel" — cubre el gap entre el
+  // submit del check-in (o el envio del primer mensaje desde Home)
+  // y el primer chunk del LLM. Mientras esto sea true:
+  //   - El landing "Estoy aquí, escuchándote" no se renderea; en su
+  //     lugar se muestra una burbuja con typing indicator (puntos)
+  //     que comunica "Mabel está pensando".
+  //   - El composer queda deshabilitado para evitar que el estudiante
+  //     mande un mensaje encima del greeting que aun se procesa.
+  // Sin este flag, el usuario veia el landing vacio durante 1-3s
+  // post-checkin sin ninguna indicacion de actividad — feedback bug
+  // reportado el 2026-05-23.
+  const [awaitingFirstResponse, setAwaitingFirstResponse] = useState(false)
 
   const preferences = usePreferencesStore((s) => s.preferences)
   const acc = preferences?.accessibility as Record<string, unknown> | null
@@ -177,8 +190,26 @@ export default function Chat() {
       const currentMsgs = useChatStore.getState().messages
       if (currentMsgs.length > 0) return // resumed session — nothing to do
 
+      // Guard: sesiones LEGACY (pre-2026-05-23) o huérfanas creadas
+      // con `checkin_opt_in=true` pero sin completar el check-in. Si
+      // el estudiante entra/re-entra al chat sin mensajes previos y
+      // sin pendingMessage del composer, redirigimos al checkin de
+      // la propia sesión para que pueda completarlo o saltarlo. Esto
+      // resuelve el bug donde una sesión quedaba colgada en estado
+      // "chat vacío con greeting placeholder" tras navegar fuera y
+      // volver sin haber tocado el formulario.
+      if (
+        !pendingMessage &&
+        session.checkin_opt_in &&
+        !session.checkin_completed_at
+      ) {
+        navigate(`/session/${id}/checkin`, { replace: true })
+        return
+      }
+
       // (a) Pending message wins — Mabel's reply will be the opener.
       if (pendingMessage) {
+        setAwaitingFirstResponse(true)
         try {
           await sendMessage(id, pendingMessage)
           // Auto-play TTS+subtitles for the first reply, same as the
@@ -187,13 +218,31 @@ export default function Chat() {
           // enabled.
           await playLastAssistantTtsIfEnabled()
         } catch (err) {
+          // code-review #7 (2026-05-23): NO silenciar el error del
+          // primer mensaje — es el momento de mayor expectativa
+          // emocional. Si console.error solo, el usuario queda
+          // mirando el landing vacio para siempre sin pista de que
+          // pasó. Toast + composer re-habilitado para que pueda
+          // re-intentar manualmente.
           console.error('[Chat] sendMessage(pending) failed', err)
+          addToast({
+            type: 'error',
+            message:
+              'No pudimos enviar tu mensaje. Intenta escribirlo de nuevo abajo.',
+          })
+        } finally {
+          setAwaitingFirstResponse(false)
         }
         return
       }
 
-      // (b) Check-in completed → personalised greeting that summarizes the form.
+      // (b) Check-in completed → personalised greeting that summarizes
+      // the form. Mientras el POST /greeting está en vuelo, marcamos
+      // `awaitingFirstResponse=true` para que el render muestre
+      // typing indicator + composer deshabilitado en lugar del
+      // landing vacío "Estoy aquí, escuchándote".
       if (session.checkin_completed_at) {
+        setAwaitingFirstResponse(true)
         try {
           const res = await apiClient.post(`/sessions/${id}/greeting`)
           if (res.data.greeting) {
@@ -201,7 +250,17 @@ export default function Chat() {
             await playLastAssistantTtsIfEnabled()
           }
         } catch (err) {
+          // code-review #7: mismo razonamiento que rama (a). Toast +
+          // composer habilitado para que el estudiante pueda iniciar
+          // la conversacion manualmente si Mabel falló al saludar.
           console.error('[Chat] greeting failed', err)
+          addToast({
+            type: 'error',
+            message:
+              'Mabel no pudo iniciar el saludo. Escríbele un mensaje para comenzar.',
+          })
+        } finally {
+          setAwaitingFirstResponse(false)
         }
         return
       }
@@ -341,6 +400,13 @@ export default function Chat() {
         height: '100%',
       }}
     >
+      {/* Heart rating ribbon — solo visible cuando la sesion está
+          finalizada. Aparece encima del header del chat para invitar
+          a calificar la conversacion. Editable indefinidamente: el
+          estudiante puede ajustar su calificacion al releer la
+          sesion en cualquier momento. */}
+      {sessionEnded && id && <HeartRating sessionId={id} />}
+
       {/* Session header bar */}
       <div
         className="mobile-fab-safe-left"
@@ -511,6 +577,62 @@ export default function Chat() {
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
           {isLoadingMessages ? (
             <SkeletonChat />
+          ) : !hasMessages && awaitingFirstResponse ? (
+            // Typing indicator durante el "primera respuesta" — cubre
+            // el gap entre submit del check-in (o envio del primer
+            // mensaje del Home) y la primera burbuja de Mabel.
+            // Reusa la estetica de la burbuja vacia + dots animados
+            // del flow streaming normal (ver `isStreaming && !streamingText`
+            // mas abajo) para no introducir un patron visual nuevo.
+            <div
+              className="fade-in"
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 12,
+                marginTop: 24,
+              }}
+            >
+              <UmbAvatar size={32} style={{ marginTop: 2 }} />
+              <div
+                style={{
+                  background: 'var(--ink-50)',
+                  border: '1px solid var(--ink-100)',
+                  borderRadius: 14,
+                  padding: '14px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  minHeight: 44,
+                }}
+                aria-live="polite"
+                aria-label="Mabel está pensando"
+              >
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 999,
+                      background: 'var(--mabel-600)',
+                      opacity: 0.7,
+                      animation: `streamingPulse 1.2s ease-in-out ${i * 0.18}s infinite`,
+                    }}
+                  />
+                ))}
+                <span
+                  style={{
+                    marginLeft: 8,
+                    fontSize: 12,
+                    color: 'var(--ink-500)',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  Mabel está pensando…
+                </span>
+              </div>
+            </div>
           ) : !hasMessages ? (
             <div
               className="fade-in"
@@ -920,7 +1042,14 @@ export default function Chat() {
             value={input}
             onChange={setInput}
             onSend={handleSend}
-            disabled={isStreaming || isRecording || sessionEnded}
+            // Bloqueamos el input tambien durante `awaitingFirstResponse`
+            // (greeting post check-in o primera respuesta al
+            // pendingMessage) para que el estudiante no encole un
+            // mensaje encima del saludo de Mabel — feedback UX
+            // 2026-05-23.
+            disabled={
+              isStreaming || isRecording || sessionEnded || awaitingFirstResponse
+            }
             isRecording={isRecording}
             onMicToggle={handleMicToggle}
             isProcessingAudio={isProcessingAudio}
@@ -929,7 +1058,11 @@ export default function Chat() {
             onMuteToggle={toggleMute}
             maxLength={2000}
             showHint
-            placeholder="Cuéntame qué necesitas hoy…"
+            placeholder={
+              awaitingFirstResponse
+                ? 'Mabel está escribiendo el primer mensaje…'
+                : 'Cuéntame qué necesitas hoy…'
+            }
           />
           <div
             style={{

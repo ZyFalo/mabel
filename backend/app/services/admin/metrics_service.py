@@ -140,6 +140,26 @@ def _safe_mean(values: list[float]) -> float | None:
     return float(np.mean(values))
 
 
+def _mood_0_10_to_1_5(value: float | None) -> float | None:
+    """Mapea un mood persistido (escala 0-10 historica) a la escala
+    1-5 del formulario actual de 5 caritas. Mapeo lineal:
+        0 → 1   (Muy mal)
+        2.5 → 2 (Mal)
+        5 → 3   (Neutral)
+        7.5 → 4 (Bien)
+        10 → 5  (Excelente)
+
+    Los 5 valores discretos del formulario actual (0/2/5/8/10) producen
+    1/1.8/3/4.2/5 — no son enteros limpios, pero al promediar a nivel
+    cohorte la curva es coherente. Para datos legacy del slider
+    continuo, todos los valores caen naturalmente en el rango [1, 5].
+    """
+    if value is None:
+        return None
+    clamped = max(0.0, min(10.0, float(value)))
+    return round(1 + (clamped / 10.0) * 4, 2)
+
+
 def _safe_std(values: list[float]) -> float | None:
     if len(values) < 2:
         return None
@@ -414,6 +434,33 @@ class AdminMetricsService:
         sus_scores = await self._sus_scores(cohort=cohort)
         sus_avg = _safe_mean(sus_scores)
 
+        # KPI: rating de corazones promedio (mig 011, 2026-05-23). Es
+        # el indicador de satisfaccion subjetivo mas directo: el
+        # estudiante mismo califica de 1 a 5 sus sesiones. Se incluye
+        # en el dashboard para que el admin vea la salud UX agregada
+        # sin tener que entrar al tab Bienestar.
+        from app.models.session_rating import SessionRating
+
+        eligible_rating_filter = await self.research_user_id_filter(
+            SessionRating.user_id
+        )
+        rating_avg_stmt = select(
+            func.avg(SessionRating.rating), func.count()
+        ).where(
+            SessionRating.created_at >= thirty_days_ago,
+            SessionRating.created_at <= now,
+            eligible_rating_filter,
+        )
+        if cohort is not None:
+            rating_avg_stmt = rating_avg_stmt.join(
+                User, SessionRating.user_id == User.id
+            ).where(User.cohort == cohort)
+        rating_row = (await self.db.execute(rating_avg_stmt)).one()
+        rating_avg_30d = (
+            float(rating_row[0]) if rating_row[0] is not None else None
+        )
+        rating_count_30d = int(rating_row[1] or 0)
+
         # Series: sessions per day (last 30d)
         sessions_per_day_30d = await self._sessions_per_day(thirty_days_ago, now, cohort=cohort)
 
@@ -477,6 +524,10 @@ class AdminMetricsService:
             "reports_pending": reports_pending,
             "latency_avg_ms": latency_avg_ms,
             "sus_avg": sus_avg,
+            # KPI nuevo 2026-05-23 (mig 011): rating de corazones agregado
+            # de los ultimos 30d. None si nadie ha calificado todavia.
+            "rating_avg_30d": rating_avg_30d,
+            "rating_count_30d": rating_count_30d,
             "sessions_per_day_30d": sessions_per_day_30d,
             "mood_distribution_30d": mood_distribution_30d,
             "latency_per_day_30d": latency_per_day_30d,
@@ -627,7 +678,27 @@ class AdminMetricsService:
 
         mood_expr = cast(SessionModel.checkin_payload["mood"].astext, Float)
         sleep_expr = cast(SessionModel.checkin_payload["sleep"].astext, Float)
-        focus_expr = SessionModel.checkin_payload["focus"].astext
+        # MIGRACION 2026-05-23: el formulario nuevo expone 5 caritas
+        # (Muy mal/Mal/Neutral/Bien/Excelente). Persistimos 0-10 en BD
+        # para compatibilidad con datos legacy del slider antiguo, pero
+        # las metricas admin trabajan en escala 1-5 mapeada linealmente.
+        # Ver _mood_0_10_to_1_5() abajo.
+        # Campos nuevos del check-in 2026-05-23 (energy, stress,
+        # loneliness 1-4 + sleep_quality categórico). Todos opcionales:
+        # las sesiones legacy con solo {mood, sleep, focus, note} se
+        # autoexcluyen porque cast("None".astext, Float) en JSONB no
+        # retorna nada y AVG(NULL,...) los ignora limpiamente.
+        energy_expr = cast(SessionModel.checkin_payload["energy"].astext, Float)
+        stress_expr = cast(SessionModel.checkin_payload["stress"].astext, Float)
+        loneliness_expr = cast(SessionModel.checkin_payload["loneliness"].astext, Float)
+        sleep_quality_expr = SessionModel.checkin_payload["sleep_quality"].astext
+        # `focus_raw` ahora trae el JSON crudo (string o array). El
+        # flatten se hace en Python después del fetch porque PostgreSQL
+        # jsonb_array_elements_text es set-returning y no compone con
+        # CASE WHEN dentro de un SELECT escalar. Volumen esperado del
+        # estudio: ~30 estudiantes × 50 sesiones = ~1.5k rows máximo —
+        # el flatten in-Python es trivial a esta escala.
+        focus_raw_expr = SessionModel.checkin_payload["focus"]
 
         # Mood per day (mean) — Bogotá-day buckets
         day_col = _bogota_day_trunc(SessionModel.checkin_completed_at).label("day")
@@ -639,11 +710,18 @@ class AdminMetricsService:
         )
         mood_stmt = _apply_cohort(mood_stmt)
         mood_result = await self.db.execute(mood_stmt)
+        # Convertimos cada promedio 0-10 → 1-5 al envolver. Los datos
+        # legacy y nuevos coexisten en BD; el cliente solo recibe la
+        # escala unificada de caritas.
         mood_per_day = [
-            {"date": _date_str(d), "mean": float(m) if m is not None else None} for d, m in mood_result.all()
+            {
+                "date": _date_str(d),
+                "mean": _mood_0_10_to_1_5(float(m)) if m is not None else None,
+            }
+            for d, m in mood_result.all()
         ]
 
-        # Sleep per day (mean)
+        # Sleep per day (mean horas)
         sleep_stmt = (
             select(day_col, func.avg(sleep_expr).label("mean"))
             .where(*completed_filter)
@@ -656,30 +734,93 @@ class AdminMetricsService:
             {"date": _date_str(d), "mean": float(m) if m is not None else None} for d, m in sleep_result.all()
         ]
 
-        # Focus distribution per week (Bogotá ISO weeks)
+        # Energy / Stress / Loneliness per day (mean 1-4) — mismo
+        # patrón que mood. Si una serie está vacía (campo no completado
+        # por nadie), retorna [] sin romper el dashboard.
+        energy_per_day = await self._avg_per_day(
+            energy_expr, day_col, completed_filter, _apply_cohort
+        )
+        stress_per_day = await self._avg_per_day(
+            stress_expr, day_col, completed_filter, _apply_cohort
+        )
+        loneliness_per_day = await self._avg_per_day(
+            loneliness_expr, day_col, completed_filter, _apply_cohort
+        )
+
+        # Sleep quality distribution (categórico: mal/regular/bien/muy_bien)
+        sleep_quality_stmt = (
+            select(sleep_quality_expr.label("quality"), func.count().label("count"))
+            .where(*completed_filter, sleep_quality_expr.is_not(None))
+            .group_by(sleep_quality_expr)
+            .order_by(sleep_quality_expr)
+        )
+        sleep_quality_stmt = _apply_cohort(sleep_quality_stmt)
+        sleep_quality_result = await self.db.execute(sleep_quality_stmt)
+        sleep_quality_distribution = [
+            {"quality": q, "count": int(c)} for q, c in sleep_quality_result.all() if q
+        ]
+
+        # Focus distribution per week (Bogotá ISO weeks) — FLATTEN.
+        # Acepta sesiones con `focus` como string (legacy pre-2026-05-23
+        # cuando era single-select) Y como array (formato actual con
+        # multi-select). Cada categoría seleccionada cuenta una vez,
+        # de modo que una sesión con focus=["Academico","Social"]
+        # incrementa AMBAS categorías por separado en el chart — lo
+        # cual es lo que queremos para entender qué áreas pesan más en
+        # la cohorte, sin que combinaciones aparezcan como "categoría"
+        # nueva (`'["A","B"]'` literal, bug pre-fix).
         week_col = _bogota_week_trunc(SessionModel.checkin_completed_at).label("week")
         focus_stmt = (
-            select(week_col, focus_expr.label("focus"), func.count().label("count"))
+            select(week_col, focus_raw_expr.label("focus_raw"))
             .where(*completed_filter)
-            .group_by(week_col, focus_expr)
-            .order_by(week_col)
         )
         focus_stmt = _apply_cohort(focus_stmt)
         focus_result = await self.db.execute(focus_stmt)
-        focus_distribution_per_week = [
-            {
-                "week": _date_str(w),
-                "focus_category": (f if f is not None else "unknown"),
-                "count": int(c),
-            }
-            for w, f, c in focus_result.all()
-        ]
 
-        # Mood summary (numpy)
+        focus_counter: dict[tuple[Any, str], int] = {}
+        for week, focus_value in focus_result.all():
+            # Normalizar el JSON crudo a lista de items. NULL en BD
+            # llega como None aquí (JSONB scalar null se traduce a
+            # Python None vía SQLAlchemy + asyncpg).
+            if focus_value is None:
+                items = ["unknown"]
+            elif isinstance(focus_value, list):
+                items = [str(x) for x in focus_value if x] or ["unknown"]
+            elif isinstance(focus_value, str) and focus_value:
+                # Empty string from legacy bug / direct API hit cae a
+                # "unknown" para no inflar el chart con una columna
+                # sin label (code-review #5, 2026-05-23).
+                items = [focus_value]
+            else:
+                items = ["unknown"]
+            for item in items:
+                key = (week, item)
+                focus_counter[key] = focus_counter.get(key, 0) + 1
+
+        focus_distribution_per_week = sorted(
+            [
+                {"week": _date_str(w), "focus_category": f, "count": c}
+                for (w, f), c in focus_counter.items()
+            ],
+            key=lambda r: (r["week"], r["focus_category"]),
+        )
+
+        # Mood summary (numpy) — convertimos cada observacion a la
+        # escala 1-5 ANTES de las estadisticas para que media,
+        # mediana, std e IC tengan unidades coherentes con lo que ve
+        # el admin (caritas). Si lo hicieramos despues, el cliente
+        # tendria que re-interpretar y abriria ambiguedad (una media
+        # de "5.5" entre escalas diferentes confunde mas que aclara).
         mood_values_stmt = select(mood_expr).where(*completed_filter)
         mood_values_stmt = _apply_cohort(mood_values_stmt)
         mood_values_result = await self.db.execute(mood_values_stmt)
-        mood_values = [float(v) for v in mood_values_result.scalars().all() if v is not None]
+        mood_values = [
+            _mood_0_10_to_1_5(float(v))
+            for v in mood_values_result.scalars().all()
+            if v is not None
+        ]
+        # Filtramos None del helper (no deberia ocurrir, defensivo).
+        mood_values = [v for v in mood_values if v is not None]
         if mood_values:
             ci_low, ci_high = _ci95(mood_values)
             mood_summary = {
@@ -707,7 +848,109 @@ class AdminMetricsService:
             "focus_distribution_per_week": focus_distribution_per_week,
             "sleep_per_day": sleep_per_day,
             "mood_summary": mood_summary,
+            # --- Campos nuevos del check-in extendido (2026-05-23) ---
+            # Cuatro series añadidas para reflejar las dimensiones
+            # nuevas del formulario (energy/stress/loneliness/sleep_quality).
+            # El frontend admin puede renderearlas en una sub-tab
+            # "Bienestar extendido" o tabs adicionales sin tocar los
+            # campos existentes. Cuando no hay datos (campo no
+            # completado por nadie), retornan [] — el dashboard debe
+            # mostrar empty-state, no error.
+            "energy_per_day": energy_per_day,
+            "stress_per_day": stress_per_day,
+            "loneliness_per_day": loneliness_per_day,
+            "sleep_quality_distribution": sleep_quality_distribution,
+            # Rating de corazones post-sesion (mig 011) — agregación
+            # cohorte-wide. Devuelve None si nadie ha calificado en el
+            # rango; el frontend debe mostrar empty-state apropiado.
+            "session_rating_summary": await self._session_rating_summary(
+                from_dt, to_dt, cohort
+            ),
         }
+
+    async def _session_rating_summary(
+        self,
+        from_dt,
+        to_dt,
+        cohort: str | None,
+    ) -> dict:
+        """Promedio + distribución de calificaciones de sesión (corazones 1-5)
+        en el rango. Filtrado a usuarios research-eligibles igual que el
+        resto de wellbeing — sesiones fuera del estudio no cuentan.
+
+        Devuelve `{ "mean": float|None, "count": int, "distribution":
+        [{"rating": 1-5, "count": N}, ...] }`. Si no hay ratings en
+        el rango, mean=None y count=0 (distribution=[]).
+        """
+        from app.models.session_rating import SessionRating
+
+        eligible_user_filter = await self.research_user_id_filter(
+            SessionRating.user_id
+        )
+        base_filters = (
+            SessionRating.created_at >= from_dt,
+            SessionRating.created_at <= to_dt,
+            eligible_user_filter,
+        )
+
+        def _apply_cohort_rating(stmt):
+            if cohort is None:
+                return stmt
+            return stmt.join(User, SessionRating.user_id == User.id).where(
+                User.cohort == cohort
+            )
+
+        # Promedio + count global
+        agg_stmt = select(
+            func.avg(SessionRating.rating).label("mean"),
+            func.count().label("count"),
+        ).where(*base_filters)
+        agg_stmt = _apply_cohort_rating(agg_stmt)
+        agg_row = (await self.db.execute(agg_stmt)).one()
+
+        # Distribución por valor 1-5
+        dist_stmt = (
+            select(SessionRating.rating, func.count().label("count"))
+            .where(*base_filters)
+            .group_by(SessionRating.rating)
+            .order_by(SessionRating.rating)
+        )
+        dist_stmt = _apply_cohort_rating(dist_stmt)
+        dist_result = await self.db.execute(dist_stmt)
+        distribution = [{"rating": int(r), "count": int(c)} for r, c in dist_result.all()]
+
+        return {
+            "mean": float(agg_row.mean) if agg_row.mean is not None else None,
+            "count": int(agg_row.count or 0),
+            "distribution": distribution,
+        }
+
+    async def _avg_per_day(
+        self,
+        value_expr,
+        day_col,
+        completed_filter,
+        apply_cohort,
+    ) -> list[dict]:
+        """Helper reutilizable: promedio diario de una columna escalar
+        del check-in payload (energy/stress/loneliness/mood-like). Aplica
+        el mismo filter base + cohort de `metrics_wellbeing` y filtra
+        a NOT NULL para no incluir sesiones donde el campo no se
+        completó (todos los campos del check-in son opcionales desde
+        2026-05-23).
+        """
+        stmt = (
+            select(day_col, func.avg(value_expr).label("mean"))
+            .where(*completed_filter, value_expr.is_not(None))
+            .group_by(day_col)
+            .order_by(day_col)
+        )
+        stmt = apply_cohort(stmt)
+        result = await self.db.execute(stmt)
+        return [
+            {"date": _date_str(d), "mean": float(m) if m is not None else None}
+            for d, m in result.all()
+        ]
 
     # -----------------------------------------------------------------------
     # Tab C — Tecnicas
@@ -1227,6 +1470,29 @@ class AdminMetricsService:
         return [{"date": _date_str(d), "count": int(c)} for d, c in result.all()]
 
     async def _mood_distribution(self, from_dt: datetime, to_dt: datetime, cohort: str | None = None) -> dict[str, int]:
+        """Distribucion del ánimo agrupada por las 5 caritas del check-in
+        nuevo (2026-05-23). El bucket asignado mapea el valor 0-10
+        persistido (los 5 valores discretos del formulario y cualquier
+        valor legacy del slider continuo) a uno de 5 segmentos.
+
+        Buckets (mismos limites en la implementacion):
+          - muy_mal: mood < 1            (Frown, valor 0)
+          - mal: 1 <= mood < 3           (Annoyed, valor 2)
+          - neutral: 3 <= mood < 7       (Meh, valor 5)
+          - bien: 7 <= mood < 10         (Smile, valor 8)
+          - excelente: mood >= 10        (Laugh, valor 10)
+
+        Nota (code-review #6, 2026-05-23): para datos legacy del
+        slider continuo, los limites NO son "carita mas cercana"
+        estricta. Por ejemplo, mood=3 esta a distancia 1 de Mal (2)
+        y distancia 2 de Neutral (5) — la carita mas cercana seria
+        Mal, pero aqui cae a Neutral porque 3 >= 3. Esto sesga
+        ligeramente la lectura hacia "neutralidad" en cohortes
+        legacy. Aceptado como trade-off: para el formulario actual
+        (valores discretos 0/2/5/8/10) los limites son exactos; el
+        pequeño sesgo solo afecta datos pre-rework, que decrecen con
+        el tiempo y son minoria en el piloto.
+        """
         # RESEARCH SURFACE — check-in mood values are personal wellbeing
         # data; restrict to users who opted into research-scope use.
         mood_expr = cast(SessionModel.checkin_payload["mood"].astext, Float)
@@ -1241,18 +1507,22 @@ class AdminMetricsService:
         if cohort is not None:
             stmt = stmt.join(User, SessionModel.user_id == User.id).where(User.cohort == cohort)
         result = await self.db.execute(stmt)
-        bajo = medio = alto = 0
+        buckets = {"muy_mal": 0, "mal": 0, "neutral": 0, "bien": 0, "excelente": 0}
         for v in result.scalars().all():
             if v is None:
                 continue
             mv = float(v)
-            if mv <= 3:
-                bajo += 1
-            elif mv <= 6:
-                medio += 1
+            if mv < 1:
+                buckets["muy_mal"] += 1
+            elif mv < 3:
+                buckets["mal"] += 1
+            elif mv < 7:
+                buckets["neutral"] += 1
+            elif mv < 10:
+                buckets["bien"] += 1
             else:
-                alto += 1
-        return {"bajo": bajo, "medio": medio, "alto": alto}
+                buckets["excelente"] += 1
+        return buckets
 
     async def _latency_per_day(self, from_dt: datetime, to_dt: datetime, cohort: str | None = None) -> list[dict]:
         # RESEARCH SURFACE — latency per day is a thesis-tracked metric

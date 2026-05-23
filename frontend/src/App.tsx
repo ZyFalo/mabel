@@ -111,6 +111,12 @@ export default function App() {
                       Legacy URLs redirect to /home so bookmarked /settings
                       deeplinks at least land somewhere usable. */}
                   <Route path="/settings" element={<Navigate to="/home" replace />} />
+                  {/* Lazy session creation (2026-05-23): /checkin/new
+                      renderiza el formulario en modo draft — no hay
+                      `id`, así que CheckIn crea la sesión + check-in
+                      atómicamente al submit. "Saltar todo" vuelve al
+                      Home sin crear nada. */}
+                  <Route path="/checkin/new" element={<CheckIn />} />
                   <Route path="/session/:id/checkin" element={<CheckIn />} />
                   <Route path="/session/:id/chat" element={<Chat />} />
                   <Route path="/session/:id/end" element={<SessionEnd />} />

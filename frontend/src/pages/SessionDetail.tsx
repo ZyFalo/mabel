@@ -1,12 +1,60 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { ArrowLeft, Calendar, Clock, Hourglass, MessageCircle, Smile, Moon, Target, Sparkles } from 'lucide-react'
+import apiClient from '../api/client'
+import ConfirmDeleteSessionModal from '../components/chat/ConfirmDeleteSessionModal'
+import HeartRating from '../components/chat/HeartRating'
+import { useToastStore } from '../stores/toastStore'
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  Hourglass,
+  MessageCircle,
+  Smile,
+  Moon,
+  Target,
+  Sparkles,
+  Battery,
+  Flame,
+  UserCheck,
+} from 'lucide-react'
 import { useChatStore } from '../stores/chatStore'
 import { SkeletonChat } from '../components/ui/Skeleton'
 import Markdown from '../components/ui/Markdown'
 import UmbAvatar from '../components/ui/UmbAvatar'
 import SosButton from '../components/ui/SosButton'
 import type { StudentOutletContext } from '../types/studentOutlet'
+import { FOCUS_LABEL_MAP, normalizeFocus } from '../constants/checkin'
+
+// Etiquetas humanas para las escalas 1-4 + sleep_quality. Duplicadas
+// localmente (no en constants/checkin.ts) porque el render de la
+// página de detalle puede divergir del formulario en el futuro y
+// preferimos no acoplarlo. Los slugs sí provienen del catálogo del
+// student-side para garantizar mapping consistente.
+const ENERGY_LABEL: Record<number, string> = {
+  1: 'Sin batería',
+  2: 'Baja',
+  3: 'Suficiente',
+  4: 'Con todo',
+}
+const STRESS_LABEL: Record<number, string> = {
+  1: 'Nada',
+  2: 'Un poco',
+  3: 'Bastante',
+  4: 'Muchísimo',
+}
+const LONELINESS_LABEL: Record<number, string> = {
+  1: 'Muy sola/o',
+  2: 'Algo sola/o',
+  3: 'Acompañada/o',
+  4: 'Muy acompañada/o',
+}
+const SLEEP_QUALITY_LABEL: Record<string, string> = {
+  mal: 'Mal',
+  regular: 'Regular',
+  bien: 'Bien',
+  muy_bien: 'Muy bien',
+}
 
 function formatDateTime(dateStr: string) {
   return new Date(dateStr).toLocaleString('es-CO', {
@@ -32,15 +80,6 @@ function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 }
 
-const FOCUS_LABELS: Record<string, string> = {
-  Academico: 'Académico',
-  Social: 'Social',
-  Familiar: 'Familiar',
-  Salud: 'Salud',
-  Economico: 'Económico',
-  Otro: 'Otro',
-}
-
 function AssistantAvatar() {
   return <UmbAvatar size={32} style={{ marginTop: 2 }} />
 }
@@ -48,7 +87,22 @@ function AssistantAvatar() {
 interface SessionData {
   started_at: string
   ended_at: string | null
-  checkin_payload?: { mood?: number; sleep?: number; focus?: string; note?: string } | null
+  // El check-in evolucionó (2026-05-23) de 4 a 7 campos opcionales.
+  // Mantenemos tipo amplio para soportar sesiones legacy (solo mood/
+  // sleep/focus/note) y nuevas (con energy/stress/loneliness/
+  // sleep_quality/focus_other). `focus` puede ser string (legacy) o
+  // string[] (multi-select nuevo).
+  checkin_payload?: {
+    mood?: number
+    energy?: number
+    stress?: number
+    sleep_quality?: string
+    sleep?: number
+    loneliness?: number
+    focus?: string | string[]
+    focus_other?: string
+    note?: string
+  } | null
 }
 
 export default function SessionDetail() {
@@ -59,6 +113,31 @@ export default function SessionDetail() {
 
   const [session, setSession] = useState<SessionData | null>(null)
   const [loading, setLoading] = useState(true)
+  // Estado del modal de confirmación hard-delete (paquete control de
+  // datos 2026-05-23). Reusa ConfirmDeleteSessionModal del sidebar
+  // para mantener UX consistente.
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  const addToast = useToastStore((s) => s.addToast)
+
+  async function handleConfirmDelete() {
+    if (!id) return
+    setDeleteSubmitting(true)
+    try {
+      await apiClient.delete(`/sessions/${id}`)
+      addToast({
+        type: 'success',
+        message: 'Conversación eliminada definitivamente',
+      })
+      navigate('/home')
+    } catch {
+      addToast({
+        type: 'error',
+        message: 'No pudimos eliminar la conversación. Intenta de nuevo.',
+      })
+      setDeleteSubmitting(false)
+    }
+  }
 
   useEffect(() => {
     if (!id) return
@@ -235,17 +314,71 @@ export default function SessionDetail() {
               gap: 10,
             }}
           >
-            {checkin?.mood !== undefined && (
+            {/* Ánimo (mood 0-10). Renderear incluso con 0 — antes la
+                comprobación `!== undefined` ya lo cubría correctamente,
+                pero validamos explícito con typeof number para no caer
+                en falsy en futuros refactors. */}
+            {typeof checkin?.mood === 'number' && (
               <CheckinChip icon={<Smile size={14} />} label="Ánimo" value={`${checkin.mood}/10`} />
             )}
-            {checkin?.sleep !== undefined && (
-              <CheckinChip icon={<Moon size={14} />} label="Sueño" value={`${checkin.sleep} h`} />
+            {/* Energía (1-4) — campo nuevo 2026-05-23 */}
+            {typeof checkin?.energy === 'number' && (
+              <CheckinChip
+                icon={<Battery size={14} />}
+                label="Energía"
+                value={ENERGY_LABEL[checkin.energy] ?? `${checkin.energy}/4`}
+              />
             )}
-            {checkin?.focus && (
+            {/* Agobio (1-4) — campo nuevo 2026-05-23 */}
+            {typeof checkin?.stress === 'number' && (
+              <CheckinChip
+                icon={<Flame size={14} />}
+                label="Agobio"
+                value={STRESS_LABEL[checkin.stress] ?? `${checkin.stress}/4`}
+              />
+            )}
+            {/* Sueño: calidad subjetiva (nueva) + horas (legacy o
+                complementario). Si solo hay horas, formato antiguo. */}
+            {(typeof checkin?.sleep === 'number' || typeof checkin?.sleep_quality === 'string') && (
+              <CheckinChip
+                icon={<Moon size={14} />}
+                label="Sueño"
+                value={
+                  checkin?.sleep_quality
+                    ? `${SLEEP_QUALITY_LABEL[checkin.sleep_quality] ?? checkin.sleep_quality}${typeof checkin.sleep === 'number' ? ` · ${checkin.sleep} h` : ''}`
+                    : `${checkin?.sleep} h`
+                }
+              />
+            )}
+            {/* Compañía / soledad (1-4) — campo nuevo 2026-05-23 */}
+            {typeof checkin?.loneliness === 'number' && (
+              <CheckinChip
+                icon={<UserCheck size={14} />}
+                label="Compañía"
+                value={LONELINESS_LABEL[checkin.loneliness] ?? `${checkin.loneliness}/4`}
+              />
+            )}
+            {(() => {
+              const focusList = normalizeFocus(checkin?.focus)
+              if (focusList.length === 0) return null
+              const value = focusList
+                .map((f) => FOCUS_LABEL_MAP[f] ?? f)
+                .join(' · ')
+              return (
+                <CheckinChip
+                  icon={<Target size={14} />}
+                  label={focusList.length > 1 ? 'Enfoques' : 'Enfoque'}
+                  value={value}
+                />
+              )
+            })()}
+            {/* Texto libre "Otro foco" cuando se marcó la categoría
+                Otro + se llenó el mini-input. */}
+            {typeof checkin?.focus_other === 'string' && checkin.focus_other.trim() && (
               <CheckinChip
                 icon={<Target size={14} />}
-                label="Enfoque"
-                value={FOCUS_LABELS[checkin.focus] ?? checkin.focus}
+                label="Otro foco"
+                value={checkin.focus_other.trim()}
               />
             )}
           </div>
@@ -269,6 +402,28 @@ export default function SessionDetail() {
             </div>
           )}
         </section>
+      )}
+
+      {/* Heart rating — solo en sesiones finalizadas (que es siempre
+          el caso aqui, pero validamos defensivamente). Aparece arriba
+          del header "Conversación", mismo patron que en Chat.tsx
+          cuando sessionEnded. Como SessionDetail vive en su propia
+          ruta `/session/:id/detail`, necesitamos montarlo aqui
+          tambien — sino el rating no aparece al volver a sesiones
+          cerradas (bug visible 2026-05-23 reportado por el usuario). */}
+      {id && session.ended_at && (
+        <div style={{ marginBottom: 16, marginInline: -16 }}>
+          <div
+            style={{
+              background: 'var(--mabel-50, #FDF2F2)',
+              border: '1px solid var(--mabel-100, #F8E0DE)',
+              borderRadius: 14,
+              overflow: 'hidden',
+            }}
+          >
+            <HeartRating sessionId={id} />
+          </div>
+        </div>
       )}
 
       {/* Conversation */}
@@ -439,40 +594,45 @@ export default function SessionDetail() {
 
         <button
           type="button"
-          disabled
-          title="Próximamente"
+          onClick={() => setDeleteOpen(true)}
+          title="Eliminar definitivamente esta conversación"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
             padding: '9px 14px',
             background: 'transparent',
-            color: 'var(--ink-400)',
-            border: '1px solid var(--ink-200)',
+            color: 'var(--danger-700, #B91C1C)',
+            border: '1px solid var(--danger-200, #FECACA)',
             borderRadius: 10,
             fontSize: 13,
             fontWeight: 500,
-            cursor: 'not-allowed',
+            cursor: 'pointer',
             fontFamily: 'var(--font-sans)',
+            transition: 'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--danger-50, #FEF2F2)'
+            e.currentTarget.style.borderColor = 'var(--danger-600, #DC2626)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.borderColor = 'var(--danger-200, #FECACA)'
           }}
         >
           Eliminar sesión
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              padding: '1px 6px',
-              borderRadius: 999,
-              background: 'var(--ink-100)',
-              color: 'var(--ink-500)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-            }}
-          >
-            Próximamente
-          </span>
         </button>
       </div>
+
+      <ConfirmDeleteSessionModal
+        open={deleteOpen}
+        sessionTitle={`Sesión del ${formatDateTime(session.started_at)}`}
+        onCancel={() => {
+          if (!deleteSubmitting) setDeleteOpen(false)
+        }}
+        onConfirm={handleConfirmDelete}
+        submitting={deleteSubmitting}
+      />
     </div>
   )
 }

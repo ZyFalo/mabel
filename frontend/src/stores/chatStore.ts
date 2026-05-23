@@ -37,7 +37,10 @@ interface ChatState {
   riskDetected: boolean
 
   loadSessions: () => Promise<void>
-  createSession: (topicHint?: string) => Promise<CreateSessionResponse>
+  createSession: (opts?: {
+    topicHint?: string
+    checkinPayload?: Record<string, unknown>
+  }) => Promise<CreateSessionResponse>
   loadSession: (sessionId: string) => Promise<Session>
   loadMessages: (sessionId: string) => Promise<void>
   sendMessage: (sessionId: string, content: string) => Promise<void>
@@ -67,8 +70,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  createSession: async (topicHint?: string) => {
-    const body = topicHint ? { topic_hint: topicHint } : {}
+  createSession: async (opts?: {
+    topicHint?: string
+    checkinPayload?: Record<string, unknown>
+  }) => {
+    // Lazy session creation (2026-05-23): los callers pasan
+    // `checkinPayload` cuando ya tienen el formulario completado,
+    // de modo que la sesión nace con el check-in marcado en una
+    // sola transacción (backend atómico). Si solo viene el primer
+    // mensaje, se llama sin checkinPayload y la sesión nace
+    // limpia para que el primer POST /messages la pueble.
+    const body: Record<string, unknown> = {}
+    if (opts?.topicHint) body.topic_hint = opts.topicHint
+    if (opts?.checkinPayload && Object.keys(opts.checkinPayload).length > 0) {
+      body.checkin_payload = opts.checkinPayload
+    }
     const res = await apiClient.post('/sessions', body)
     const session: CreateSessionResponse = res.data
     set((state) => ({ sessions: [session, ...state.sessions], currentSession: session }))

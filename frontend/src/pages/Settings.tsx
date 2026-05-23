@@ -24,6 +24,8 @@ import DeleteAccountModal from '../components/settings/DeleteAccountModal'
 import RevokeConsentModal from '../components/settings/RevokeConsentModal'
 import ArcoExportModal from '../components/settings/ArcoExportModal'
 import ChangePasswordModal from '../components/settings/ChangePasswordModal'
+import ConfirmHideHistoryModal from '../components/settings/ConfirmHideHistoryModal'
+import { useChatStore } from '../stores/chatStore'
 
 // Settings overlay primitives (Cap 6.4)
 import SettingsField from '../components/settings/primitives/SettingsField'
@@ -115,7 +117,15 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
   const [ttsEnabled, setTtsEnabled] = useState(true)
   const [chatMode, setChatMode] = useState<'chat' | 'avatar'>('chat')
   const [previewPlaying, setPreviewPlaying] = useState(false)
-  const [consentScope, setConsentScope] = useState<string>('')
+  // CRÍTICO (code-review 2026-05-23 #1): consentScope arranca como
+  // `null` (no como `''`) para que el modal de ConfirmHideHistory
+  // interprete "scope desconocido" como el caso mas restrictivo
+  // (hard delete = lo que backend ACTUALMENTE va a ejecutar para
+  // scope solo_uso o sin consentimiento). Sin esto, una race entre
+  // abrir Settings y la fetch de /users/me/consent-status hace que
+  // un usuario solo_uso vea el copy de soft-hide mientras el backend
+  // hard-deletea — viola Ley 1581 art. 4 lit. d (no engaño).
+  const [consentScope, setConsentScope] = useState<string | null>(null)
 
   // Active tab — start with the prop value; the parent can change it
   // between mounts via `initialTab` and we react to that.
@@ -136,6 +146,12 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
   const [showRevoke, setShowRevoke] = useState(false)
   const [showArco, setShowArco] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  // Modal de confirmacion del toggle "Guardar historial" → OFF
+  // (paquete control de datos 2026-05-23). Solo se abre cuando el
+  // usuario intenta desactivar el toggle, no al activarlo.
+  const [showHideHistory, setShowHideHistory] = useState(false)
+  const [hideHistorySubmitting, setHideHistorySubmitting] = useState(false)
+  const loadSessions = useChatStore((s) => s.loadSessions)
 
   // Hydrate from preferences
   useEffect(() => {
@@ -202,14 +218,103 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
   // -------------------------------------------------------------------------
 
   async function savePrivacy() {
+    // NOTA (2026-05-23): `save_history` ya NO se persiste desde este
+    // SaveBar. El toggle del historial vive en su propio flow
+    // atomico (modal con CONFIRMAR + POST /users/me/history/toggle-
+    // off|on en data_control_router.py) que ramifica por scope de
+    // consentimiento. Aqui solo persistimos `checkin_enabled`, que
+    // sigue siendo un toggle sin efectos secundarios sobre data.
     try {
       await updatePreferences({
-        save_history: saveHistory,
         checkin_enabled: checkinEnabled,
       })
       addToast({ type: 'success', message: 'Cambios guardados' })
     } catch {
       addToast({ type: 'error', message: 'Error al guardar' })
+    }
+  }
+
+  /**
+   * Interceptor del toggle "Guardar historial". Disparo dos paths:
+   *  - OFF (true → false): abre modal CONFIRMAR. El state solo
+   *    cambia DESPUES de que el backend confirma el hide/delete.
+   *  - ON  (false → true): llama directo al endpoint toggle-on
+   *    (audit log + cambio de pref atomico). Sin confirmacion
+   *    porque no es destructivo.
+   */
+  function handleSaveHistoryChange(next: boolean) {
+    if (saveHistory === next) return // no-op
+    if (!next) {
+      // Going OFF — abrir modal de confirmacion.
+      setShowHideHistory(true)
+      return
+    }
+    // Going ON — llamada directa.
+    apiClient
+      .post('/users/me/history/toggle-on')
+      .then(async () => {
+        setSaveHistory(true)
+        // code-review #8 (2026-05-23): re-hidratar el preferencesStore
+        // para que la prop `save_history` global quede coherente con
+        // el cambio. Sin esto, otros componentes que leen del store
+        // ven el valor stale (false) hasta el próximo reload.
+        try {
+          const res = await apiClient.get('/preferences/me')
+          usePreferencesStore.setState({ preferences: res.data })
+        } catch {
+          // No critico — el local state ya es correcto, el store se
+          // re-hidrata en el proximo loadPreferences global.
+        }
+        addToast({
+          type: 'success',
+          message: 'Historial reactivado para conversaciones nuevas',
+        })
+      })
+      .catch(() => {
+        addToast({
+          type: 'error',
+          message: 'No pudimos reactivar el historial. Intenta de nuevo.',
+        })
+      })
+  }
+
+  async function handleConfirmHideHistory() {
+    setHideHistorySubmitting(true)
+    try {
+      const res = await apiClient.post('/users/me/history/toggle-off')
+      const data = res.data as {
+        behavior: 'soft_hide' | 'hard_delete'
+        affected_sessions: number
+        deleted_messages: number
+      }
+      setSaveHistory(false)
+      setShowHideHistory(false)
+      addToast({
+        type: 'success',
+        message:
+          data.behavior === 'hard_delete'
+            ? `Tu historial se eliminó (${data.affected_sessions} conversación${data.affected_sessions === 1 ? '' : 'es'})`
+            : `Tu historial se ocultó (${data.affected_sessions} conversación${data.affected_sessions === 1 ? '' : 'es'})`,
+      })
+      // Refrescar la lista en el sidebar para que las conversaciones
+      // ocultas/eliminadas desaparezcan inmediatamente.
+      await loadSessions()
+      // code-review #8: re-hidratar el preferencesStore para que
+      // save_history quede coherente con el backend en el resto de
+      // componentes que lo consumen.
+      try {
+        const prefRes = await apiClient.get('/preferences/me')
+        usePreferencesStore.setState({ preferences: prefRes.data })
+      } catch {
+        // ignored — local setSaveHistory ya es correcto
+      }
+    } catch {
+      addToast({
+        type: 'error',
+        message: 'No pudimos procesar la acción. Intenta de nuevo.',
+      })
+    } finally {
+      setHideHistorySubmitting(false)
     }
   }
 
@@ -422,7 +527,7 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
               {activeTab === 'privacy' && (
                 <PrivacidadSection
                   saveHistory={saveHistory}
-                  setSaveHistory={setSaveHistory}
+                  setSaveHistory={handleSaveHistoryChange}
                   checkinEnabled={checkinEnabled}
                   setCheckinEnabled={setCheckinEnabled}
                   onSave={savePrivacy}
@@ -490,6 +595,15 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
       <ChangePasswordModal
         open={showPassword}
         onClose={() => setShowPassword(false)}
+      />
+      <ConfirmHideHistoryModal
+        open={showHideHistory}
+        scope={consentScope}
+        onCancel={() => {
+          if (!hideHistorySubmitting) setShowHideHistory(false)
+        }}
+        onConfirm={handleConfirmHideHistory}
+        submitting={hideHistorySubmitting}
       />
     </div>
   )

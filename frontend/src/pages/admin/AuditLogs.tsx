@@ -34,6 +34,14 @@ type StudentAction =
   | 'consent_revoked'
   | 'password_reset_requested'
   | 'password_reset_completed'
+  // Acciones de control de datos (mig 012, 2026-05-23). Documentadas
+  // en docs/DATA_RETENTION_POLICY.md. Las usa el data_control_router
+  // para audit trail student-side de toggle history y soft/hard delete.
+  | 'history_toggle_off'
+  | 'history_toggle_on'
+  | 'session_hidden'
+  | 'session_deleted_hard'
+  | 'user_messages_hard_delete'
 
 type SystemAction = 'user_login_failed'
 
@@ -102,6 +110,12 @@ const ACTION_LABELS: Record<string, string> = {
   consent_revoked: 'Consentimiento revocado',
   password_reset_requested: 'Solicitud reset contraseña',
   password_reset_completed: 'Reset contraseña completado',
+  // Student — control de datos (mig 012, 2026-05-23)
+  history_toggle_off: 'Desactivó historial',
+  history_toggle_on: 'Reactivó historial',
+  session_hidden: 'Ocultó conversación',
+  session_deleted_hard: 'Eliminó conversación',
+  user_messages_hard_delete: 'Eliminó todo el historial',
   // System events
   user_login_failed: 'Login fallido',
 }
@@ -127,6 +141,13 @@ const ACTION_CHIP_STYLES: Record<string, React.CSSProperties> = {
   consent_revoked: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
   password_reset_requested: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37,99,235,0.25)' },
   password_reset_completed: { background: 'var(--info-50)', color: 'var(--info-600)', borderColor: 'rgba(37,99,235,0.25)' },
+  // Student — control de datos (mig 012). Color warning para los
+  // "ocultar/desactivar" y danger para los "eliminar".
+  history_toggle_off: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  history_toggle_on: { background: 'var(--success-50)', color: 'var(--success-700)', borderColor: 'var(--success-200)' },
+  session_hidden: { background: 'var(--warn-50)', color: 'var(--warn-700)', borderColor: 'var(--warn-200)' },
+  session_deleted_hard: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
+  user_messages_hard_delete: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
   // System
   user_login_failed: { background: 'var(--danger-50)', color: 'var(--danger-700)', borderColor: 'var(--danger-200)' },
 }
@@ -605,6 +626,15 @@ export default function AuditLogs() {
               </option>
               <option value="password_reset_completed">
                 {ACTION_LABELS.password_reset_completed}
+              </option>
+            </optgroup>
+            <optgroup label="Control de datos (estudiante)">
+              <option value="history_toggle_off">{ACTION_LABELS.history_toggle_off}</option>
+              <option value="history_toggle_on">{ACTION_LABELS.history_toggle_on}</option>
+              <option value="session_hidden">{ACTION_LABELS.session_hidden}</option>
+              <option value="session_deleted_hard">{ACTION_LABELS.session_deleted_hard}</option>
+              <option value="user_messages_hard_delete">
+                {ACTION_LABELS.user_messages_hard_delete}
               </option>
             </optgroup>
             <optgroup label="Sistema">

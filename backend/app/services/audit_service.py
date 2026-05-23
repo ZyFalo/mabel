@@ -41,6 +41,19 @@ ALLOWED_ACTIONS = frozenset(
         "consent_revoked",
         "password_reset_requested",
         "password_reset_completed",
+        # --- student: control de datos (mig 012, 2026-05-23) ---
+        # Documentado en docs/DATA_RETENTION_POLICY.md.
+        "history_toggle_off",
+        "history_toggle_on",
+        "session_hidden",
+        "session_deleted_hard",
+        "user_messages_hard_delete",
+        # --- student: rating de corazones (mig 011, 2026-05-23) ---
+        # Trazabilidad investigativa: el rating es metrica
+        # research-relevant; auditoria permite responder "quien
+        # cambio su calificacion y cuando" sin tocar la tabla
+        # session_ratings que solo guarda el valor final.
+        "session_rated",
         # --- system ---
         # (reserved for future cronjobs / non-user-driven events)
     }

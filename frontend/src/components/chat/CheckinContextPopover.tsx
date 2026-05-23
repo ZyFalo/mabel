@@ -1,12 +1,66 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import type { StudentOutletContext } from '../../types/studentOutlet'
-import { Info, Smile, Moon, Target, MessageSquare, Sparkles, X } from 'lucide-react'
+import {
+  Info,
+  Smile,
+  Moon,
+  Target,
+  MessageSquare,
+  Sparkles,
+  X,
+  Battery,
+  Flame,
+  UserCheck,
+} from 'lucide-react'
+import {
+  FOCUS_LABEL_MAP,
+  FOCUS_COLOR_MAP,
+  normalizeFocus,
+} from '../../constants/checkin'
+
+// Catálogos compactos para mostrar las escalas 1-4 (energy, stress,
+// loneliness) y la calidad de sueño categórica. Duplicados aquí para
+// no tener que importar 4 constantes más cuando el popover solo
+// necesita el label humano. Si los rangos cambiaran, actualizar
+// también `constants/checkin.ts`.
+const ENERGY_DISPLAY: Record<number, string> = {
+  1: 'Sin batería',
+  2: 'Baja',
+  3: 'Suficiente',
+  4: 'Con todo',
+}
+const STRESS_DISPLAY: Record<number, string> = {
+  1: 'Nada',
+  2: 'Un poco',
+  3: 'Bastante',
+  4: 'Muchísimo',
+}
+const LONELINESS_DISPLAY: Record<number, string> = {
+  1: 'Muy sola/o',
+  2: 'Algo sola/o',
+  3: 'Acompañada/o',
+  4: 'Muy acompañada/o',
+}
+const SLEEP_QUALITY_DISPLAY: Record<string, string> = {
+  mal: 'Mal',
+  regular: 'Regular',
+  bien: 'Bien',
+  muy_bien: 'Muy bien',
+}
 
 interface CheckinPayload {
   mood?: number | null
+  energy?: number | null
+  stress?: number | null
+  sleep_quality?: string | null
   sleep?: number | null
-  focus?: string | null
+  loneliness?: number | null
+  // `focus` puede venir como string (formato legacy, pre 2026-05-23)
+  // o array (formato actual con multi-select). `normalizeFocus`
+  // unifica ambas formas.
+  focus?: string | string[] | null
+  focus_other?: string | null
   note?: string | null
   [k: string]: unknown
 }
@@ -20,23 +74,8 @@ interface CheckinContextPopoverProps {
   startedAt?: string | null
 }
 
-const FOCUS_LABELS: Record<string, string> = {
-  Academico: 'Académico',
-  Social: 'Social',
-  Familiar: 'Familiar',
-  Salud: 'Salud',
-  Economico: 'Económico',
-  Otro: 'Otro',
-}
-
-const FOCUS_TONES: Record<string, string> = {
-  Academico: 'var(--info-600)',
-  Social: 'var(--mabel-600)',
-  Familiar: 'var(--warn-600)',
-  Salud: 'var(--success-600)',
-  Economico: 'var(--ink-700)',
-  Otro: 'var(--ink-500)',
-}
+// Mapas movidos a `constants/checkin.ts` — single source of truth
+// compartida con CheckIn.tsx y SessionDetail.tsx.
 
 function moodLabel(score: number | null | undefined): { label: string; color: string } {
   if (score == null) return { label: '—', color: 'var(--ink-500)' }
@@ -90,8 +129,13 @@ export default function CheckinContextPopover({
 
   const cp = (payload ?? {}) as CheckinPayload
   const mood = typeof cp.mood === 'number' ? cp.mood : null
+  const energy = typeof cp.energy === 'number' ? cp.energy : null
+  const stress = typeof cp.stress === 'number' ? cp.stress : null
+  const sleepQuality = typeof cp.sleep_quality === 'string' ? cp.sleep_quality : null
   const sleep = typeof cp.sleep === 'number' ? cp.sleep : null
-  const focus = typeof cp.focus === 'string' ? cp.focus : null
+  const loneliness = typeof cp.loneliness === 'number' ? cp.loneliness : null
+  const focusList = normalizeFocus(cp.focus)
+  const focusOther = typeof cp.focus_other === 'string' ? cp.focus_other.trim() : ''
   const note = typeof cp.note === 'string' ? cp.note.trim() : ''
   const hasCheckin = !!completedAt && Object.keys(cp).length > 0
   const since = timeSince(completedAt ?? startedAt)
@@ -231,7 +275,44 @@ export default function CheckinContextPopover({
                   </span>
                 </div>
 
-                {/* Sleep */}
+                {/* Energy (nuevo 2026-05-23). Solo render si presente
+                    en el payload — sesiones legacy no lo tienen. */}
+                {energy != null && (
+                  <div style={rowStyle}>
+                    <Battery size={16} color="var(--ink-500)" />
+                    <span style={{ fontSize: 13, color: 'var(--ink-700)' }}>Energía</span>
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: 'var(--ink-900)',
+                      }}
+                    >
+                      {ENERGY_DISPLAY[energy] ?? '—'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Stress (nuevo 2026-05-23) */}
+                {stress != null && (
+                  <div style={rowStyle}>
+                    <Flame size={16} color="var(--ink-500)" />
+                    <span style={{ fontSize: 13, color: 'var(--ink-700)' }}>Agobio</span>
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: 'var(--ink-900)',
+                      }}
+                    >
+                      {STRESS_DISPLAY[stress] ?? '—'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Sleep — calidad (nueva) + horas (legacy o
+                    complementario). Si solo hay horas, mostramos
+                    el formato antiguo. */}
                 <div style={rowStyle}>
                   <Moon size={16} color="var(--ink-500)" />
                   <span style={{ fontSize: 13, color: 'var(--ink-700)' }}>Sueño</span>
@@ -243,26 +324,119 @@ export default function CheckinContextPopover({
                       fontVariantNumeric: 'tabular-nums',
                     }}
                   >
-                    {sleep != null ? `${sleep} h` : '—'}
+                    {sleepQuality
+                      ? `${SLEEP_QUALITY_DISPLAY[sleepQuality] ?? sleepQuality}${sleep != null ? ` · ${sleep} h` : ''}`
+                      : sleep != null
+                        ? `${sleep} h`
+                        : '—'}
                   </span>
                 </div>
 
-                {/* Focus */}
+                {/* Loneliness / connection (nuevo 2026-05-23) */}
+                {loneliness != null && (
+                  <div style={rowStyle}>
+                    <UserCheck size={16} color="var(--ink-500)" />
+                    <span style={{ fontSize: 13, color: 'var(--ink-700)' }}>Compañía</span>
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: 'var(--ink-900)',
+                      }}
+                    >
+                      {LONELINESS_DISPLAY[loneliness] ?? '—'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Focus — multi-value: render as a pill list. Single
+                    value mantiene el look minimal de tag uppercase para
+                    no romper la compatibilidad visual con sesiones
+                    antiguas que solo tienen un foco. */}
                 <div style={rowStyle}>
                   <Target size={16} color="var(--ink-500)" />
                   <span style={{ fontSize: 13, color: 'var(--ink-700)' }}>Enfoque</span>
-                  <span
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      color: focus ? FOCUS_TONES[focus] ?? 'var(--ink-700)' : 'var(--ink-500)',
-                      letterSpacing: '0.01em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {focus ? FOCUS_LABELS[focus] ?? focus : '—'}
-                  </span>
+                  {focusList.length === 0 ? (
+                    <span
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: 'var(--ink-500)',
+                        letterSpacing: '0.01em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      —
+                    </span>
+                  ) : focusList.length === 1 ? (
+                    <span
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: FOCUS_COLOR_MAP[focusList[0]] ?? 'var(--ink-700)',
+                        letterSpacing: '0.01em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {FOCUS_LABEL_MAP[focusList[0]] ?? focusList[0]}
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        flexWrap: 'wrap',
+                        gap: 4,
+                        justifyContent: 'flex-end',
+                        maxWidth: 200,
+                      }}
+                    >
+                      {focusList.map((f) => (
+                        <span
+                          key={f}
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 600,
+                            color: FOCUS_COLOR_MAP[f] ?? 'var(--ink-700)',
+                            background: 'var(--ink-50)',
+                            border: '1px solid var(--ink-200)',
+                            borderRadius: 6,
+                            padding: '2px 7px',
+                            letterSpacing: '0.01em',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {FOCUS_LABEL_MAP[f] ?? f}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </div>
+
+                {/* Texto libre cuando el foco "Otro" fue seleccionado y
+                    el estudiante completó el mini-input. Lo mostramos
+                    en línea separada para no romper el layout de la
+                    fila de focos cuando el contenido es largo. */}
+                {focusList.includes('Otro') && focusOther && (
+                  <div style={{ ...rowStyle, alignItems: 'flex-start' }}>
+                    <Target size={16} color="var(--ink-400)" style={{ marginTop: 2 }} />
+                    <span style={{ fontSize: 12.5, color: 'var(--ink-500)' }}>Otro foco</span>
+                    <span
+                      style={{
+                        gridColumn: '2 / span 2',
+                        fontSize: 12,
+                        color: 'var(--ink-700)',
+                        background: 'var(--ink-50)',
+                        border: '1px solid var(--ink-100)',
+                        borderRadius: 8,
+                        padding: '6px 9px',
+                        marginTop: 4,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {focusOther}
+                    </span>
+                  </div>
+                )}
 
                 {/* Note (only if present) */}
                 {note && (

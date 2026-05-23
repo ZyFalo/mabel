@@ -31,9 +31,33 @@ class ChatService:
         self.llm = llm
         self.guardrails = guardrails
 
-    async def create_session(self, user_id: uuid.UUID, topic_hint: str | None = None) -> tuple:
+    async def create_session(
+        self,
+        user_id: uuid.UUID,
+        topic_hint: str | None = None,
+        checkin_payload: dict | None = None,
+    ) -> tuple:
+        """Create a session for `user_id`.
+
+        Lazy-creation pattern (2026-05-23): el caller decide cuándo
+        crear la sesión — típicamente cuando hay una acción real del
+        estudiante (submit del check-in o envío de primer mensaje).
+        Si `checkin_payload` viene, la sesión nace con el check-in
+        ya completado en la MISMA transacción, evitando el window de
+        "sesión creada sin check-in" que provocaba sesiones huérfanas
+        cuando el usuario abandonaba.
+
+        Returns `(session, previous_closed)`. `previous_closed` es
+        True si hubo que cerrar una sesión activa anterior para
+        respetar el UNIQUE constraint `uq_sessions_user_active`.
+        """
         prefs = await self.preference_repo.get_by_user_id(user_id)
         checkin_opt_in = prefs.checkin_enabled if prefs else True
+
+        # Si el payload trae check-in, la sesión nace completada;
+        # `checkin_opt_in` se preserva como pista histórica pero el
+        # `checkin_completed_at` ya está marcado.
+        now = datetime.now(UTC) if checkin_payload else None
 
         previous_closed = False
         try:
@@ -41,6 +65,8 @@ class ChatService:
                 user_id=user_id,
                 topic_hint=topic_hint,
                 checkin_opt_in=checkin_opt_in,
+                checkin_payload=checkin_payload,
+                checkin_completed_at=now,
             )
         except IntegrityError:
             await self.session_repo.db.rollback()
@@ -50,6 +76,8 @@ class ChatService:
                 user_id=user_id,
                 topic_hint=topic_hint,
                 checkin_opt_in=checkin_opt_in,
+                checkin_payload=checkin_payload,
+                checkin_completed_at=now,
             )
             previous_closed = True
 
@@ -231,12 +259,50 @@ class ChatService:
             mood = cp.get("mood")
             if isinstance(mood, (int, float)) and not isinstance(mood, bool):
                 bullets.append(f"- Ánimo reportado: {mood}/10")
+            # Campos nuevos del check-in extendido 2026-05-23. Crítico
+            # (code-review #2): sin estos bullets, generate_greeting
+            # ignoraría las dimensiones más empáticamente cargadas que
+            # el estudiante acaba de reportar (energía baja, agobio
+            # alto, soledad). Aunque build_system_prompt() ya las
+            # inyecta en el system prompt, el greeting_instruction es
+            # lo que más fuertemente steerea el primer mensaje.
+            energy_labels = {1: "sin batería", 2: "baja", 3: "suficiente", 4: "con todo"}
+            stress_labels = {1: "nada", 2: "un poco", 3: "bastante", 4: "muchísimo"}
+            loneliness_labels = {
+                1: "muy sola/o", 2: "algo sola/o", 3: "acompañada/o", 4: "muy acompañada/o"
+            }
+            sleep_quality_labels = {
+                "mal": "mal", "regular": "regular", "bien": "bien", "muy_bien": "muy bien"
+            }
+            energy = cp.get("energy")
+            if isinstance(energy, int) and not isinstance(energy, bool) and energy in energy_labels:
+                bullets.append(f"- Energía para hoy: {energy_labels[energy]}")
+            stress = cp.get("stress")
+            if isinstance(stress, int) and not isinstance(stress, bool) and stress in stress_labels:
+                bullets.append(f"- Nivel de agobio hoy: {stress_labels[stress]}")
+            sleep_quality = cp.get("sleep_quality")
+            if isinstance(sleep_quality, str) and sleep_quality in sleep_quality_labels:
+                bullets.append(f"- Calidad de sueño anoche: {sleep_quality_labels[sleep_quality]}")
             sleep = cp.get("sleep")
             if isinstance(sleep, (int, float)) and not isinstance(sleep, bool):
                 bullets.append(f"- Sueño anoche: {sleep} horas")
+            loneliness = cp.get("loneliness")
+            if isinstance(loneliness, int) and not isinstance(loneliness, bool) and loneliness in loneliness_labels:
+                bullets.append(f"- Sensación de compañía hoy: {loneliness_labels[loneliness]}")
+            # `focus` puede venir como string (legacy) o lista (multi-select
+            # post-rework 2026-05-23). Sin el branch `isinstance(focus, list)`
+            # las nuevas sesiones con focus=['Academico','Pareja'] se
+            # quedaban sin bullet de foco — code-review #2.
             focus = cp.get("focus")
             if isinstance(focus, str) and focus:
                 bullets.append(f"- Foco principal: {focus}")
+            elif isinstance(focus, list) and focus:
+                focus_items = [str(f) for f in focus if isinstance(f, str) and f]
+                if focus_items:
+                    bullets.append(f"- Focos de preocupación: {', '.join(focus_items)}")
+            focus_other = cp.get("focus_other")
+            if isinstance(focus_other, str) and focus_other.strip():
+                bullets.append(f"- Foco adicional descrito por el estudiante: «{focus_other.strip()}»")
             note = cp.get("note")
             if isinstance(note, str) and note.strip():
                 bullets.append(f"- Nota libre del estudiante: «{note.strip()}»")
@@ -247,8 +313,12 @@ class ChatService:
                 "un check-in inicial. Tu tarea:\n"
                 "1. Saluda en una sola frase corta, cálida y sin clichés.\n"
                 "2. Resume con empatía lo que entendiste del check-in en 1-2 frases, "
-                "mencionando los datos relevantes (ánimo, sueño, foco) sin sonar a robot.\n"
-                "3. Si hay nota libre, recógela explícitamente con tono validante.\n"
+                "mencionando los datos relevantes (ánimo, energía, agobio, sueño, "
+                "compañía, foco) sin sonar a robot. Si hay combinaciones cargadas "
+                "(ej. ánimo bajo + sin batería) ajusta el tono: cuando no hay energía, "
+                "evita proponer ejercicios activos y prioriza validar el descanso.\n"
+                "3. Si hay nota libre o foco adicional descrito, recógelos "
+                "explícitamente con tono validante.\n"
                 "4. Termina con UNA sola pregunta abierta que invite a profundizar.\n\n"
                 "Datos del check-in:\n"
                 f"{summary_block}\n\n"

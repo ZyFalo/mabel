@@ -261,6 +261,46 @@ interface WellbeingResponse {
     min: number | null
     max: number | null
   } | null
+  // Campos nuevos del check-in extendido 2026-05-23. Sesiones legacy
+  // sin energy/stress/loneliness/sleep_quality llegan como [].
+  // El frontend renderea cada chart con su propio empty-state.
+  energy_per_day?: Array<{ date: string; mean: number }>
+  stress_per_day?: Array<{ date: string; mean: number }>
+  loneliness_per_day?: Array<{ date: string; mean: number }>
+  sleep_quality_distribution?: Array<{ quality: string; count: number }>
+  // Rating de corazones agregado (mig 011). Mean en [1, 5] o null si
+  // no hay ratings en el rango. Distribution es por valor (1..5).
+  session_rating_summary?: {
+    mean: number | null
+    count: number
+    distribution: Array<{ rating: number; count: number }>
+  }
+}
+
+// Etiquetas humanas para sleep_quality (mantenidas en frontend para
+// no acoplar el dashboard al schema de `constants/checkin.ts` student-
+// side y para tener libertad de copy específica del admin).
+const SLEEP_QUALITY_LABEL: Record<string, string> = {
+  mal: 'Mal',
+  regular: 'Regular',
+  bien: 'Bien',
+  muy_bien: 'Muy bien',
+}
+
+// Etiquetas humanas para focos. Misma fuente que el student-side
+// FOCUS_LABEL_MAP pero duplicada aquí porque el dashboard admin
+// también recibe categorías legacy que pueden no estar en el catálogo
+// actual (ej. focos de sesiones de hace meses con catálogos previos).
+const FOCUS_LABEL_ADMIN: Record<string, string> = {
+  Academico: 'Académico',
+  Social: 'Social',
+  Familiar: 'Familiar',
+  Pareja: 'Pareja',
+  Salud: 'Salud',
+  Economico: 'Económico',
+  Futuro: 'Futuro',
+  Otro: 'Otro',
+  unknown: 'Sin clasificar',
 }
 
 function fmtNum(v: number | null | undefined, digits = 2): string {
@@ -301,6 +341,48 @@ function TabWellbeing({
     () => (data?.sleep_per_day ?? []).map((p) => ({ date: p.date, sueno: p.mean })),
     [data],
   )
+  // Series 1-4 de los segmented sliders nuevos del check-in. Cada uno
+  // se rendera en su propio chart de línea — escala 1-4 — para que la
+  // tendencia sea legible (no mezclados con mood que es 0-10).
+  const energySeries = useMemo(
+    () => (data?.energy_per_day ?? []).map((p) => ({ date: p.date, energy: p.mean })),
+    [data],
+  )
+  const stressSeries = useMemo(
+    () => (data?.stress_per_day ?? []).map((p) => ({ date: p.date, stress: p.mean })),
+    [data],
+  )
+  const lonelinessSeries = useMemo(
+    () => (data?.loneliness_per_day ?? []).map((p) => ({ date: p.date, loneliness: p.mean })),
+    [data],
+  )
+  // Distribución de calidad de sueño — bar único agregado todo el rango
+  // (no apilado por semana porque las 4 categorías ya bastan para leer
+  // patrón sin saturar). Las etiquetas se humanizan en el render.
+  const sleepQualityData = useMemo(() => {
+    const order = ['mal', 'regular', 'bien', 'muy_bien']
+    const raw = data?.sleep_quality_distribution ?? []
+    return order
+      .map((q) => {
+        const found = raw.find((r) => r.quality === q)
+        return found
+          ? { quality: SLEEP_QUALITY_LABEL[q] ?? q, count: found.count }
+          : null
+      })
+      .filter((x): x is { quality: string; count: number } => x !== null)
+  }, [data])
+
+  // Rating de corazones — distribución por valor (1..5). Garantizamos
+  // que las 5 columnas siempre aparezcan (incluso con 0) para que el
+  // chart muestre la silueta completa de la escala, no solo los
+  // valores efectivamente votados.
+  const ratingDistData = useMemo(() => {
+    const raw = data?.session_rating_summary?.distribution ?? []
+    return [1, 2, 3, 4, 5].map((v) => {
+      const found = raw.find((r) => r.rating === v)
+      return { rating: `${v} ♥`, count: found?.count ?? 0 }
+    })
+  }, [data])
 
   const focusData = useMemo(() => {
     // `byWeek` holds only the per-category COUNTS (numbers). The week
@@ -326,9 +408,19 @@ function TabWellbeing({
     return { rows, cats }
   }, [data])
 
+  // El tab se considera vacío solo si NINGUNA de las dimensiones
+  // tiene datos. Antes solo miraba mood+sleep, lo cual ocultaba
+  // todo el tab cuando habia sesiones nuevas con solo energy/stress
+  // marcados — escenario realista del piloto.
   const empty =
     !data ||
-    ((data.mood_per_day?.length ?? 0) === 0 && (data.sleep_per_day?.length ?? 0) === 0)
+    ((data.mood_per_day?.length ?? 0) === 0 &&
+      (data.sleep_per_day?.length ?? 0) === 0 &&
+      (data.energy_per_day?.length ?? 0) === 0 &&
+      (data.stress_per_day?.length ?? 0) === 0 &&
+      (data.loneliness_per_day?.length ?? 0) === 0 &&
+      (data.sleep_quality_distribution?.length ?? 0) === 0 &&
+      (data.session_rating_summary?.count ?? 0) === 0)
   if (loading || error || empty) {
     return <TabState loading={loading} error={error} empty={!loading && !error && empty} />
   }
@@ -336,39 +428,96 @@ function TabWellbeing({
   const summary = data!.mood_summary
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
+      {/* ════════════════════════════════════════════════════════════
+          BLOQUE 1 — Estado emocional (4 sliders del check-in)
+          Las 4 dimensiones afectivas en escala unificada 1-5/1-4
+          mostradas juntas para que el admin lea correlaciones de
+          un vistazo (ej. ánimo bajo + energía baja = patrón típico
+          de fatiga emocional).
+          ════════════════════════════════════════════════════════════ */}
+      <SectionHeading title="Estado emocional" subtitle="Cuatro dimensiones del check-in inicial" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 flex flex-col gap-3">
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
           <ChartCard
             title="Ánimo por día"
-            subtitle="Escala 0–10 · promedios diarios"
-            info="Promedio diario del ánimo reportado por los estudiantes en el check-in (campo mood, escala 0-10). Mide la tendencia agregada del estado emocional en el rango."
+            subtitle="Escala 1–5 · 5 caritas"
+            info="Promedio diario del ánimo reportado en el check-in, mapeado a la escala de las 5 caritas (1 = Muy mal, 2 = Mal, 3 = Neutral, 4 = Bien, 5 = Excelente). Datos legacy del slider 0-10 se interpolan linealmente al mismo rango."
           >
-            <LineChartWrapper
-              data={moodSeries}
-              lines={[{ key: 'mood', label: 'Ánimo', color: CHART_COLORS.primary }]}
-              yLabel="Ánimo"
-              height={170}
-            />
+            {moodSeries.length === 0 ? (
+              <div className="h-[170px] flex items-center justify-center text-sm text-text-primary/40 italic">
+                Sin datos suficientes
+              </div>
+            ) : (
+              <LineChartWrapper
+                data={moodSeries}
+                lines={[{ key: 'mood', label: 'Ánimo', color: CHART_COLORS.primary }]}
+                yLabel="Ánimo (1-5)"
+                height={170}
+              />
+            )}
           </ChartCard>
           <ChartCard
-            title="Horas de sueño por día"
-            subtitle="Promedios diarios"
-            info="Promedio diario de horas de sueño autorreportadas en el check-in (campo sleep). El sueño insuficiente correlaciona fuertemente con malestar emocional."
+            title="Energía por día"
+            subtitle="Escala 1–4"
+            info="Promedio diario del campo `energy` del check-in (1 = sin batería, 4 = con todo). Permite distinguir 'ánimo bajo + sin batería' (Mabel desacelera, normaliza descanso) de 'ánimo bajo + energía OK' (Mabel puede proponer ejercicios activos)."
           >
-            <LineChartWrapper
-              data={sleepSeries}
-              lines={[{ key: 'sueno', label: 'Sueño (h)', color: CHART_COLORS.cyan }]}
-              yLabel="Horas"
-              height={170}
-            />
+            {energySeries.length === 0 ? (
+              <div className="h-[170px] flex items-center justify-center text-sm text-text-primary/40 italic">
+                Sin datos suficientes
+              </div>
+            ) : (
+              <LineChartWrapper
+                data={energySeries}
+                lines={[{ key: 'energy', label: 'Energía', color: CHART_COLORS.success }]}
+                yLabel="Energía (1-4)"
+                height={170}
+              />
+            )}
+          </ChartCard>
+          <ChartCard
+            title="Agobio por día"
+            subtitle="Escala 1–4 · derivado del PSS-4"
+            info="Promedio diario del campo `stress` del check-in (1 = nada, 4 = muchísimo). Item derivado del PSS-4 (Perceived Stress Scale) validado en universitarios colombianos. Picos sostenidos sugieren períodos de mayor presión académica."
+          >
+            {stressSeries.length === 0 ? (
+              <div className="h-[170px] flex items-center justify-center text-sm text-text-primary/40 italic">
+                Sin datos suficientes
+              </div>
+            ) : (
+              <LineChartWrapper
+                data={stressSeries}
+                lines={[{ key: 'stress', label: 'Agobio', color: CHART_COLORS.warning }]}
+                yLabel="Agobio (1-4)"
+                height={170}
+              />
+            )}
+          </ChartCard>
+          <ChartCard
+            title="Compañía por día"
+            subtitle="Escala 1–4 · adaptado de UCLA"
+            info="Promedio diario del campo `loneliness` del check-in (1 = muy sola/o, 4 = muy acompañada/o). Single-item adaptado del UCLA Loneliness Scale. La soledad es predictor independiente de sintomatología depresiva en universitarios."
+          >
+            {lonelinessSeries.length === 0 ? (
+              <div className="h-[170px] flex items-center justify-center text-sm text-text-primary/40 italic">
+                Sin datos suficientes
+              </div>
+            ) : (
+              <LineChartWrapper
+                data={lonelinessSeries}
+                lines={[{ key: 'loneliness', label: 'Compañía', color: CHART_COLORS.violet }]}
+                yLabel="Compañía (1-4)"
+                height={170}
+              />
+            )}
           </ChartCard>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
+        {/* Sidebar derecho: resumen estadistico del animo */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4 self-start">
           <div className="flex items-center mb-3" style={{ gap: 6 }}>
             <h3 className="text-sm font-semibold text-text-primary">Resumen ánimo</h3>
-            <InfoHint text="Estadística descriptiva del ánimo en el rango. IC 95% calculado con t-Student (df = n-1) — para muestras pequeñas del piloto refleja honestamente la incertidumbre. Valores fuera de [0, 10] indican que n es muy pequeño para estimar la media con precisión." />
+            <InfoHint text="Estadística descriptiva del ánimo en el rango, expresada en la escala de las 5 caritas (1-5). IC 95% calculado con t-Student (df = n-1) — para muestras pequeñas del piloto refleja honestamente la incertidumbre." />
           </div>
           {summary ? (
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
@@ -383,19 +532,75 @@ function TabWellbeing({
                     : `${fmtNum(summary.ci95_low)} — ${fmtNum(summary.ci95_high)}`
                 }
               />
-              <SummaryRow label="Min" value={fmtNum(summary.min, 0)} />
-              <SummaryRow label="Max" value={fmtNum(summary.max, 0)} />
+              <SummaryRow label="Min" value={fmtNum(summary.min)} />
+              <SummaryRow label="Max" value={fmtNum(summary.max)} />
             </dl>
           ) : (
             <p className="text-sm text-text-primary/40 italic">Sin datos suficientes</p>
           )}
+          <p className="text-[11px] text-text-primary/40 italic mt-3 leading-relaxed">
+            Escala 1-5 · 1 = Muy mal, 3 = Neutral, 5 = Excelente
+          </p>
         </div>
       </div>
 
+      {/* ════════════════════════════════════════════════════════════
+          BLOQUE 2 — Sueño (calidad principal + horas secundario)
+          La calidad subjetiva predice mejor que las horas absolutas
+          (SHAWQ, Frontiers in Sleep 2023), por eso es primaria.
+          Las horas quedan como detalle complementario opcional.
+          ════════════════════════════════════════════════════════════ */}
+      <SectionHeading title="Sueño" subtitle="Calidad subjetiva (principal) + horas exactas (opcional)" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartCard
+          title="Calidad de sueño"
+          subtitle="Distribución agregada del rango"
+          info="Cuántas sesiones reportaron cada nivel de calidad de sueño subjetiva (campo `sleep_quality` del check-in). Esta es la métrica principal de sueño — la literatura (SHAWQ, Frontiers in Sleep 2023) muestra que la calidad percibida predice bienestar mejor que las horas absolutas."
+        >
+          {sleepQualityData.length === 0 ? (
+            <div className="h-[220px] flex items-center justify-center text-sm text-text-primary/40 italic">
+              Sin datos suficientes
+            </div>
+          ) : (
+            <BarChartWrapper
+              data={sleepQualityData}
+              bars={[{ key: 'count', label: 'Check-ins', color: CHART_COLORS.cyan }]}
+              xKey="quality"
+              yLabel="Check-ins"
+              height={220}
+            />
+          )}
+        </ChartCard>
+        <ChartCard
+          title="Horas de sueño por día"
+          subtitle="Promedios diarios · campo opcional"
+          info="Promedio diario de horas exactas de sueño (campo `sleep`). Desde 2026-05-23 este campo es opcional plegable en el formulario — la mayoría de check-ins solo usan la calidad subjetiva. Cuando hay datos, complementa la calidad con magnitud."
+        >
+          {sleepSeries.length === 0 ? (
+            <div className="h-[220px] flex items-center justify-center text-sm text-text-primary/40 italic">
+              Pocos estudiantes están reportando las horas exactas
+            </div>
+          ) : (
+            <LineChartWrapper
+              data={sleepSeries}
+              lines={[{ key: 'sueno', label: 'Sueño (h)', color: CHART_COLORS.cyan }]}
+              yLabel="Horas"
+              height={220}
+            />
+          )}
+        </ChartCard>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════
+          BLOQUE 3 — Contexto temático (focos de preocupación)
+          Multi-select con 8 categorías ampliadas (incluyendo Pareja
+          y Futuro post-recomendación del agente research-analytics).
+          ════════════════════════════════════════════════════════════ */}
+      <SectionHeading title="Contexto temático" subtitle="¿De dónde viene lo que sienten?" />
       <ChartCard
         title="Foco de preocupación por semana"
-        subtitle="Distribución apilada"
-        info="Categorías de preocupación que reportaron los estudiantes en sus check-ins, agrupadas por semana ISO. Identifica qué temas predominan (académico, social, otro) y cómo cambian en el tiempo."
+        subtitle="Distribución apilada · multi-select"
+        info="Categorías de preocupación que reportaron los estudiantes en sus check-ins, agrupadas por semana ISO. Cada categoría marcada cuenta independiente (un estudiante puede marcar varias en el mismo check-in)."
       >
         {focusData.rows.length === 0 ? (
           <div className="h-[260px] flex items-center justify-center text-sm text-text-primary/40 italic">
@@ -406,7 +611,7 @@ function TabWellbeing({
             data={focusData.rows}
             bars={focusData.cats.map((cat, idx) => ({
               key: cat,
-              label: cat,
+              label: FOCUS_LABEL_ADMIN[cat] ?? cat,
               stackId: 'focus',
               color: [
                 CHART_COLORS.accent,
@@ -415,7 +620,9 @@ function TabWellbeing({
                 CHART_COLORS.violet,
                 CHART_COLORS.cyan,
                 CHART_COLORS.success,
-              ][idx % 6],
+                'rgb(168, 85, 247)',
+                'rgb(20, 184, 166)',
+              ][idx % 8],
             }))}
             xKey="week"
             yLabel="Check-ins"
@@ -423,6 +630,86 @@ function TabWellbeing({
           />
         )}
       </ChartCard>
+
+      {/* ════════════════════════════════════════════════════════════
+          BLOQUE 4 — Satisfacción (corazones post-sesión)
+          Métrica de UX subjetiva: el estudiante mismo califica sus
+          conversaciones de 1 a 5 corazones desde el header del chat.
+          ════════════════════════════════════════════════════════════ */}
+      <SectionHeading title="Satisfacción" subtitle="Calificación de corazones post-sesión" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-white border border-gray-200 rounded-lg p-4 lg:col-span-1 flex flex-col justify-center">
+          <div className="flex items-center mb-3" style={{ gap: 6 }}>
+            <h3 className="text-sm font-semibold text-text-primary">
+              Calificación promedio
+            </h3>
+            <InfoHint text="Promedio de los corazones (1-5, más es mejor) que los estudiantes asignaron a sus sesiones en el rango. Es la métrica de satisfacción agregada más directa del producto desde el lado del usuario." />
+          </div>
+          {data?.session_rating_summary &&
+          data.session_rating_summary.count > 0 &&
+          data.session_rating_summary.mean != null ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-baseline gap-2">
+                <span
+                  className="text-3xl font-bold"
+                  style={{ color: 'var(--mabel-600)' }}
+                >
+                  {data.session_rating_summary.mean.toFixed(2)}
+                </span>
+                <span className="text-sm text-text-primary/50">/ 5</span>
+              </div>
+              <span className="text-xs text-text-primary/50">
+                {data.session_rating_summary.count} calificación
+                {data.session_rating_summary.count === 1 ? '' : 'es'} en el rango
+              </span>
+            </div>
+          ) : (
+            <p className="text-sm text-text-primary/40 italic">
+              Sin calificaciones todavía
+            </p>
+          )}
+        </div>
+        <div className="lg:col-span-2">
+          <ChartCard
+            title="Distribución de calificaciones"
+            subtitle="Cuántos estudiantes eligieron cada valor"
+            info="Distribución del rating de corazones por valor (1-5). Útil para detectar polarización (muchos 5 y muchos 1) que la media oculta, o evidencia de techo (concentración en 5) que sugiere subutilización de la escala."
+          >
+            {(data?.session_rating_summary?.count ?? 0) === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-sm text-text-primary/40 italic">
+                Sin calificaciones todavía
+              </div>
+            ) : (
+              <BarChartWrapper
+                data={ratingDistData}
+                bars={[{ key: 'count', label: 'Calificaciones', color: CHART_COLORS.primary }]}
+                xKey="rating"
+                yLabel="Conteo"
+                height={200}
+              />
+            )}
+          </ChartCard>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Encabezado de sección dentro de un tab. Visual minimal: línea
+ * superior + título + subtítulo opcional. Usado en TabWellbeing
+ * para separar los 4 bloques temáticos (Estado emocional / Sueño /
+ * Contexto temático / Satisfacción).
+ */
+function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="flex items-baseline gap-3 mt-2">
+      <h2 className="text-base font-semibold text-text-primary leading-tight">
+        {title}
+      </h2>
+      {subtitle && (
+        <span className="text-[12px] text-text-primary/50">{subtitle}</span>
+      )}
     </div>
   )
 }

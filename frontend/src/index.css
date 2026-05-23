@@ -232,10 +232,27 @@ button, input, select, textarea {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.3; }
   }
+  /* Pulsación suave del avatar/escudo durante transiciones cortas
+     (Home → Chat al enviar el primer mensaje). Combina respiración
+     de escala con halo de sombra suave para dar la sensación de
+     "Mabel está despertando" sin freezing visual. */
+  @keyframes softBreath {
+    0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(165, 25, 22, 0.0); }
+    50%      { transform: scale(1.06); box-shadow: 0 0 0 14px rgba(165, 25, 22, 0.12); }
+  }
+  /* Overlay que aparece cuando se está creando una sesión + se
+     navega al chat. Fade-in muy corto para no agregar latencia
+     percibida. */
+  @keyframes overlayIn {
+    from { opacity: 0; backdrop-filter: blur(0); }
+    to   { opacity: 1; backdrop-filter: blur(6px); }
+  }
 
-  .fade-up  { animation: fadeUp 0.4s var(--ease-out) backwards; }
-  .fade-in  { animation: fadeIn 0.2s var(--ease-out); }
-  .scale-in { animation: scaleIn 0.22s var(--ease-out); }
+  .fade-up      { animation: fadeUp 0.4s var(--ease-out) backwards; }
+  .fade-in      { animation: fadeIn 0.2s var(--ease-out); }
+  .scale-in     { animation: scaleIn 0.22s var(--ease-out); }
+  .soft-breath  { animation: softBreath 1.4s ease-in-out infinite; border-radius: 50%; }
+  .overlay-in   { animation: overlayIn 0.18s var(--ease-out) forwards; }
 }
 
 /* ============================================================
