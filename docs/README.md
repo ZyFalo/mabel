@@ -125,6 +125,29 @@ Cada archivo en `docs/` sigue este patrón mínimo:
 - **Estado de una página específica**: el bloque "Estado" al inicio de cada `.md`
 - **Cambios estructurales del repo**: `git log --oneline --all | head -30`
 
+### Verificación automatizada
+
+`scripts/verify_docs.py` audita los docs en busca de:
+- Dead pointers (paths citados que no existen)
+- Refs `archivo:linea` fuera de rango
+- Hashes de commit que no existen en git history
+- YAML frontmatter inválido en `.claude/agents/AGENT_*.md`
+- Numbering gaps (secciones §9.1, §9.2, §9.4 sin §9.3)
+- Cross-doc refs `§N.M` a secciones que no existen
+
+```bash
+# Verificar todos los docs:
+python scripts/verify_docs.py --report-only
+
+# Verificar solo lo staged en git:
+python scripts/verify_docs.py --staged
+```
+
+Pre-commit hook (no bloqueante por defecto):
+```bash
+bash scripts/install_pre_commit_hook.sh
+```
+
 ### Cuándo crear un nuevo archivo en `docs/` vs editar uno existente
 
 - **Crear nuevo**: cuando el tema es independiente y supera ~200 líneas (ej: una nueva fase implementada, una nueva integración mayor).
