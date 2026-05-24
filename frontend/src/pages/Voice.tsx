@@ -32,6 +32,8 @@ import { usePreferencesStore } from '../stores/preferencesStore'
 import useAudioRecorder from '../hooks/useAudioRecorder'
 import useTts from '../hooks/useTts'
 import useLlmPrewarm from '../hooks/useLlmPrewarm'
+import useElapsedSeconds from '../hooks/useElapsedSeconds'
+import { streamingStatusText } from '../utils/streamingStatus'
 import LlmStatusChip from '../components/chat/LlmStatusChip'
 import MabelAvatar, { type AvatarState } from '../components/voice/MabelAvatar'
 import ReactiveRings from '../components/voice/ReactiveRings'
@@ -88,6 +90,10 @@ export default function Voice() {
   }, [voiceModeEnabled, preferences, id, navigate])
 
   const [state, setState] = useState<AvatarState>('idle')
+  // Capa 1 — texto progresivo durante 'thinking'. Voice no lo tenía
+  // (solo Chat), pero un wait de 60-90s mirando un avatar inerte es
+  // objetivamente peor UX que en chat texto. Audit 2026-05-24.
+  const thinkingElapsed = useElapsedSeconds(state === 'thinking')
   const [elapsed, setElapsed] = useState(0)
   const [lastUserText, setLastUserText] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -245,14 +251,11 @@ export default function Voice() {
           return
         }
         setLastUserText(text)
-        // Capa 2 — refuerza al enviar audio si LLM está cold
-        if (llm.status === 'cold') {
-          addToast({
-            type: 'warning',
-            message:
-              'Mabel está despertando (~60-90 s) — Mabel ya escuchó tu mensaje, está procesándolo.',
-          })
-        }
+        // Capa 2 NO se aplica con toast en Voice: el chip del header
+        // (Capa 4) + el stateLabel del avatar (escalación con elapsed,
+        // ver streamingStatusText abajo) ya comunican el cold start.
+        // Disparar también un toast resultaba en triple-noise para el
+        // mismo evento (audit 2026-05-24).
         try {
           await sendMessage(id, text, { voiceMode: true })
         } catch (err) {
@@ -291,19 +294,19 @@ export default function Voice() {
   const fmtTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
-  // Si el LLM está cold (worker apagado en Modal), el chip dice
-  // "despertando" en lugar del estado normal, así el usuario sabe
-  // que la primera respuesta puede tardar más.
+  // Capa 1 — durante 'thinking', el texto escala con elapsed (pensando
+  // → cuidadosa → tomándose su tiempo → despertando del descanso).
+  // Misma escalación que el indicador del chat texto (consistencia).
+  // En 'idle', el texto se queda en "Toca el micrófono" salvo cold
+  // pre-detectado (ahí avisamos antes del primer mensaje).
   const stateLabel: Record<AvatarState, string> = {
     idle: isProcessing
       ? 'Procesando…'
       : llm.status === 'cold'
-        ? 'Mabel está despertando (~60 s)…'
+        ? 'Mabel está despertando — toca el mic cuando estés listo/a'
         : 'Toca el micrófono para hablar',
     listening: 'Escuchando…',
-    thinking: llm.status === 'cold'
-      ? 'Mabel está despertando (~60 s)…'
-      : 'Mabel está pensando',
+    thinking: streamingStatusText(thinkingElapsed, false),
     speaking: 'Mabel está hablando',
     error: 'Hubo un problema',
   }

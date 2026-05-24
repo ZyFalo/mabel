@@ -12,15 +12,23 @@
  * Devuelve el estado para que la UI pueda mostrar "Mabel está
  * despertando..." si está cold.
  *
- * SEMÁNTICA DE ESTADOS (importante — audit 2026-05-23):
+ * SEMÁNTICA DE ESTADOS (audit 2026-05-24):
  *   warm     → backend devolvió status:'warm' (Modal respondió 200)
  *   cold     → backend devolvió status:'cold' (Modal respondió 503 Loading)
  *   down     → backend devolvió status:'down' (Modal o intermedio caído)
  *   unknown  → algo falló localmente (404 endpoint, sin token, network)
- *              UI NO debe asumir 'warm' — antes lo hacía y enmascaraba
- *              outages reales.
+ *
+ * COMPORTAMIENTO DE POLLING (audit 2026-05-24):
+ *   - Solo polled SI la pestaña está visible (document.visibilityState).
+ *     Sin esto los tabs idle pingean 24/7 y Modal scale-to-zero nunca
+ *     dispara → factura explota en el piloto. Al volver a visible se
+ *     dispara un check inmediato.
+ *   - `checking` flag SOLO toggle true en el primer check (mount) y
+ *     en recheck() manuales — no en cada poll automático. Sin esto
+ *     consumers que rendereen spinner basado en `checking` flickean
+ *     cada 30s sin razón.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AxiosError } from 'axios'
 import apiClient from '../api/client'
 
@@ -28,7 +36,8 @@ export type LlmStatus = 'unknown' | 'warm' | 'cold' | 'down'
 
 interface UseLlmPrewarmReturn {
   status: LlmStatus
-  /** True mientras la promesa del health check sigue en vuelo. */
+  /** True SOLO mientras el primer check (o un recheck()) está en vuelo.
+   *  No flickea durante el polling automático. */
   checking: boolean
   /** Vuelve a chequear (útil tras un retry o cambio de foco). */
   recheck: () => void
@@ -36,8 +45,8 @@ interface UseLlmPrewarmReturn {
 
 interface UseLlmPrewarmOptions {
   /** Polling silencioso cada `pollIntervalMs` después del primer check.
-   *  Útil para Capa 4 (chip de estado siempre visible en el header).
-   *  Si se omite, solo hace UN check al mount. Por defecto omitido. */
+   *  Solo polled cuando el tab está visible. Si se omite, solo un check
+   *  al mount. */
   pollIntervalMs?: number
 }
 
@@ -50,16 +59,19 @@ export default function useLlmPrewarm(
   const { pollIntervalMs } = options
 
   useEffect(() => {
-    // Skip si no hay token — sin esto el prewarm dispara durante el
-    // login flicker y un 401 stale dispara el modal session-expired
-    // en mount aunque el usuario no haya tocado nada LLM-related.
     const token = localStorage.getItem('mabel_token')
     if (!token) return
 
     let cancelled = false
+    let intervalId: number | undefined
+    let firstCheckDone = false
 
-    async function checkOnce() {
-      setChecking(true)
+    async function checkOnce(opts: { silent?: boolean } = {}) {
+      // Silent = no togglear `checking`. Usado por el polling para no
+      // hacer flickear el flag y romper consumers que lo lean como
+      // "está cargando ahora mismo".
+      const silent = opts.silent ?? false
+      if (!silent) setChecking(true)
       try {
         const res = await apiClient.get('/llm/health', { timeout: 20000 })
         if (cancelled) return
@@ -77,23 +89,56 @@ export default function useLlmPrewarm(
           setStatus('unknown')
         }
       } finally {
-        if (!cancelled) setChecking(false)
+        if (!cancelled && !silent) setChecking(false)
       }
     }
 
-    checkOnce()
+    // Initial check — NO silent (consumer puede querer mostrar
+    // spinner durante el primer health check).
+    checkOnce().then(() => {
+      firstCheckDone = true
+    })
 
-    // Polling silencioso opcional para el chip de estado siempre visible.
-    let intervalId: number | undefined
+    function startInterval() {
+      if (intervalId !== undefined) return
+      if (!pollIntervalMs || pollIntervalMs <= 0) return
+      intervalId = window.setInterval(() => {
+        // Solo poll si el tab está visible Y el primer check ya completó.
+        // Sin la guard de visibilidad, tabs en background siguen
+        // pingueando — Modal scale-to-zero defeat + factura explota.
+        if (document.visibilityState !== 'visible') return
+        if (!firstCheckDone) return
+        checkOnce({ silent: true })
+      }, pollIntervalMs)
+    }
+
+    function stopInterval() {
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId)
+        intervalId = undefined
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        // Al volver, dispara un check inmediato (silent — el chip se
+        // actualiza sin flickear el spinner) y reanuda el intervalo.
+        if (firstCheckDone) checkOnce({ silent: true })
+        startInterval()
+      } else {
+        stopInterval()
+      }
+    }
+
     if (pollIntervalMs && pollIntervalMs > 0) {
-      intervalId = window.setInterval(checkOnce, pollIntervalMs)
+      startInterval()
+      document.addEventListener('visibilitychange', onVisibilityChange)
     }
 
     return () => {
       cancelled = true
-      if (intervalId !== undefined) {
-        window.clearInterval(intervalId)
-      }
+      stopInterval()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [tick, pollIntervalMs])
 

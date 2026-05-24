@@ -21,8 +21,8 @@ import useTts from '../hooks/useTts'
 import useSubtitles from '../hooks/useSubtitles'
 import useLlmPrewarm from '../hooks/useLlmPrewarm'
 import useElapsedSeconds from '../hooks/useElapsedSeconds'
-import { streamingStatusText } from '../utils/streamingStatus'
 import LlmStatusChip from '../components/chat/LlmStatusChip'
+import StreamingIndicator from '../components/chat/StreamingIndicator'
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('es-CO', {
@@ -350,15 +350,18 @@ export default function Chat() {
     if (!input.trim() || !id || isStreaming) return
     const text = input.trim()
     setInput('')
-    // Capa 2 — toast informativo si el LLM está cold al momento del
-    // SEND. Refuerza el banner del header (Capa 4) en el contexto
-    // exacto del envío para que la persona no se ponga ansiosa cuando
-    // los primeros 30-60s no llegan tokens.
-    if (llm.status === 'cold') {
+    // Capa 2 — toast informativo si el LLM está cold O 'unknown' al
+    // momento del SEND. 'unknown' = el primer health check aún no
+    // resolvió (típico cuando user llega y tipea rápido); el estado
+    // real puede ser cold y sin este aviso la persona espera 60-90s
+    // sin saber por qué. Audit 2026-05-24.
+    if (llm.status === 'cold' || llm.status === 'unknown') {
       addToast({
         type: 'warning',
         message:
-          'Mabel está despertando del descanso — tu respuesta puede tardar 60-90 s, pero ya está procesándose.',
+          llm.status === 'cold'
+            ? 'Mabel está despertando del descanso — tu respuesta puede tardar 60-90 s, pero ya está procesándose.'
+            : 'Verificando estado de Mabel — si está despertando, esto puede tardar hasta un minuto.',
       })
     }
     try {
@@ -676,45 +679,11 @@ export default function Chat() {
               }}
             >
               <UmbAvatar size={32} style={{ marginTop: 2 }} />
-              <div
-                style={{
-                  background: 'var(--ink-50)',
-                  border: '1px solid var(--ink-100)',
-                  borderRadius: 14,
-                  padding: '14px 18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  minHeight: 44,
-                }}
-                aria-live="polite"
-                aria-label={streamingStatusText(streamingElapsed)}
-              >
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: 999,
-                      background: 'var(--mabel-600)',
-                      opacity: 0.7,
-                      animation: `streamingPulse 1.2s ease-in-out ${i * 0.18}s infinite`,
-                    }}
-                  />
-                ))}
-                <span
-                  style={{
-                    marginLeft: 8,
-                    fontSize: 12,
-                    color: 'var(--ink-500)',
-                    fontStyle: 'italic',
-                    transition: 'opacity var(--dur-base) var(--ease-out)',
-                  }}
-                >
-                  {streamingStatusText(streamingElapsed)}
-                </span>
-              </div>
+              <StreamingIndicator
+                elapsedSeconds={streamingElapsed}
+                hasFirstToken={!!streamingText}
+                variant="card"
+              />
             </div>
           ) : !hasMessages ? (
             <div
@@ -1063,57 +1032,11 @@ export default function Chat() {
                   }}
                 >
                   <AssistantAvatar />
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      paddingTop: 10,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        background: 'var(--ink-400)',
-                        borderRadius: '50%',
-                        animation: 'bounce 1.4s infinite',
-                        animationDelay: '0ms',
-                      }}
-                      className="animate-bounce"
-                    />
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        background: 'var(--ink-400)',
-                        borderRadius: '50%',
-                        animationDelay: '150ms',
-                      }}
-                      className="animate-bounce"
-                    />
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        background: 'var(--ink-400)',
-                        borderRadius: '50%',
-                        animationDelay: '300ms',
-                      }}
-                      className="animate-bounce"
-                    />
-                    <span
-                      style={{
-                        marginLeft: 10,
-                        fontSize: 12,
-                        color: 'var(--ink-500)',
-                        fontStyle: 'italic',
-                      }}
-                      aria-live="polite"
-                    >
-                      {streamingStatusText(streamingElapsed)}
-                    </span>
-                  </div>
+                  <StreamingIndicator
+                    elapsedSeconds={streamingElapsed}
+                    hasFirstToken={!!streamingText}
+                    variant="inline"
+                  />
                 </div>
               )}
 
