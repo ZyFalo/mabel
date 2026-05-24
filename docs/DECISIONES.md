@@ -6,9 +6,9 @@
 
 Este documento consolida **todas las decisiones técnicas, de producto y de proceso** que rigen al proyecto Mabel IA. Está organizado en cuatro bloques cronológicos:
 
-1. **Decisiones canónicas D-01 a D-15** — Las 15 decisiones formales registradas en Notion durante el diseño (2026-02 a 2026-03).
-2. **Decisiones del Product Owner 2026-02-23** — Las 25 discrepancias resueltas en sesión PO entre mockups y especificación.
-3. **Decisiones post-MVP (D-16+)** — Decisiones tomadas durante la implementación que aún no entran al formato canónico de Notion (la página dejó de actualizarse en 2026-03-07).
+1. **Decisiones canónicas D-01 a D-15** — Decisiones de producto / legal / UX. Esta es la numeración **oficial actual**; no confundir con la "D-XX del snapshot Notion 2026-03" que aparece en `docs/AGENTES.md` §9.1 como **DT-XX** ("Decisiones Técnicas") y cubre infraestructura (stack, motor BD, constraints internos). Ambas listas son válidas y complementarias; el mapeo histórico está en `docs/AGENTES.md` §9.3.
+2. **Decisiones del Product Owner 2026-02-23 (PO-1 a PO-25)** — Discrepancias resueltas en sesión PO entre mockups y especificación. Ejemplos como "SOS solo FAB" (PO-2) y "Sidebar 220px" (PO-6) son decisiones PO; en docs antiguos a veces aparecían numeradas como D-07 / D-09 — usar `PO-N` para evitar colisión.
+3. **Decisiones post-MVP (D-16 a D-22)** — Decisiones tomadas durante la implementación (mayo 2026). Esta numeración es **canónica y formal**, no "propuesta".
 4. **Workflow agreements** — Acuerdos de proceso que no son decisiones técnicas pero rigen cómo el equipo trabaja.
 
 Cada decisión incluye: **fecha**, **propuestos por**, **decisión**, **motivación** y **impacto** (archivos / artefactos afectados).
@@ -122,11 +122,11 @@ Cada decisión incluye: **fecha**, **propuestos por**, **decisión**, **motivaci
 - **Estado**: ✅ implementado.
 
 ### D-14 — Hard DELETE de usuarios + `safety_events.user_id` SET NULL
-- **Fecha**: 2026-02-26 (Evo 005c)
+- **Fecha**: 2026-02-26 (decisión); consolidado en el initial migration Alembic (no existe migración `005c` como archivo; las "Evo 002…005c" eran labels narrativos de marzo 2026, ver `docs/AGENTES.md` §9.4)
 - **Propuesto por**: Ag.02, Ag.03, Ag.04, Ag.12 (unánime)
 - **Decisión**: Cuando un estudiante elimina su cuenta (`DELETE /users/me`), se hace **hard DELETE** inmediato + CASCADE sobre todas sus tablas relacionadas, EXCEPTO `safety_events.user_id` que cambia a `ON DELETE SET NULL` para preservar el evento como anónimo (cuenta para métricas de safety, NO se borra el evento como tal).
 - **Motivación**: Ley 1581/2012 derecho de supresión (Art. 8 lit. e). Hard DELETE evita riesgos de "datos remanentes" que el titular cree haber borrado. La excepción de safety_events.user_id preserva la línea base epidemiológica (Defensoría del Pueblo puede solicitar agregados históricos sin reconstruir identidades).
-- **Impacto**: Evo 005c en BD (`safety_events.user_id` NULLABLE con `ON DELETE SET NULL`). `account_service.delete_user()` ejecuta CASCADE limpio.
+- **Impacto**: `safety_events.user_id` NULLABLE con `ON DELETE SET NULL` (vigente desde el initial migration `08b6189ffc35` — el SET NULL ya estaba allí). `account_service.delete_account()` ejecuta CASCADE limpio + emite `audit_log` con `actor_id=NULL` y `details={email_snapshot}` antes del DELETE. Efecto colateral en `safety_events.session_id`: también queda NULL (CASCADE indirecto vía borrado de `sessions`).
 - **Estado**: ✅ implementado.
 
 ### D-15 — Mabel IA se distribuye como PWA
@@ -232,7 +232,7 @@ Estas decisiones se tomaron durante implementación (2026-05) pero la página No
 - **Decisión**: A partir de 2026-05-24, la documentación técnica vive en `docs/*.md` del repositorio. Notion queda como snapshot histórico (no se elimina, no se actualiza). Cualquier PR que afecte arquitectura, schema, deploy o flujo de usuario DEBE incluir el update del `.md` correspondiente, verificado pre-commit por el code-review skill.
 - **Motivación**: drift comprobado de 11 semanas en Notion vs código. La fricción de actualizar Notion (browser, navegación, IDs) hizo que dejara de actualizarse. Markdown en repo evoluciona junto al código en el mismo PR, sin fricción.
 - **Impacto**: nuevos docs en `docs/` (este archivo entre ellos). Deprecación de `TECHSTACK.md`, `DB_SCHEMA_REVIEW.md`, `DB_SCHEMA_EVOLUTION_002/004.md`, `INTERFACES_MVP_CATALOGO.md`, `REPORTE_VALIDACION_BD_INTERFACES.md`, `FASE2_*.md`, `FASE3_*.md`. `.claude/agents/AGENT_*.md` trimmed a stubs.
-- **Estado**: 🟡 en implementación (esta migración).
+- **Estado**: ✅ implementado (commit `4546308`, 2026-05-24).
 
 ---
 
@@ -262,7 +262,7 @@ Acuerdos de proceso del equipo. No son decisiones técnicas pero rigen cómo se 
 
 - `MEMORY.md` — auto-memoria con D-XX, evos, workflows acumulados
 - `docs/TECH_STACK.md` — ADRs técnicos vivos (paralelos a las D-XX)
-- `docs/DB_SCHEMA.md` — evoluciones del esquema (refleja D-14, Evo 005c)
+- `docs/DB_SCHEMA.md` — evoluciones del esquema (refleja D-14 / DT-11+DT-12; las antiguas labels "Evo 005b/005c" no existen como archivos Alembic, ver `docs/AGENTES.md` §9.4)
 - `docs/FASES_IMPLEMENTACION.md` — qué fase implementó cada decisión
 - `docs/INTERFACES_MVP.md` — qué interfaces materializan cada decisión
 - `docs/AGENTES.md` — quién propuso/votó cada decisión

@@ -55,6 +55,10 @@ Las cinco cadenas validadas en Notion (2026-03-01) siguen vigentes con un ajuste
 
 ## 4. Fichas individuales
 
+> **Nota de numeración D-XX (importante)**: las citas "D-XX" dentro de las fichas siguientes (`Participación en decisiones (D-XX)`) son una **numeración heredada del snapshot Notion** de marzo 2026. Esa numeración cubre principalmente decisiones técnicas de infraestructura y se encuentra catalogada en §9.1 como **DT-01 a DT-13** (T por "Técnicas"). Para decisiones de producto/legal/UX (login unificado, SOS FAB, ARCO en preferencias, etc.) la **fuente canónica** vigente es `docs/DECISIONES.md` con su propio set D-01 a D-22. Cuando una ficha diga "Ag.X arbitró D-07 (SOS FAB)", el lector debe entender: tema "SOS FAB", catalogado hoy como **D-02 en DECISIONES.md** y referenciado también como **PO-2** (decisión del Product Owner 2026-02-23). La reconciliación completa de equivalencias está en §9.3.
+
+> **Nota de Evoluciones BD (importante)**: las fichas citan "Evo 002 / 003 / 004 / 005 / 005b / 005c" como migraciones — son **labels narrativos del snapshot Notion**, NO archivos Alembic. Las migraciones Alembic reales empiezan en `08b6189ffc35_initial_schema_13_tables` (que consolida todo lo que esos labels describían) seguido de `006_*` … `012_*`. Listado completo en §9.4. Cualquier mención a `005b_*.py` o `005c_*.py` en estas fichas es un alias histórico — el cambio real vive en el initial migration.
+
 ### Ag.01 — Project Manager / Scrum Master
 
 **Propósito.** Coordinar el ciclo de vida del proyecto, planificación de sprints, backlog (HU-01 … HU-17), priorización y desbloqueo cross-agente. Es el "Agente Orquestador".
@@ -157,7 +161,7 @@ Las cinco cadenas validadas en Notion (2026-03-01) siguen vigentes con un ajuste
 
 **Responsabilidades actuales**:
 - **Capa LLM**: por defecto `OpenAICompatAdapter` (no `GeminiAdapter` directo). Factory `get_llm_provider()` en `backend/app/services/llm/__init__.py` lee `LLM_PROVIDER` env. Default apunta a **Mabel-Gemma4** vía Modal.com (`LLM_BASE_URL`, `LLM_MODEL=mabel-gemma4`).
-- 28 endpoints REST en `backend/app/routers/*`, incluido el endpoint SSE de chat (`session_router.py:send_message → EventSourceResponse`).
+- ~75 endpoints REST en `backend/app/routers/*` (12 routers estudiante/sistema + 7 admin), incluido el endpoint SSE de chat (`session_router.py:send_message` línea 182 → `StreamingResponse(sse_generator(), media_type="text/event-stream")` con generador async que formatea events SSE a mano; no se usa `sse-starlette`).
 - **Script cron L2 redaction**: `backend/scripts/redact_old_message_ids.py`, invocado por `railway.cron.toml` con `python -m scripts.redact_old_message_ids` (módulo, no script directo).
 - Admin panel backend (commit `ffe1211`): full lifecycle de sesiones (list / hide / delete bulk), audit log con `actor_id` (Evo 008), multi-select bulk actions, métricas reactivas (`empathy_service`, `metrics_service`).
 - Pipeline guardrails pre/post sobre cualquier adapter LLM.
@@ -386,7 +390,7 @@ Las cinco cadenas validadas en Notion (2026-03-01) siguen vigentes con un ajuste
 
 **Participación en D-XX**: arbitró D-03, D-05, D-11, D-14, D-15.
 
-**Participación en evoluciones**: lead en 004 (consent_versions), 005, 005b, 005c; validador del cron L2 (010+pipeline retention).
+**Participación en evoluciones**: lead narrativo en las decisiones que el snapshot Notion etiquetó como "Evo 004 / 005 / 005b / 005c" — todas consolidadas en el initial migration Alembic `08b6189ffc35` (ver §9.4 — esas labels nunca existieron como archivos `.py`). Validador del cron L2 de retención (D-21) implementado como script standalone (`backend/scripts/redact_old_message_ids.py` + `railway.cron.toml`), NO una migración Alembic.
 
 **Permisos / restricciones**: puede bloquear release si DPIA detecta riesgo no mitigado. Dueño de los documentos legales.
 
@@ -544,7 +548,7 @@ Pasos:
 4. **Decisión consensuada** o sube a PO si requiere alineación de producto.
 5. **Ag.14** documenta como D-XX en este archivo (sección 9) y en `docs/` del feature.
 
-Histórico aplicable: D-01 … D-15. Propuestas en pipeline: D-16 (swap LLM Mabel-Gemma4 + Modal), D-17 (cron L2 redaction), D-18 (Modal hosting), D-19 (docs en repo), D-20 (avatar 2D pre-Fase-9).
+Histórico aplicable: **D-01 … D-22 canonical** en `docs/DECISIONES.md` (D-01..D-15 base + D-16 brand-skin + D-17 swap LLM + D-18 Modal + D-19 lazy session + D-20 cold-start UX + D-21 cron L2 + D-22 docs viva en repo). Decisiones técnicas internas (stack, motor BD, factory LLM, etc.) catalogadas como **DT-01 … DT-13** en §9.1 de este doc.
 
 ### 6.4 Implementación (Sprint)
 
@@ -616,70 +620,130 @@ Regla: **el PR debe incluir actualización de doc en el mismo commit/PR**. No se
 
 ## 9. Historial de participación
 
-### 9.1 Decisiones (D-01 … D-15) — del snapshot Notion
+### 9.1 Decisiones técnicas de infraestructura (DT-01 … DT-13)
 
-| D | Tema | Estado | Arbitró | Año |
-|---|------|--------|---------|------|
-| D-01 | Stack monorepo (FastAPI + React + Postgres) | Aprobada | Ag.02 | 2026 |
-| D-02 | PostgreSQL único motor (dev y prod) | Aprobada | Ag.03 | 2026 |
-| D-03 | Masking PII en admin panel | Aprobada | Ag.12 | 2026 |
-| D-04 | Eliminación `consents.version` (redundante con `consent_version_id`) | Aprobada | Ag.02 | 2026 |
-| D-05 | Consent gating en routers protegidos | Aprobada | Ag.12 | 2026 |
-| D-06 | Severity ladder safety_events (1-5) + rúbrica empatía 1-5 | Aprobada | Ag.08 + Ag.13 | 2026 |
-| D-07 | SOS solo FAB (no header) | Aprobada | Ag.09 (PO) | 2026 |
-| D-08 | UNIQUE `uq_consents_user_version` para re-aceptación via UPDATE | Aprobada | Ag.03 | 2026 |
-| D-09 | Sidebar 220px ambos roles | Aprobada | Ag.09 (PO) | 2026 |
-| D-10 | Env vars vs `system_config` (two-layer config) | Aprobada | Ag.02 | 2026 |
-| D-11 | Hard DELETE no borra eventos críticos (SET NULL) | Aprobada | Ag.12 | 2026 |
-| D-12 | UI persistence Compliance (Settings consent fetch) | Aprobada | Ag.05 + Ag.12 | 2026 |
-| D-13 | Factory pattern para LLM (dos adapters) | Aprobada | Ag.02 | 2026 |
-| D-14 | Hard DELETE directo MVP (Opción A) | Aprobada | Ag.12 + Ag.02 | 2026 |
-| D-15 | PWA con `vite-plugin-pwa` | Aprobada | Ag.02 + Ag.05 | 2026 |
+> Estas decisiones fueron registradas en el snapshot Notion de marzo 2026 con la numeración heredada D-01 … D-15. Para evitar colisión con `docs/DECISIONES.md` (numeración canónica de producto/legal/UX), se renombran en este doc a **DT-XX** ("Decisiones Técnicas"). El mapeo histórico Notion-vs-actual está en §9.3. Estas decisiones cubren stack, persistencia, contratos internos y constraints — separadas de las decisiones de producto.
 
-### 9.2 Decisiones propuestas (D-16 … D-20) — pendientes de formalizar
+| DT | Tema | Estado | Owner | Equivalencia DECISIONES.md |
+|----|------|--------|-------|---------------------------|
+| DT-01 | Stack monorepo (FastAPI + React + Postgres) | Aprobada | Ag.02 | — (infraestructura base, no en lista product) |
+| DT-02 | PostgreSQL único motor (dev y prod, sin SQLite) | Aprobada | Ag.03 | — |
+| DT-03 | Masking PII en admin panel | Aprobada | Ag.12 | — (control transversal admin) |
+| DT-04 | Eliminación `consents.version` (redundante con `consent_version_id`) | Aprobada | Ag.02 | — (refactor BD interno) |
+| DT-05 | Consent gating en routers protegidos | Aprobada | Ag.12 | Relacionada con D-09 (consent scroll) |
+| DT-06 | Severity ladder safety_events (1-5) + rúbrica empatía 1-5 | Aprobada | Ag.08 + Ag.13 | Relacionada con D-11 (instrumentos) |
+| DT-07 | UNIQUE `uq_consents_user_version` para re-aceptación via UPDATE | Aprobada | Ag.03 | Relacionada con D-09 |
+| DT-08 | Env vars vs `system_config` (two-layer config) | Aprobada | Ag.02 | — |
+| DT-09 | UI persistence Compliance (Settings consent fetch) | Aprobada | Ag.05 + Ag.12 | Relacionada con D-05 (ARCO) |
+| DT-10 | Factory pattern para LLM (dos adapters: OpenAICompat + Gemini fallback) | Aprobada | Ag.02 | Ver D-17 (swap default) |
+| DT-11 | Hard DELETE directo MVP (Opción A) — sin grace period | Aprobada | Ag.12 + Ag.02 | **= D-14 en DECISIONES.md** |
+| DT-12 | `safety_events.user_id` SET NULL para preservar eventos anónimos post-eliminación | Aprobada | Ag.12 + Ag.03 | **Parte de D-14** |
+| DT-13 | PWA con `vite-plugin-pwa` (decisión registrada; implementación pendiente Fase 10) | 🟠 Decidida, no implementada | Ag.02 + Ag.05 | **= D-15 en DECISIONES.md** |
 
-| D | Tema | Disparador | Proponente |
-|---|------|-----------|-----------|
-| D-16 | Swap LLM default a Mabel-Gemma4 vía Modal.com | Commit `768b17d` (2026-05-23) | Ag.06 + Ag.02 |
-| D-17 | Cron L2 redaction (servicio Railway separado) | Commit `8adbb54` (2026-05-24) | Ag.12 + Ag.11 |
-| D-18 | Modal.com como host del modelo (warm pools + check-in user turn) | Commit `768b17d` | Ag.11 + Ag.06 |
-| D-19 | Docs vivos en `docs/*.md` reemplazan a Notion como referencia técnica | Política 2026-05-22/24 | Ag.14 |
-| D-20 | Brand-skin v2 unificado (student + admin) con paleta `#A51916`/`#0F303A` | Commits `ca845f4` + `543f4b9` | Ag.09 |
+### 9.2 Decisiones de producto / legal / UX
 
-### 9.3 Evoluciones de schema (002 … 012)
+La fuente canónica es **`docs/DECISIONES.md`** (D-01 a D-22). Esta tabla es solo un índice rápido:
 
-| Evo | Tema | Owner | Estado |
-|-----|------|-------|--------|
-| 002 | Initial schema (13 tablas) | Ag.03 | Aplicada |
-| 003 | Seed `consent_versions.active` | Ag.03 + Ag.12 | Aplicada |
-| 004 | Seed `system_config` operational keys | Ag.03 + Ag.08 | Aplicada |
-| 005 | Eliminar `consents.version` redundante | Ag.03 + Ag.02 | Aplicada |
-| 005b | `safety_events.user_id` nullable + SET NULL | Ag.03 + Ag.12 | Aplicada |
-| 005c | Documentación formal del cambio en Notion (legacy) | Ag.14 | Aplicada (snapshot Notion) |
-| 006 | Research instrumentation (`users.cohort`, latencia split, `empathy_ratings`, `study_lock_enabled`) | Ag.13 + Ag.03 | Aplicada |
-| 007 | TIMESTAMPTZ conversion en columnas time | Ag.03 | Aplicada |
-| 008 | `audit_logs.actor_id` | Ag.03 + Ag.04 | Aplicada |
-| 009 | Greeting unique + `empathy_updated` | Ag.03 + Ag.04 | Aplicada |
-| 010 | `safety_keywords` legacy → estructurado `[{keyword, critical}]` | Ag.08 + Ag.03 | Aplicada (idempotente) |
-| 011 | `session_ratings` (1-5 corazones, upsert) | Ag.13 + Ag.03 | Aplicada |
-| 012 | `sessions.hidden_at` + `hidden_reason` (soft-hide) | Ag.03 + Ag.12 | Aplicada |
+| ID | Tema | Estado |
+|----|------|--------|
+| D-01 | Login unificado (estudiante + admin) | ✅ |
+| D-02 | Panel SOS como FAB flotante (no ruta) | ✅ |
+| D-03 | Recuperación de contraseña simplificada (manual en MVP) | 🟡 Parcial |
+| D-04 | Recharts para gráficas admin | ✅ |
+| D-05 | Derechos ARCO en Settings (no ruta) | ✅ |
+| D-06 | Logs de auditoría en tabla separada | ✅ |
+| D-07 | No chat tiempo real multi-usuario | ✅ (enforced) |
+| D-08 | Empty states con acción sugerida | ✅ |
+| D-09 | Consentimiento con scroll obligatorio | ✅ |
+| D-10 | Tabla `password_reset_tokens` separada | ✅ |
+| D-11 | Instrumentos SUS/Empatía administrados externamente | ✅ |
+| D-12 | 3 interfaces adicionales (42 total) | ✅ |
+| D-13 | Importación de resultados vía API | ✅ |
+| D-14 | Hard DELETE de usuarios + safety_events SET NULL | ✅ (= DT-11 + DT-12) |
+| D-15 | Mabel IA como PWA | 🟠 Decidida, no implementada (= DT-13) |
+| D-16 | Brand-skin v2 aplicado a UI student + admin | ✅ |
+| D-17 | Swap del adaptador LLM a OpenAI-compat (default) | ✅ |
+| D-18 | Mabel-Gemma4 hospedada en Modal.com | ✅ |
+| D-19 | Lazy session create (primer mensaje) | ✅ |
+| D-20 | 3 capas UX para LLM cold start | ✅ |
+| D-21 | Cron L2 de redacción de `message_id` | ✅ |
+| D-22 | Documentación viva en repo, Notion como vitrina | ✅ |
 
-> **Drift detectado**: `db/schema_postgresql.sql` actualmente declara 14 tablas y omite `session_ratings` (Evo 011). Ag.03 debe sincronizar el DDL como deuda de la sección 10.
+Detalle completo (fecha, propuesto-por, motivación, impacto): `docs/DECISIONES.md`.
+
+### 9.3 Mapeo histórico Notion → AGENTES.md actual
+
+Para reconciliar referencias en docs antiguos / Notion snapshot:
+
+| Notion (snapshot 2026-03-01) | AGENTES.md actual | DECISIONES.md actual |
+|-----------------------------|-------------------|---------------------|
+| D-01 Stack monorepo | DT-01 | — |
+| D-02 PostgreSQL único motor | DT-02 | — |
+| D-03 Masking PII | DT-03 | — |
+| D-04 Eliminación consents.version | DT-04 | — |
+| D-05 Consent gating | DT-05 | Relacionada D-09 |
+| D-06 Severity ladder | DT-06 | Relacionada D-11 |
+| D-07 SOS FAB (Notion) | — | D-02 (canonical) / PO-2 (PO list) |
+| D-08 UNIQUE re-aceptación | DT-07 | — |
+| D-09 Sidebar 220px (Notion) | — | PO-6 (PO list) |
+| D-10 Env vs system_config | DT-08 | — |
+| D-11 Hard DELETE no borra eventos | DT-12 | Parte de D-14 |
+| D-12 UI persistence | DT-09 | — |
+| D-13 Factory LLM | DT-10 | Relacionada D-17 |
+| D-14 Hard DELETE directo | DT-11 | **D-14 (idéntica)** |
+| D-15 PWA | DT-13 | **D-15 (idéntica)** |
+
+Decisiones nuevas post-snapshot (no estaban en Notion 2026-03-01): D-16..D-22 son la extensión canónica registrada en `docs/DECISIONES.md`.
+
+### 9.4 Evoluciones de schema (Alembic real)
+
+> **Aclaración de numeración**: hay **dos sistemas en uso**: (a) el **filename Alembic** (ej. `007_timestamptz_conversion.py`), y (b) el **`[Evolucion N]` en docstring** dentro de cada migración (ej. `007_*` dice `[Evolucion 006]`). Difieren por +1 porque las evoluciones 002-005 históricas se consolidaron en el initial migration. Esta tabla usa el **filename** como fuente única.
+
+| Archivo Alembic | Fecha | Tema | Owner |
+|-----------------|-------|------|-------|
+| `08b6189ffc35_initial_schema_13_tables.py` | 2026-03-07 | Initial schema consolidado (incluye lo que docs de marzo llamaban Evo 002-005c) | Ag.03 |
+| `3c6f5125803d_seed_consent_version_active.py` | 2026-03-07 | Seed `consent_versions.active` v1.0 | Ag.03 + Ag.12 |
+| `a1b2c3d4e5f6_seed_system_config_operational_keys.py` | 2026-03-07 | Seed 4 keys: `sos_hotline_numbers`, `safety_keywords`, `sos_severity_threshold`, `guardrails_enabled` | Ag.03 + Ag.08 |
+| `006_research_instrumentation.py` | 2026-05-20 | `users.cohort`, latency split en messages, `empathy_ratings`, `study_lock_enabled` | Ag.13 + Ag.03 |
+| `007_timestamptz_conversion.py` | 2026-05-22 | TIMESTAMPTZ universal (24 cols) — fix asyncpg offset-aware/naive | Ag.03 |
+| `008_audit_logs_actor.py` | 2026-05-22 | `audit_logs.admin_id` → `actor_id` + `actor_role` (admin\|student\|system) | Ag.03 + Ag.04 |
+| `009_greeting_unique_empathy_updated.py` | 2026-05-22 | `uq_messages_session_greeting` UNIQUE parcial + `empathy_ratings.updated_at` | Ag.03 + Ag.04 |
+| `010_safety_keywords_structured.py` | 2026-05-23 | `safety_keywords` shape: `string[]` → `[{keyword, critical}]` (idempotente) | Ag.08 + Ag.03 |
+| `011_session_ratings.py` | 2026-05-23 | Tabla nueva `session_ratings` (1-5 corazones, upsert idempotente) | Ag.13 + Ag.03 |
+| `012_sessions_hidden.py` | 2026-05-23 | `sessions.hidden_at` + `hidden_reason` + índice parcial `idx_sessions_user_visible` | Ag.03 + Ag.12 |
+
+**Total**: 10 archivos en `backend/alembic/versions/` al 2026-05-24 (1 initial + 2 seeds + 7 evolutivas 006-012).
+
+> **Drift detectado** (registrado en DR-03 de §10): `db/schema_postgresql.sql` declara 14 `CREATE TABLE` y omite `session_ratings` (Evo 011) y las columnas `sessions.hidden_at` / `hidden_reason` (Evo 012). El DDL declarativo debe regenerarse vía `pg_dump --schema-only` post `alembic upgrade head` para volver a ser fuente humana confiable.
+
+**Sobre las "Evo 002…005c" antiguas**: aparecían en el snapshot Notion como migraciones separadas pero NUNCA fueron archivos Alembic — son labels narrativos que describen pasos del diseño consolidados en el initial migration. Las menciones residuales en docs (`DECISIONES.md` D-14 "Evo 005c", memorias antiguas) deben leerse como "consolidado en el initial migration".
 
 ## 10. Drift residual / pendientes
 
+### Cerrados en migración Notion → docs/ (2026-05-24, commit `4546308`)
+
+| ID | Pendiente original | Resolución |
+|----|--------------------|-----------|
+| DR-01 | Recortar stubs `.claude/agents/AGENT_*.md` a 1-liner | ✅ 15/15 stubs trimmed, YAML frontmatter preservado para routing |
+| DR-02 | Etiquetar Notion como snapshot histórico | ✅ Política D-22 formalizada en `DECISIONES.md`; Notion explícitamente deprecada como referencia técnica viva |
+| DR-04 | Stubs AGENT_03 dicen "8-table schema" / "Gemini directo" | ✅ Descriptions del YAML corregidas al estado real ("15-table schema", "OpenAI-compatible adapter") |
+| DR-05 | Stubs AGENT_06/11 dicen "100% local" / "DIFERIDO" | ✅ AGENT_06 reactivado en YAML ("Owns Mabel-Gemma4 fine-tune..."), AGENT_11 actualizado ("Railway production deploy + Modal LLM") |
+| DR-06 | Stubs AGENT_14 dicen "Notion knowledge base" | ✅ Actualizado a "docs/*.md (canonical source) + Notion (snapshots históricos)" |
+| DR-07 | Formalizar D-16..D-20 como decisiones canónicas | ✅ Formalizadas como D-16..D-22 en `DECISIONES.md` §3; equivalencias en §9.3 de este doc |
+
+### Pendientes abiertos (al 2026-05-24)
+
 | ID | Pendiente | Owner | Prioridad |
 |----|-----------|-------|-----------|
-| DR-01 | Stubs `.claude/agents/AGENT_*.md` deben recortarse a 1-liner que apunte a `docs/AGENTES.md`; preservar SOLO el frontmatter YAML (que es lo único que el harness lee para routing). | Ag.01 + Ag.14 | Alta — programado para Etapa 4 |
-| DR-02 | Notion "Sistema de Agentes" debe etiquetarse explícitamente: "Snapshot histórico — ver `docs/AGENTES.md` para estado actual". | Ag.14 | Alta |
-| DR-03 | `db/schema_postgresql.sql` declara 14 tablas; falta `session_ratings` (Evo 011). Sincronizar DDL. | Ag.03 | Media |
-| DR-04 | Stubs `.claude/agents/AGENT_03_*.md` mencionan "8-table schema" y "Gemini directo" en descripciones largas; sólo el frontmatter YAML está al día. | Ag.14 (recorte en DR-01) | Cubierto por DR-01 |
-| DR-05 | Stubs `.claude/agents/AGENT_06_*.md` y `AGENT_11_*.md` declaran "100% local" / "DIFERIDO"; estado real es Activo / Railway+Modal. | Ag.14 (recorte en DR-01) | Cubierto por DR-01 |
-| DR-06 | Stubs `.claude/agents/AGENT_14_*.md` indican "Notion knowledge base" como destino; política actual es docs en repo. | Ag.14 (recorte en DR-01) | Cubierto por DR-01 |
-| DR-07 | Decisiones D-16 … D-20 propuestas (sección 9.2) deben formalizarse como entradas equivalentes a D-01 … D-15 en una próxima auditoría de Ag.01. | Ag.01 + Ag.02 | Media |
-| DR-08 | Migración Alembic formal pendiente al cortar release real (memoria `dev-prod-status`); revisar idempotencia de toda la cadena 001 … 012 sobre BD limpia. | Ag.03 + Ag.10 | Alta antes del piloto |
-| DR-09 | DPIA debe actualizarse incorporando el cron L2 redaction como control activo (D-17). | Ag.12 | Alta |
-| DR-10 | Avatar 3D (Fase 9) sigue pendiente; mantener `docs/AVATAR_3D_DECISION_TECNICA.md` como plan vivo. | Ag.15 | Media |
+| DR-03 | `db/schema_postgresql.sql` declara 14 tablas; falta `session_ratings` (Evo 011) y columnas `sessions.hidden_at/hidden_reason` (Evo 012). Regenerar vía `pg_dump --schema-only` post `alembic upgrade head`. | Ag.03 | Media |
+| DR-08 | Re-verificar idempotencia de toda la cadena Alembic (initial → 012) sobre BD limpia antes de cortar release a producción real. La memoria `dev-prod-status` aceptó force-update durante pre-prod, pero el deploy real requiere validación. | Ag.03 + Ag.10 | Alta antes del piloto |
+| DR-09 | DPIA debe actualizarse incorporando el cron L2 redaction (D-21) como control activo. Hoy el DPIA pre-existente no lo refleja. | Ag.12 | Alta |
+| DR-10 | Avatar 3D (Fase 9) sigue pendiente. `docs/AVATAR_3D_DECISION_TECNICA.md` se preserva como spec vivo para cuando se ejecute. MVP usa sustituto 2D en `Voice.tsx` + `MabelAvatar.tsx`. | Ag.15 | Media |
+| DR-11 | Constraint duplicada potencial: el modelo SQLAlchemy declara `audit_logs_actor_role_check` mientras la migración 008 crea `chk_audit_logs_actor_role`. Verificar con `\d audit_logs` post-deploy; alinear naming. | Ag.03 | Media |
+| DR-12 | PWA (D-15 = DT-13): decisión registrada pero `vite-plugin-pwa` NO instalado en `frontend/package.json`. Implementar en Fase 10. | Ag.05 + Ag.02 | Media (Fase 10) |
+| DR-13 | numpy es importado por `backend/app/services/admin/metrics_service.py` pero NO declarado en `backend/requirements.txt` — viene transitivo vía scipy. Riesgo si scipy cambia su dep tree. Añadir numpy explícito. | Ag.04 + Ag.11 | Baja |
+| DR-14 | `empathy_rating.py:34` (modelo SQLAlchemy) tiene un comentario "[Evolución 008]" cuando el cambio realmente vive en migración `009_greeting_unique_empathy_updated`. Bug menor de doc-en-código. | Ag.03 | Baja |
+| DR-15 | Hallazgos pendientes del audit de manuales `.docx` (`docs/AUDITORIA_MANUALES_2026-05-24.md` §Pendientes): 8 items que requieren decisión del PO o intervención manual (no auto-aplicables). | Ag.14 + PO | Media (post-tribunal) |
 
 ---
 

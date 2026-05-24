@@ -128,7 +128,7 @@
 - **Cambios desde Notion**:
   - `LlmStatusChip` (4 estados: ok/degraded/down/checking) en header con popover ARIA.
   - `StreamingIndicator` 5-stage (idle → thinking → typing → finalizing → error) reemplaza el placeholder genérico "Mabel está escribiendo…".
-  - `HeartRating` agrega calificación empática inline por mensaje (feed para #44).
+  - `HeartRating` — calificación del estudiante a **toda la sesión** (1-5 corazones). Recibe `sessionId`, se monta UNA vez al cerrar la sesión (`sessionEnded === true`). Persiste en tabla `session_ratings` (no `empathy_ratings`). NO alimenta #44 (esa cola usa `empathy_ratings` poblada por admins inter-rater, no por estudiantes).
   - El switch "Modo Avatar 3D" (#10B Notion) **NO existe**: el modo voz se accede como ruta separada `/session/:id/voice` con avatar 2D animado (ver #43).
 
 ### #11 — Modal de reporte de mensaje
@@ -335,7 +335,7 @@
 - **Backend**: `backend/app/services/admin/empathy_service.py`.
 - **Migración asociada**: `009_greeting_unique_empathy_updated.py`.
 - **Origen**: commit `ffe1211`.
-- **Propósito**: panel de calificaciones empáticas inter-rater (HeartRating capturado en `Chat.tsx`) para cumplir criterio de éxito "empatía ≥ 4/5 en ≥80% de casos".
+- **Propósito**: panel de calificaciones empáticas **inter-rater** (admins/investigadores califican mensajes seleccionados de la cola). NO es el mismo widget que `HeartRating` del estudiante en #18: aquel califica sesión completa y persiste en `session_ratings`; este califica mensajes individuales y persiste en `empathy_ratings`. Cumple criterio de éxito "empatía ≥ 4/5 en ≥80% de casos".
 
 ### Componentes transversales nuevos
 
@@ -429,7 +429,7 @@ Para el detalle completo y discusiones véase `docs/DECISIONES.md` (o memoria pe
 
 ### Sidebar (220px)
 - **`StudentSidebarV3`** — colapsable con iconos centrados (commits e91d0d2, fdaca26, 6d5a77e). 4 grupos temporales que sustituyen `/history`. Botón "Nueva sesión" + acceso modal Settings.
-- **`AdminSidebar`** — 9 links (Dashboard, Users, Reports, Safety Events, Metrics, Empathy Ratings, Config, Audit Logs) + badges polling-based.
+- **`AdminSidebar`** — 8 links (Dashboard, Users, Reports, Safety Events, Metrics, Empathy Ratings, Config, Audit Logs) + badges polling-based.
 
 ### Header / UserMenu
 - `Header.tsx` + `UserMenu.tsx` montan el avatar (`UmbAvatar`), nombre, acceso a Settings (modal) y logout.
@@ -465,7 +465,7 @@ Para el detalle completo y discusiones véase `docs/DECISIONES.md` (o memoria pe
 | `CheckinContextPopover.tsx` | Muestra contexto check-in al estudiante. |
 | `Composer.tsx` | Input + mic + send. |
 | `ConfirmDeleteSessionModal.tsx` | Confirmación eliminar sesión. |
-| `HeartRating.tsx` | Rating empático por mensaje. |
+| `HeartRating.tsx` | Calificación 1-5 corazones del estudiante a la sesión completa (al cerrar). Persiste en `session_ratings`. NO alimenta #44. |
 | `LlmStatusChip.tsx` | Estado LLM en TopBar. |
 | `ReportModal.tsx` | Reporte de mensaje (#11). |
 | `SessionSearchModal.tsx` | Búsqueda fuzzy de sesiones (Cmd/Ctrl+K). |

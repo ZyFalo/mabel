@@ -440,7 +440,7 @@ Tabla inmutable de auditoría (no se eliminan, no se actualizan). Evo 008 renomb
 | `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
 
 **CHECK**
-- `audit_logs_actor_role_check` (alias `chk_audit_logs_actor_role` en la migración): `actor_role IN ('admin','student','system')`
+- CHECK constraint `actor_role IN ('admin','student','system')`. **⚠️ Naming dual (deuda DR-11)**: el modelo SQLAlchemy declara `name='audit_logs_actor_role_check'` (`backend/app/models/audit_log.py:16`) mientras la migración 008 crea `chk_audit_logs_actor_role` (`backend/alembic/versions/008_audit_logs_actor.py:124`). **No son alias** — son nombres distintos en Postgres; según el orden de aplicación puede crearse uno u otro (o duplicarse si Postgres ya tiene la otra por autogenerate previo). Verificar con `\d audit_logs` post-deploy.
 
 **Índices**
 - PK
@@ -742,3 +742,33 @@ Inventariado al 2026-05-24:
 | `SessionRating` | `backend/app/models/session_rating.py` | `session_ratings` |
 | `AuditLog` | `backend/app/models/audit_log.py` | `audit_logs` |
 | `SystemConfig` | `backend/app/models/system_config.py` | `system_config` |
+
+---
+
+## Apéndice C — Mapa Repositorio ↔ Tabla + comportamientos no-evidentes
+
+Los repositorios viven en `backend/app/repositories/`. Hay **14 archivos** para 15 tablas — `session_ratings` no tiene repo dedicado; su acceso se hace desde `session_repository.py`.
+
+| Repositorio | Tabla principal | Notas / comportamientos no-evidentes |
+|---|---|---|
+| `user_repository.py` | `users` | `list_paginated` no filtra `disabled_at IS NULL` — el filter es responsabilidad del caller. |
+| `password_reset_repository.py` | `password_reset_tokens` | `mark_used` setea `used_at`. Idempotente: no falla si ya está used. |
+| `consent_version_repository.py` | `consent_versions` | `get_active()` filtra `is_active=true`. Solo una activa a la vez (UNIQUE parcial). |
+| `consent_repository.py` | `consents` | `get_current(user_id)` devuelve el consentimiento más reciente (`MAX(accepted_at)`). |
+| `preference_repository.py` | `preferences` | Si no existe, devuelve `None` (no crea defaults — `preference_service` se encarga). |
+| `session_repository.py` | `sessions` (solo) | **⚠️ load-bearing**: `list_by_user` filtra `hidden_at IS NULL` por defecto. `history_service.py:227` (línea 226 es el comentario, 227-229 la query real) usa `select(SessionModel)` directo para listar incluyendo hidden, intencional. |
+| (sin repo dedicado) | `session_ratings` | Acceso directo vía SQLAlchemy desde `backend/app/services/admin/metrics_service.py` (import del modelo `SessionRating` + queries inline). El servicio del chat usa el repo de mensajes; los ratings no tienen wrapper. |
+| `message_repository.py` | `messages` | `list_by_session` ordena por `created_at ASC` para preservar orden conversacional. `count_for_window` cuenta para el sliding window (default 20). |
+| `message_report_repository.py` | `message_reports` | `exists_for_message_user` para badge "Ya reportado" (idempotencia UI). |
+| `attachment_repository.py` | `attachments` | `create_audio` setea `kind='audio'` automáticamente. |
+| `safety_event_repository.py` | `safety_events` | `count_active_for_user` para badge sidebar. NO filtra por `user_id IS NULL` (los anónimos cuentan para métricas globales). |
+| `survey_response_repository.py` | `survey_responses` | Import-only API; sin métodos UI-facing. |
+| `empathy_rating_repository.py` | `empathy_ratings` | `list_queue` devuelve mensajes sin calificar; `list_rated` muestra todos los ratings (cross-rater). |
+| `audit_log_repository.py` | `audit_logs` | `create` valida `actor_role` ∈ ALLOWED_ROLES en código (no confiar solo en CHECK). |
+| `system_config_repository.py` | `system_config` | Cache en memoria con TTL — refresh al restart. `set_value` invalida el cache. |
+
+### Servicios que bypassean el repo deliberadamente
+
+- `history_service.py:227-229` — `select(SessionModel).where(SessionModel.id == session_id)` directo para INCLUIR sesiones soft-hidden (el repo `list_by_user` las filtra). Comentario en línea 226 documenta la decisión.
+- `account_service.delete_account()` — delega en `user_repository.delete()` (no ejecuta SQL crudo). El repo hace `delete(User).where(User.id == user_id)` ORM-level DML; el CASCADE lo aplica Postgres. El snapshot del email se hace ANTES del delete porque `audit_logs.actor_id` queda NULL post-CASCADE (FK SET NULL).
+- `chat_service` — usa `update(Message)` directo (`backend/app/services/chat_service.py:631-638`) para acumular tokens en el greeting de forma atómica, evitando race en concurrent assistant turns. El repo de mensajes no expone un `increment_tokens` atómico. El sliding window de contexto sí va por el repo (`self.message_repo.get_context_window(...)`), no por SQL directo.

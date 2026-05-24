@@ -29,7 +29,7 @@ Runtime y framework
 | Componente | Versión (real) | Origen | Notas |
 |---|---|---|---|
 | Python | **3.11-slim** | `Dockerfile:28` | Runtime de producción. Antes se documentó 3.12; la imagen final corre 3.11 (estabilidad de wheels en faster-whisper). |
-| FastAPI | `>=0.115,<1` | `backend/requirements.txt:1` | ASGI app principal. Lifespan hook valida `JWT_SECRET` no vacío al boot (`app/main.py:52-57`). |
+| FastAPI | `>=0.115,<1` | `backend/requirements.txt:1` | ASGI app principal. Lifespan hook valida `JWT_SECRET` no vacío al boot (`app/main.py:52-58`). |
 | Uvicorn (`[standard]`) | `>=0.32,<1` | `requirements.txt:2` | Servidor ASGI; `exec uvicorn ...` como PID 1 en Docker para SIGTERM graceful (`Dockerfile:82-87`). |
 | Pydantic Settings | `>=2.6,<3` | `requirements.txt:6` | Carga de `.env` desde la raíz del repo (`app/core/config.py:6`). |
 | SQLAlchemy `[asyncio]` | `>=2.0,<3` | `requirements.txt:3` | ORM async. Repository pattern. |
@@ -52,7 +52,7 @@ LLM / dependencias auxiliares
 | google-generativeai | `>=0.8,<1` | Solo para `GeminiAdapter` legacy (fallback cuando `LLM_PROVIDER=gemini_native`). |
 | faster-whisper | `>=1.0,<2` | ASR local. |
 | piper-tts | `>=1.4,<2` | TTS local subprocess. |
-| scipy | `>=1.13,<2` | Cálculos estadísticos para el panel admin (Cohen's d, IC). |
+| scipy | `>=1.13,<2` | Estadística inferencial del panel admin: `ttest_rel`, `wilcoxon`, `shapiro`, `t.ppf` para IC, además de Cohen's d. Importado en `backend/app/services/admin/metrics_service.py:27`. **Carga `numpy` transitivamente** (numpy NO está declarado en `requirements.txt`; si scipy cambia su dep tree, el panel rompe — ver DR-13 en `AGENTES.md` §10). |
 | python-dotenv | `>=1.0,<2` | Carga `.env` (en local; Railway inyecta directo). |
 | Ruff | `>=0.8,<1` | Linter + formatter Python. |
 
@@ -83,7 +83,7 @@ Versiones reales según `frontend/package.json` (al 2026-05-24):
 | `@vitejs/plugin-react` | `^5.1.1` | HMR + Fast Refresh. |
 | tailwindcss | `^4.2.1` | CSS utility-first (v4, no v3.4). |
 | `@tailwindcss/vite` | `^4.2.1` | Plugin Vite v4 (config en `vite.config.ts`, sin `tailwind.config.js` separado). |
-| zustand | `^5.0.11` | Stores globales (`authStore`, `chatStore`, `preferencesStore`, `toastStore`). |
+| zustand | `^5.0.11` | Stores globales en `frontend/src/stores/`: `authStore`, `chatStore`, `preferencesStore`, `toastStore`, `adminStore`. |
 | axios | `^1.13.6` | Cliente HTTP. Interceptor JWT en `src/api/client.ts`. |
 | recharts | `^3.8.1` | Gráficos del panel admin (métricas B–E). |
 | lucide-react | `^1.16.0` | Iconografía. |
@@ -91,9 +91,15 @@ Versiones reales según `frontend/package.json` (al 2026-05-24):
 | eslint | `^9.39.1` | Linter (flat config). |
 | prettier | `^3.8.1` | Formatter. |
 
-Páginas (`frontend/src/pages/`) — 17 archivos: `Landing`, `Login`, `Register`, `ForgotPassword`, `ResetPassword`, `Consent`, `ConsentRejected`, `ConsentRequired`, `Onboarding`, `Home`, `CheckIn`, `Chat`, `Voice`, `SessionDetail`, `SessionEnd`, `Settings`, `AccessDenied`, más subdirectorio `admin/`.
+Páginas (`frontend/src/pages/`) — **17 archivos student** (`Landing`, `Login`, `Register`, `ForgotPassword`, `ResetPassword`, `Consent`, `ConsentRejected`, `ConsentRequired`, `Onboarding`, `Home`, `CheckIn`, `Chat`, `Voice`, `SessionDetail`, `SessionEnd`, `Settings`, `AccessDenied`) + subdirectorio `admin/` con **9 páginas** (`Dashboard`, `Users`, `UserDetail`, `Reports`, `SafetyEvents`, `Metrics`, `Config`, `AuditLogs`, `EmpathyRatings`).
 
-Stores Zustand y guards (`guards/`: `ProtectedRoute`, `ConsentGuard`, `OnboardingGuard`, `PublicRoute`, `RoleGuard`) sostienen el control de flujo. No hay PWA activa al 2026-05-24 (la decisión D-15 documentada en Notion sigue en backlog; no se ha instalado `vite-plugin-pwa`).
+Hooks personalizados (`frontend/src/hooks/`) — **6 hooks**: `useAudioRecorder` (MediaRecorder API), `useElapsedSeconds` (contador con gracia 600ms para Strict Mode + SSE blip), `useKeyboardShortcuts` (cmd-k, etc.), `useLlmPrewarm` (poll `/api/v1/llm/health` con Page Visibility guard), `useSubtitles` (highlight word-by-word proporcional), `useTts` (auto-play + mute global vía localStorage).
+
+Stores Zustand (`frontend/src/stores/`) — **5 stores**: `authStore`, `chatStore`, `preferencesStore`, `toastStore`, `adminStore`.
+
+Guards (`frontend/src/guards/`) — 5 guards: `ProtectedRoute`, `ConsentGuard`, `OnboardingGuard`, `PublicRoute`, `RoleGuard`.
+
+PWA: NO activa al 2026-05-24 (D-15 en backlog; `vite-plugin-pwa` no instalado).
 
 > El frontend se compila en Stage 1 del Dockerfile y se copia a `/app/static` en Stage 2. El SPA se sirve desde el mismo FastAPI con catch-all en `app/main.py:121-145`, con guard de path-traversal.
 
@@ -107,7 +113,7 @@ Stores Zustand y guards (`guards/`: `ProtectedRoute`, `ConsentGuard`, `Onboardin
 | Local | `docker compose up -d` levanta el servicio en `localhost:5433`. |
 | Prod | Railway Managed Postgres; `DATABASE_URL` inyectado por el plugin. Se normaliza a `postgresql+asyncpg://` en `config.py:73-83`. |
 | Extensión | `pgcrypto` (UUIDs `gen_random_uuid()`). |
-| Migraciones | Alembic. 12 revisiones aplicadas al 2026-05-24 (`08b6189ffc35_initial_schema_13_tables` → `012_sessions_hidden`). |
+| Migraciones | Alembic. **10 archivos** en `backend/alembic/versions/` al 2026-05-24 (`08b6189ffc35_initial_schema_13_tables` → `012_sessions_hidden`): 1 initial + 2 seeds + 7 evolutivas (006-012). Detalle: `docs/DB_SCHEMA.md` §4 y `docs/AGENTES.md` §9.4. |
 | DDL fuente | `db/schema_postgresql.sql` para referencia humana; los models SQLAlchemy son la fuente real al haber Alembic autogenerate. |
 
 Detalle de tablas, columnas, FK, índices y evoluciones completas (002 → 012): ver `docs/DB_SCHEMA.md`. Política de retención: `docs/DATA_RETENTION_POLICY.md`.
@@ -131,15 +137,21 @@ class LLMProvider(Protocol):
     ) -> AsyncGenerator[str, None]: ...
 ```
 
+**Contrato semántico de `usage_sink`** (load-bearing): si el caller pasa un dict, el adapter DEBE rellenarlo in-place con `prompt_tokens` y `completion_tokens` (típicamente en el último chunk del stream). Esa mutación alimenta las columnas `messages.tokens_prompt` y `messages.tokens_completion` en BD. Adapters deben tratar `usage_sink` como **best-effort** y nunca lanzar excepción si el proveedor no expone usage. Callers que no necesitan stats lo omiten.
+
 Factory en `services/llm/__init__.py`:
 
 ```python
 def get_llm_provider() -> LLMProvider:
     provider = (settings.LLM_PROVIDER or "openai_compat").lower()
     if provider == "gemini_native":
+        from app.services.llm.gemini_adapter import GeminiAdapter  # lazy
         return GeminiAdapter()        # legacy fallback
+    from app.services.llm.openai_adapter import OpenAICompatAdapter  # lazy
     return OpenAICompatAdapter()      # default
 ```
+
+> **Imports lazy intencionales** dentro de las ramas del `if`. Esto evita cargar el SDK `google-generativeai` cuando el provider activo es `openai_compat`, y viceversa — reduce el peso al startup y permite que el cron service (que no usa LLM) no arrastre ninguno de los dos.
 
 Dos implementaciones activas:
 
@@ -159,10 +171,10 @@ Dos implementaciones activas:
 
 `prompts.py` mantiene dos system prompts:
 
-- **`MABEL_GEMMA4_SYSTEM_PROMPT`** (`prompts.py:46-61`) — prompt B+ EXACTO con el que se fine-tuneó. NUNCA editar a la ligera (degrada safety, estilo y guardrails según la doc del repo `Gemma4-Mabel`).
+- **`MABEL_GEMMA4_SYSTEM_PROMPT`** (`prompts.py:46-62`) — prompt B+ EXACTO con el que se fine-tuneó. NUNCA editar a la ligera (degrada safety, estilo y guardrails según la doc del repo `Gemma4-Mabel`).
 - **`MABEL_SYSTEM_PROMPT`** (`prompts.py:84-109`) — prompt rico para LLMs no entrenados (Gemini, OpenAI). Incluye identidad, personalidad, límites.
 
-La selección la decide `is_mabel_gemma4()` (`prompts.py:64-81`) leyendo `settings.LLM_FLAVOR`:
+La selección la decide `is_mabel_gemma4()` (`prompts.py:64-82`) leyendo `settings.LLM_FLAVOR`:
 
 - `LLM_FLAVOR=mabel_gemma4` → devuelve el prompt fijo del fine-tune **sin** inyectar check-in al system.
 - `LLM_FLAVOR=generic` (default) → devuelve `MABEL_SYSTEM_PROMPT` con check-in concatenado.
@@ -234,7 +246,7 @@ UX:
 | Tokens | JWT HS256 stateless via PyJWT. |
 | Hashing | bcrypt directo. |
 | Secreto | `JWT_SECRET` env var. **Default `""`** en `config.py:17`. |
-| Validación | El web service valida `JWT_SECRET` no vacío en el **lifespan hook** (`app/main.py:52-57`), aborta boot si está vacío. |
+| Validación | El web service valida `JWT_SECRET` no vacío en el **lifespan hook** (`app/main.py:52-58`), aborta boot si está vacío. |
 | Cron y scripts | NO requieren `JWT_SECRET`: pueden importar `settings` sin error y no firman JWTs. |
 
 > **Audit 2026-05-24**: antes `JWT_SECRET` era `str` sin default y el cron crasheaba con `ValidationError` al importar `settings` aunque no use JWT. El default vacío + validación tardía resuelve eso sin debilitar el web.
@@ -251,7 +263,7 @@ Flujo:
 
 ### 8.1 Dockerfile (multi-stage)
 
-`Dockerfile` (88 líneas) — referencia exacta:
+`Dockerfile` (87 líneas) — referencia exacta:
 
 - **Stage 1 (`node:20-alpine`)**: instala deps frontend, `VITE_API_URL=/api/v1`, `npm run build`. Esto baked la base URL relativa para que axios pegue al mismo host del backend en Railway → cero CORS, sin segundo dominio.
 - **Stage 2 (`python:3.11-slim`)**: instala `libpq5` y `curl`, copia `backend/`, copia `dist/` del Stage 1 a `/app/static/`, descarga voz Piper en `/app/models/piper/`.
@@ -404,7 +416,7 @@ Vigente. Middleware FastAPI + keywords + regex en español. Detalle en `backend/
 **Pendiente real**: Playwright está documentado pero no instalado al 2026-05-24. No hay `playwright` en `package.json`. Decisión preservada para Fase 10.
 
 ### ADR #9 — SSE para streaming del chat
-Vigente. `session_router.send_message` usa `EventSourceResponse` (sse-starlette). Streaming token-by-token desde `OpenAICompatAdapter.generate_stream`.
+Vigente. `session_router.send_message` (línea 182) devuelve `StreamingResponse(sse_generator(), media_type="text/event-stream")` usando `fastapi.responses.StreamingResponse` con un generador async que formatea events SSE a mano (`data: ...\n\n`). **NO se usa `sse-starlette`** (no está en `requirements.txt`). Streaming token-by-token desde `OpenAICompatAdapter.generate_stream`.
 
 ### ADR #10 — Config en dos capas: infraestructura (env vars) vs operativa (`system_config`)
 Vigente. Env vars para credenciales/endpoints; tabla `system_config` (TEXT PK) para `sos_hotline_numbers`, `safety_keywords`, `sos_severity_threshold`, `guardrails_enabled`. Audit_log captura cambios.

@@ -66,11 +66,11 @@ bash scripts/setup-piper.sh
 - **core/database.py** — async SQLAlchemy engine + session factory.
 
 ### Frontend Structure (frontend/src/)
-- **pages/** — Route components. Student: Landing, Register, Login, Onboarding, Consent, Home, CheckIn, Chat, **Voice** (modo voz 2D), SessionEnd, SessionDetail. Admin: Dashboard, Users, Reports, SafetyEvents, Metrics, Config, AuditLogs, EmpathyRatings.
+- **pages/** — Route components. Student (17): Landing, Register, Login, ForgotPassword, ResetPassword, Consent, ConsentRejected, ConsentRequired, AccessDenied, Onboarding, Home, CheckIn, Chat, **Voice** (modo voz 2D), SessionEnd, SessionDetail, Settings. Admin (9): Dashboard, Users, UserDetail, Reports, SafetyEvents, Metrics, Config, AuditLogs, EmpathyRatings.
 - **stores/** — Zustand (authStore, chatStore, preferencesStore, toastStore, adminStore).
 - **guards/** — Route protection (ProtectedRoute, ConsentGuard, OnboardingGuard, PublicRoute, RoleGuard).
 - **components/** — `layout/`, `sos/`, `chat/` (incl. `LlmStatusChip`, `StreamingIndicator`), `settings/`, `voice/` (`MabelAvatar`, `ReactiveRings`), `admin/`, `ui/`.
-- **hooks/** — `useAudioRecorder`, `useTts`, `useSubtitles`, `useLlmPrewarm`, `useElapsedSeconds`.
+- **hooks/** — `useAudioRecorder`, `useTts`, `useSubtitles`, `useLlmPrewarm`, `useElapsedSeconds`, `useKeyboardShortcuts`.
 - **utils/** — `streamingStatus.ts` (5-stage progressive wait text), `greetings.ts`.
 - **api/client.ts** — Axios with JWT interceptor.
 

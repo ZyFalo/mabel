@@ -4,7 +4,9 @@
 > **Agente lider:** Agente 15 (3D & Avatar Engineer)
 > **Agentes contribuyentes:** 04 (Backend), 05 (Frontend), 07 (Voice), 08 (Safety), 09 (UX/UI), 11 (DevOps)
 > **Fecha de decision:** 2026-02-22
-> **Estado:** APROBADO
+> **Estado al 2026-05-24**: ✅ APROBADO como spec, ⏳ **DIFERIDO a Fase 9 — NO implementado en MVP**.
+>
+> **Sustituto vigente en MVP**: avatar 2D ilustrado en `frontend/src/components/voice/MabelAvatar.tsx` + `ReactiveRings.tsx`, montado en la ruta `/session/:id/voice` (página `Voice.tsx`). Cubre 5 estados visuales (idle/listening/thinking/speaking/error) y el flujo conversacional por voz sin requerir WebGL, three.js ni modelos VRM. La spec 3D de este documento se preserva para cuando se ejecute la Fase 9.
 
 ---
 
@@ -385,9 +387,9 @@ Se agrega el **Modo Avatar** como modo visual alternativo. Los cambios son ADITI
 
 ## 7. Impacto en Base de Datos
 
-### 7.1 Cambios al esquema
+### 7.1 Cambios al esquema (✅ YA APLICADOS en el initial migration Alembic, 2026-03-07)
 
-Se requieren 2 cambios minimos al esquema de BD:
+> Los 2 cambios siguientes se documentaron originalmente en febrero 2026 como ALTER TABLE pendientes (Evo 003 narrativa). Hoy ya están presentes en el initial migration consolidado y en los modelos SQLAlchemy (`backend/app/models/preference.py:25` y `backend/app/models/session.py:54`). El DDL declarativo `db/schema_postgresql.sql` también los incluye. **No hay trabajo de BD pendiente para Fase 9** — solo trabajo de frontend (WebGL + lip sync + canvas 3D).
 
 **Cambio 1:** Nueva columna en `preferences`
 ```sql

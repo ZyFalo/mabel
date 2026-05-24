@@ -103,7 +103,7 @@ Plan original: 10 fases incrementales. **Hito pilotable** alcanzado tras la Fase
   - System prompt como constante en `prompts.py`:
     - Generic flavor: `MABEL_SYSTEM_PROMPT` (psicoeducación, empatía, límites éticos, identidad)
     - Mabel-Gemma4 flavor: `MABEL_GEMMA4_SYSTEM_PROMPT` (fijo, viene en el fine-tune; check-in se inyecta en user turn, no system)
-  - Streaming SSE via FastAPI `StreamingResponse` + `EventSourceResponse`
+  - Streaming SSE via FastAPI `StreamingResponse(media_type="text/event-stream")` con generador async que formatea events a mano (`data: ...\n\n`). No se usa `sse-starlette`.
   - Schemas: `chat.py` (11 DTOs)
   - Repositories: session, message, message_report, preference (async)
   - Services: ChatService, ReportService

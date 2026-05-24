@@ -2,7 +2,7 @@
 
 > Documentación operativa y técnica del panel admin. Crece a medida que validamos cada sección contra la base de datos y se documentan decisiones, fixes y reglas de negocio.
 
-**Última actualización:** 2026-05-22
+**Última actualización:** 2026-05-24 (post-migración Notion → docs/, audit de Ronda 2)
 **Estado:** Dashboard ✅, Métricas ✅, Calificación empatía ✅, Usuarios ✅ (parcial), Logs ✅. Pendiente: Safety events (validación operativa detallada), Reportes (validación cruzada de cifras), Configuración.
 
 ---
@@ -34,7 +34,7 @@
 **Roles**: el panel solo está accesible a usuarios con `role='admin'`. Validado vía `require_admin` middleware en cada endpoint.
 
 **Stack**:
-- Backend: FastAPI + SQLAlchemy 2.0 async + PostgreSQL 16 (todas las columnas temporales son `TIMESTAMPTZ` desde Evolución 006, 2026-05-22).
+- Backend: FastAPI + SQLAlchemy 2.0 async + PostgreSQL 16 (todas las columnas temporales son `TIMESTAMPTZ` desde la migración Alembic `007_timestamptz_conversion.py`, 2026-05-22 — ver `docs/DB_SCHEMA.md` §4 para detalle).
 - Frontend: React 18 + Vite + TailwindCSS v4 + Zustand + Recharts.
 
 **Privacidad**:
@@ -66,7 +66,7 @@
 
 > Documentación parcial — KPIs y charts cubiertos. Falta validación detallada de cada cifra contra BD.
 
-**Ruta:** `/admin/dashboard`
+**Ruta:** `/admin` (mounted como AdminDashboard; NO existe `/admin/dashboard` separada)
 **Endpoint principal:** `GET /api/v1/admin/dashboard`
 **Servicio:** `AdminMetricsService.dashboard_kpis(cohort=None)`
 
@@ -557,7 +557,10 @@ CREATE INDEX idx_audit_logs_role_time   ON audit_logs(actor_role, created_at DES
 | `review_report` | Admin cambia estado de un reporte | `{status, notes, previous_status}` |
 | `review_safety_event` | Admin triagea un safety event | `{status, notes}` |
 | `export_data` | Admin descarga un CSV | `{resource, filters, rows}` |
-| `empathy_rate` | Admin califica un mensaje | `{score, criteria}` |
+| `empathy_rate` | Admin califica un mensaje en la cola | `{score, criteria}` |
+| `empathy_rate_updated` | Admin actualiza una calificación previa (Evo 009) | `{score_before, score_after, criteria}` |
+| `delete_user` | Admin elimina permanentemente una cuenta deshabilitada (multi-select bulk o `/admin/users/{id}` action) | `{email_masked, reason}` |
+| `update_system_config` | Variante de `change_config` para la tabla `system_config` específicamente | `{key, before, after}` |
 
 #### Acciones de **estudiante** (originadas por el propio usuario)
 
@@ -570,6 +573,12 @@ CREATE INDEX idx_audit_logs_role_time   ON audit_logs(actor_role, created_at DES
 | `consent_revoked` | Estudiante revoca su consentimiento | `{scope}` |
 | `password_reset_requested` | Estudiante solicita reset (fail-soft anti-enumeration: si el email no existe, NO se loguea para no filtrar existencia) | `{email}` |
 | `password_reset_completed` | Estudiante completa el reset con token válido | — |
+| `history_toggle_off` | Estudiante apaga `save_history`. El service ramifica por scope: si `solo_uso` → hard delete; si `uso_mejora_anon` → soft hide masivo de sesiones existentes. | `{affected_sessions, scope, behavior}` |
+| `history_toggle_on` | Estudiante enciende `save_history` (sesiones nuevas nacen visibles; las soft-hidden previas NO se re-exponen) | `{}` |
+| `session_hidden` | Estudiante oculta una sesión individual del sidebar | `{session_id, reason: 'user_per_session'}` |
+| `session_deleted_hard` | Estudiante hace hard DELETE de una sesión individual | `{session_id, messages_deleted}` |
+| `user_messages_hard_delete` | Estudiante elimina TODAS sus conversaciones (preserva cuenta) desde Settings | `{sessions_deleted, messages_deleted}` |
+| `session_rated` | Estudiante califica una sesión cerrada con HeartRating (upsert en `session_ratings`, Evo 011) | `{session_id, rating}` |
 
 #### Eventos de **sistema** (sin actor humano identificable)
 

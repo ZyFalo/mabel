@@ -1,8 +1,8 @@
 # Política de retención de datos — Mabel-IA
 
-**Fecha**: 2026-05-23
+**Fecha**: 2026-05-24 (última revisión)
 **Marco aplicable**: Ley 1581/2012 (Habeas Data Colombia) + Decreto 1377/2013, Ley 1616/2013 (salud mental), Resolución 8430/1993 (investigación con riesgo mínimo), Ley 1419/2010 (telehealth), principios UNESCO 2021 + AI Act UE (transparencia y explicabilidad).
-**Auditado por**: Agente 12 — Ethics, Privacy & Compliance (2026-05-23).
+**Auditado por**: Agente 12 — Ethics, Privacy & Compliance (2026-05-23 + ronda de fixes 2026-05-24).
 
 ---
 
@@ -10,10 +10,9 @@
 
 1. **No engaño en el copy** (Ley 1581 art. 4 lit. d). Si los datos siguen en BD, no decimos "eliminar". Si se ocultan al usuario pero persisten para investigación, decimos exactamente eso.
 2. **Información previa** (Decreto 1377 art. 5). Cualquier acción irreversible o asimétrica debe explicarse al usuario ANTES de pedirle confirmación.
-3. **Ramificación por consentimiento** (Ley 1581 art. 8 + Decreto 1377 art. 6). El alcance del scope firmado determina si una sesión puede retenerse o debe eliminarse. Tres scopes posibles:
+3. **Ramificación por consentimiento** (Ley 1581 art. 8 + Decreto 1377 art. 6). El alcance del scope firmado determina si una sesión puede retenerse o debe eliminarse. **Dos scopes posibles** (CHECK constraint en `consents.scope`):
    - `solo_uso` — usar Mabel sin ceder datos a investigación → **no autoriza** retención para análisis.
-   - `uso_mejora_anon` — permite uso anonimizado para mejorar el modelo.
-   - `uso_investigacion` — todo lo anterior + análisis para tesis.
+   - `uso_mejora_anon` — permite uso anonimizado para mejorar el modelo y para la investigación de la tesis (no se separa "uso_investigacion" como tercer scope; el alcance investigativo está cubierto por el consentimiento previo + base legal del estudio cuasiexperimental clasificado como riesgo mínimo por Resolución 8430/1993).
 4. **Derecho de supresión efectiva** (Ley 1581 art. 8 lit. e). Independiente del scope firmado, el titular puede pedir borrado real de datos pasados sin tener que revocar consentimientos futuros.
 5. **`messages.content` es dato sensible** (Ley 1581 art. 5). Toda lógica que lo manipule aplica el estándar reforzado: autorización expresa, finalidad específica.
 
@@ -75,11 +74,19 @@ El backend lee `consent.scope` del usuario antes de marcar `hidden_at`. Si scope
 
 El modal del toggle muestra dinámicamente el comportamiento esperado: para `solo_uso` el copy dice "se eliminarán de forma definitiva" en lugar de "se ocultarán".
 
-### 6.2 Usuario revoca consentimiento de investigación
+### 6.2 Usuario reduce el alcance (action=reduce-scope)
 
-Endpoint `PATCH /consents/current` permite cambiar el scope. Bajar de `uso_investigacion` a `solo_uso` **NO** dispara borrado retroactivo automáticamente (el flujo "Eliminar mis datos" es voluntario y explícito). La interfaz de cambio de scope informa al usuario que su data pasada permanece visible para investigación bajo el consentimiento previo, y le muestra el enlace a "Eliminar mis datos" si quiere supresión efectiva.
+Endpoint `PATCH /api/v1/consents/current` con `{action: "reduce-scope"}` baja el scope a `solo_uso`. **NO dispara borrado retroactivo** — la data pasada permanece visible para investigación bajo el consentimiento previo. La interfaz informa al usuario y le ofrece el enlace a "Eliminar mis datos" si quiere supresión efectiva.
 
-### 6.3 Admin elimina cuenta de usuario
+### 6.3 Usuario revoca consentimiento (action=revoke)
+
+Endpoint `PATCH /api/v1/consents/current` con `{action: "revoke"}` marca `consents.revoked_at = NOW()`. El estudiante **pierde acceso al sistema** (los guards `ConsentGuard` redirigen a `/consent-required` variante "revoked") hasta que vuelve a aceptar el consentimiento (`{action: "re-accept"}`). **Sus datos NO se eliminan** — siguen en BD bajo la base legal del consentimiento previo a la revocación. Es **reversible**: re-aceptar restaura el acceso sin pérdida.
+
+Si quiere **eliminación efectiva** (no solo revocación temporal), debe usar `DELETE /api/v1/users/me` (D-14, hard delete CASCADE).
+
+> **Nota legal**: el doc original confundía "revocar consentimiento" con "eliminar datos". La revocación es solo pérdida de acceso; la supresión es DELETE de cuenta. Ambas son derechos del titular pero con efectos distintos.
+
+### 6.4 Admin elimina cuenta de usuario
 
 Operación distinta a las del titular (no implementada hoy). Si se implementa, debe seguir el patrón D-14: hard delete CASCADE + audit_log con `actor_role='admin'` + razón obligatoria mínima 10 chars.
 
@@ -87,13 +94,20 @@ Operación distinta a las del titular (no implementada hoy). Si se implementa, d
 
 ## 7. Endpoints
 
-| Verbo | Path | Acción | Audit log action |
-|---|---|---|---|
-| `PUT` | `/preferences` | Toggle `save_history`. Lógica adicional en el service. | `history_toggle_off` / `history_toggle_on` |
-| `PATCH` | `/sessions/{id}/hide` | Soft hide individual | `session_hidden` |
-| `DELETE` | `/sessions/{id}` | Hard delete individual | `session_deleted_hard` |
-| `DELETE` | `/users/me/messages` | Hard delete todas las conversaciones (preserva cuenta) | `user_messages_hard_delete` |
-| `DELETE` | `/users/me` | Hard delete cuenta entera (D-14) | `user_delete` (existente) |
+> **Importante**: el toggle `save_history` NO se ejecuta vía `PUT /preferences`. El servicio `history_service.HistoryService.apply_history_toggle_off()` se invoca desde endpoints dedicados en `data_control_router.py` que sí ramifican por scope y emiten el `audit_log` correcto. `PUT /preferences` (preference_router) solo persiste el flag sin lógica adicional — usarlo NO dispara las acciones descritas en §2.
+
+| Verbo | Path | Acción | Audit log action | Implementación |
+|---|---|---|---|---|
+| `POST` | `/api/v1/users/me/history/toggle-off` | Toggle OFF `save_history` con ramificación por scope (soft hide para `uso_mejora_anon`; hard delete para `solo_uso`) | `history_toggle_off` | `data_control_router.py:49` → `history_service.apply_history_toggle_off()` |
+| `POST` | `/api/v1/users/me/history/toggle-on` | Toggle ON `save_history`. Sesiones nuevas nacen visibles; las existentes (soft-hidden previas) NO se re-exponen. | `history_toggle_on` | `data_control_router.py:102` |
+| `PUT` | `/api/v1/preferences` | Persiste preferencias sin lógica adicional. **NO usar para toggle save_history** — usa los dos endpoints anteriores. | (sin audit) | `preference_router.py:32` |
+| `PATCH` | `/api/v1/sessions/{id}/hide` | Soft hide individual | `session_hidden` | (existente) |
+| `DELETE` | `/api/v1/sessions/{id}` | Hard delete individual | `session_deleted_hard` | (existente) |
+| `DELETE` | `/api/v1/users/me/messages` | Hard delete todas las conversaciones (preserva cuenta) | `user_messages_hard_delete` | (existente) |
+| `PATCH` | `/api/v1/consents/current` action=`re-accept` | Re-acepta consentimiento previo. No toca data. | `consent_granted` | `consent_router.py` |
+| `PATCH` | `/api/v1/consents/current` action=`reduce-scope` | Cambia scope a `solo_uso`. No borra retroactivamente. | `consent_revoked` (parcial) | `consent_router.py` |
+| `PATCH` | `/api/v1/consents/current` action=`revoke` | Revoca total: `revoked_at = NOW()`. Pierde acceso hasta re-aceptar. Tus datos NO se eliminan. | `consent_revoked` | `consent_router.py` |
+| `DELETE` | `/api/v1/users/me` | Hard delete cuenta entera (D-14). CASCADE sobre sessions/messages/preferences/consents. `safety_events.user_id` y `session_id` quedan NULL. Audit emitido ANTES del DELETE con `details={email_snapshot}`. | `user_delete` | `account_service.py:38` |
 
 ---
 
@@ -135,10 +149,13 @@ CREATE INDEX idx_sessions_user_visible
 ### Qué hace
 
 ```sql
+-- SQL real del script (backend/scripts/redact_old_message_ids.py):
 UPDATE safety_events
 SET    payload = payload - 'message_id'
-WHERE  created_at < NOW() - INTERVAL '30 days'
+WHERE  created_at < NOW() - make_interval(days => :days)
   AND  payload ? 'message_id';
+-- :days se bindea como integer (RETENTION_DAYS = 30); make_interval evita
+-- string-concat frágil con asyncpg.
 ```
 
 - **Elimina solo la clave `message_id`** del JSONB `payload`. Resto del payload (`severity`, `matched_keywords`, etc.) intacto.
@@ -175,7 +192,7 @@ Reproducible en local con Postgres corriendo:
 # 1. Seed
 import asyncio, asyncpg, json, uuid
 async def seed():
-    c = await asyncpg.connect('postgresql://USER:PASS@localhost:5432/mabel_ia')
+    c = await asyncpg.connect('postgresql://USER:PASS@localhost:5433/mabel_dev')
     await c.execute("DELETE FROM safety_events WHERE event_type='test_redact'")
     for days, payload in [
         (38, {'message_id': str(uuid.uuid4()), 'severity': 'high'}),    # debe redactarse
