@@ -10,8 +10,8 @@ verifica:
    `docs/Z.md`, `.claude/...`, etc.) deben existir en el filesystem.
 2. **archivo:linea refs**: el archivo citado debe existir; la línea citada
    debe ser razonable (≤ total de líneas del archivo).
-3. **Commit hashes**: hashes git citados (`commit X`, `\`hash\``) deben
-   existir vía `git cat-file -e`.
+3. **Commit hashes**: hashes git citados con backticks deben existir
+   vía ``git cat-file -e``.
 4. **YAML frontmatter de agents**: `.claude/agents/AGENT_*.md` deben tener
    YAML válido con `name`, `description`, `model`.
 5. **Cross-doc refs**: `docs/X.md §N.M` — verifica que la sección §N.M exista.
