@@ -55,11 +55,29 @@ Si eres una IA **read-only** y detectas que algo en `docs/` está desactualizado
 
 | Archivo | Propósito |
 |---|---|
-| `TECH_STACK.md` | Stack tecnológico completo: backend, frontend, BD, LLM, voz, deploy. **Consolida** lo que antes estaba en `TECHSTACK.md` y la página Notion "Tech Stack Definitivo". |
-| `DB_SCHEMA.md` | Esquema de base de datos: 15 tablas, columnas, FKs, CHECKs, índices, evoluciones 002-012. **Consolida** los `DB_SCHEMA_EVOLUTION_*.md` antiguos y la página Notion "Esquema BD". |
-| `INTERFACES_MVP.md` | Catálogo funcional de las pantallas del MVP. **Consolida** `INTERFACES_MVP_CATALOGO.md` y la página Notion "Interfaces MVP". |
+| `TECH_STACK.md` | Stack tecnológico completo: backend, frontend, BD, LLM, voz, deploy. ADRs vivos. |
+| `API_REFERENCE.md` | Catálogo de los ~75 endpoints REST con request/response shape, audit, archivo:linea de implementación. |
+| `DB_SCHEMA.md` | Esquema de base de datos: 15 tablas, columnas, FKs, CHECKs, índices, evoluciones 002-012 + Apéndice C (repositorios). |
+| `BACKEND_SERVICES.md` | Catálogo de services + repositories + middleware: 11 services, 6 admin services, 5 archivos LLM, 14 repos. |
+| `FRONTEND_COMPONENTS.md` | Catálogo de componentes React, 6 hooks, 5 stores, 5 guards, 4 utils, API client. |
+| `INTERFACES_MVP.md` | Catálogo funcional de las pantallas del MVP (44 interfaces). |
 | `ADMIN_PANEL.md` | Especificación detallada del panel administrativo (Fase 8): tabs, métricas, lifecycle de usuarios, audit logs, configuración. |
-| `AVATAR_3D_DECISION_TECNICA.md` | ADR del avatar 3D (Fase 9 — aprobado, pendiente de implementación). El MVP actual usa avatar 2D animado en modo voz. |
+| `AVATAR_3D_DECISION_TECNICA.md` | ADR del avatar 3D (Fase 9 — aprobado, diferido). El MVP usa avatar 2D animado en modo voz. |
+
+### Operaciones (deploy, dev, testing)
+
+| Archivo | Propósito |
+|---|---|
+| `DEPLOY_RUNBOOK.md` | Guía paso a paso de despliegue Railway + Modal.com: primer deploy, env vars, cron service, troubleshooting, rollback, monitoreo. |
+| `LOCAL_DEV_SETUP.md` | Setup local en macOS/Linux: pre-requisitos, `.env`, Postgres Docker, backend + frontend, voz opcional, troubleshooting frecuente. |
+| `TESTING_STRATEGY.md` | Estado honesto (sin tests automatizados al 2026-05-24) + priorización + setup recomendado + criterios de cobertura + tests manuales obligatorios pre-deploy. |
+
+### Forward-looking (Fases 9-10 pendientes)
+
+| Archivo | Propósito |
+|---|---|
+| `FASE_9_AVATAR_3D_SPEC.md` | Spec ejecutiva de Fase 9 (Avatar 3D + Lip Sync): alcance, criterios medibles, riesgos, cronograma 4 sprints. |
+| `FASE_10_PWA_TESTING_SPEC.md` | Spec ejecutiva de Fase 10 (PWA + Tests + Instrumentos + Polish): 4 componentes, 14 criterios, ~9-10 semanas. |
 
 ### Gobernanza, decisiones e historia
 
@@ -122,14 +140,19 @@ Cada archivo en `docs/` sigue este patrón mínimo:
 | Qué hace el proyecto en general | `CLAUDE.md` |
 | Qué versión de React/Python/Postgres usamos | `TECH_STACK.md` |
 | Cómo está estructurada la BD | `DB_SCHEMA.md` |
-| Por qué decidimos X (D-XX) | `DECISIONES.md` |
+| Qué endpoint usar para X | `API_REFERENCE.md` |
+| Qué servicio backend hace qué | `BACKEND_SERVICES.md` |
+| Qué componente frontend usar | `FRONTEND_COMPONENTS.md` |
+| Cómo correr localmente | `LOCAL_DEV_SETUP.md` |
+| Cómo desplegar a producción | `DEPLOY_RUNBOOK.md` |
+| Qué hay (o falta) de testing | `TESTING_STRATEGY.md` |
+| Por qué decidimos X (D-XX / PO-N / DT-XX) | `DECISIONES.md` + `AGENTES.md` §9 |
 | En qué fase está la implementación | `FASES_IMPLEMENTACION.md` |
 | Qué pantallas tiene la app | `INTERFACES_MVP.md` |
 | Cómo funciona el panel admin | `ADMIN_PANEL.md` |
 | Cómo se cumple la Ley 1581 (privacidad) | `DATA_RETENTION_POLICY.md` |
-| Cómo despliega en Railway | `TECH_STACK.md` (sección Deploy) + `Dockerfile` + `railway.cron.toml` |
-| Cómo se integra con Modal (LLM) | `TECH_STACK.md` (sección LLM) + `backend/app/services/llm/openai_adapter.py` |
 | Cómo funciona el cron L2 de retención | `DATA_RETENTION_POLICY.md` §10 + `backend/scripts/redact_old_message_ids.py` |
 | Cómo está organizado el equipo de agentes IA | `AGENTES.md` |
 | Qué dice la auditoría sobre los manuales de tesis | `AUDITORIA_MANUALES_2026-05-24.md` |
-| Cuál es el avatar planeado vs el actual | `AVATAR_3D_DECISION_TECNICA.md` (3D pendiente) + `INTERFACES_MVP.md` (2D actual en `/voice`) |
+| Cuál es el avatar planeado vs el actual | `AVATAR_3D_DECISION_TECNICA.md` (ADR completo) + `FASE_9_AVATAR_3D_SPEC.md` (ejecutiva) + `FRONTEND_COMPONENTS.md` (2D actual `MabelAvatar`) |
+| Qué falta para terminar el MVP | `FASE_9_AVATAR_3D_SPEC.md` + `FASE_10_PWA_TESTING_SPEC.md` |
