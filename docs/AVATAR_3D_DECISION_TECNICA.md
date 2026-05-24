@@ -411,7 +411,7 @@ ALTER TABLE sessions ADD COLUMN avatar_used BOOLEAN NOT NULL DEFAULT FALSE;
 
 ## 8. Impacto en Tech Stack
 
-### Nueva seccion en TECHSTACK.md: Avatar 3D y Lip Sync
+### Nueva sección en `docs/TECH_STACK.md`: Avatar 3D y Lip Sync
 
 | Tecnologia | Version | Justificacion |
 |------------|---------|---------------|
