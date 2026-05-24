@@ -32,6 +32,7 @@ import { usePreferencesStore } from '../stores/preferencesStore'
 import useAudioRecorder from '../hooks/useAudioRecorder'
 import useTts from '../hooks/useTts'
 import useLlmPrewarm from '../hooks/useLlmPrewarm'
+import LlmStatusChip from '../components/chat/LlmStatusChip'
 import MabelAvatar, { type AvatarState } from '../components/voice/MabelAvatar'
 import ReactiveRings from '../components/voice/ReactiveRings'
 
@@ -51,9 +52,10 @@ export default function Voice() {
   const { isRecording, startRecording, stopRecording, error: micError } =
     useAudioRecorder()
   const { playTts, stopTts, isMuted, toggleMute } = useTts()
-  // Pre-warm Mabel-Gemma4 — vital en voice porque el cold start de 60s
-  // sentado mirando un avatar inerte es peor UX que en chat texto.
-  const llm = useLlmPrewarm()
+  // Pre-warm Mabel-Gemma4 + polling 30s — vital en voice porque el
+  // cold start sentado mirando un avatar inerte es peor UX que en
+  // chat texto. El polling alimenta el chip de estado en el header.
+  const llm = useLlmPrewarm({ pollIntervalMs: 30000 })
 
   // Route guard: si el usuario llega a /voice con sus preferencias
   // diciendo que NO quiere modo voz (master `voice_enabled` off o
@@ -243,6 +245,14 @@ export default function Voice() {
           return
         }
         setLastUserText(text)
+        // Capa 2 — refuerza al enviar audio si LLM está cold
+        if (llm.status === 'cold') {
+          addToast({
+            type: 'warning',
+            message:
+              'Mabel está despertando (~60-90 s) — Mabel ya escuchó tu mensaje, está procesándolo.',
+          })
+        }
         try {
           await sendMessage(id, text, { voiceMode: true })
         } catch (err) {
@@ -477,21 +487,25 @@ export default function Voice() {
             Voz
           </span>
         </div>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--ink-600)',
-            padding: '5px 11px',
-            borderRadius: 999,
-            background: 'rgba(255,255,255,0.85)',
-            border: '1px solid var(--ink-200)',
-            fontVariantNumeric: 'tabular-nums',
-            flexShrink: 0,
-          }}
-        >
-          {fmtTime(elapsed)}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* Capa 4 — chip de estado LLM también visible en voice */}
+          <LlmStatusChip status={llm.status} />
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--ink-600)',
+              padding: '5px 11px',
+              borderRadius: 999,
+              background: 'rgba(255,255,255,0.85)',
+              border: '1px solid var(--ink-200)',
+              fontVariantNumeric: 'tabular-nums',
+              flexShrink: 0,
+            }}
+          >
+            {fmtTime(elapsed)}
+          </span>
+        </div>
       </div>
 
       {/* ───────── ZONA AVATAR (flex: 1, centra avatar + estado) ─────────

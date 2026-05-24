@@ -34,10 +34,20 @@ interface UseLlmPrewarmReturn {
   recheck: () => void
 }
 
-export default function useLlmPrewarm(): UseLlmPrewarmReturn {
+interface UseLlmPrewarmOptions {
+  /** Polling silencioso cada `pollIntervalMs` después del primer check.
+   *  Útil para Capa 4 (chip de estado siempre visible en el header).
+   *  Si se omite, solo hace UN check al mount. Por defecto omitido. */
+  pollIntervalMs?: number
+}
+
+export default function useLlmPrewarm(
+  options: UseLlmPrewarmOptions = {},
+): UseLlmPrewarmReturn {
   const [status, setStatus] = useState<LlmStatus>('unknown')
   const [checking, setChecking] = useState(false)
   const [tick, setTick] = useState(0)
+  const { pollIntervalMs } = options
 
   useEffect(() => {
     // Skip si no hay token — sin esto el prewarm dispara durante el
@@ -47,41 +57,45 @@ export default function useLlmPrewarm(): UseLlmPrewarmReturn {
     if (!token) return
 
     let cancelled = false
-    setChecking(true)
-    apiClient
-      .get('/llm/health', { timeout: 20000 })
-      .then((res) => {
+
+    async function checkOnce() {
+      setChecking(true)
+      try {
+        const res = await apiClient.get('/llm/health', { timeout: 20000 })
         if (cancelled) return
         const s = (res.data?.status as LlmStatus) || 'unknown'
         setStatus(s === 'warm' || s === 'cold' || s === 'down' ? s : 'unknown')
-      })
-      .catch((err) => {
+      } catch (err) {
         if (cancelled) return
-        // Distinguir tipos de error en lugar de optimistic 'warm':
-        // - 401 → no hacer nada, el interceptor de axios maneja el
-        //   modal session-expired. Status queda 'unknown'.
-        // - 404 (endpoint no existe en deploy) → 'down', el banner
-        //   mostrará advertencia genuina.
-        // - timeout / network → 'unknown', no asumir nada.
         const axErr = err as AxiosError
         const code = axErr?.response?.status
         if (code === 401 || code === 403) {
-          // Auth issue; el interceptor lo maneja a nivel global.
           setStatus('unknown')
         } else if (code === 404 || code === 500 || code === 502 || code === 503) {
           setStatus('down')
         } else {
-          // Timeout, network, CORS, etc. — desconocido.
           setStatus('unknown')
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setChecking(false)
-      })
+      }
+    }
+
+    checkOnce()
+
+    // Polling silencioso opcional para el chip de estado siempre visible.
+    let intervalId: number | undefined
+    if (pollIntervalMs && pollIntervalMs > 0) {
+      intervalId = window.setInterval(checkOnce, pollIntervalMs)
+    }
+
     return () => {
       cancelled = true
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId)
+      }
     }
-  }, [tick])
+  }, [tick, pollIntervalMs])
 
   return { status, checking, recheck: () => setTick((t) => t + 1) }
 }

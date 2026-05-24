@@ -20,6 +20,9 @@ import useAudioRecorder from '../hooks/useAudioRecorder'
 import useTts from '../hooks/useTts'
 import useSubtitles from '../hooks/useSubtitles'
 import useLlmPrewarm from '../hooks/useLlmPrewarm'
+import useElapsedSeconds from '../hooks/useElapsedSeconds'
+import { streamingStatusText } from '../utils/streamingStatus'
+import LlmStatusChip from '../components/chat/LlmStatusChip'
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('es-CO', {
@@ -121,10 +124,13 @@ export default function Chat() {
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder()
   const { playTts, stopTts, isMuted, toggleMute } = useTts()
-  // Pre-warm Mabel-Gemma4 al montar el chat — si el worker de Modal
-  // está dormido, esto inicia el cold start de 60-90s en paralelo al
-  // tiempo que el usuario tarda en leer el saludo y escribir.
-  const llm = useLlmPrewarm()
+  // Pre-warm Mabel-Gemma4 al montar el chat + POLLING cada 30s para
+  // que el chip de estado del header siempre refleje warm/cold/down
+  // sin esperar al próximo SEND.
+  const llm = useLlmPrewarm({ pollIntervalMs: 30000 })
+  // Capa 1 — texto progresivo "Mabel está pensando…" → "despertando…"
+  // según los segundos transcurridos desde que arrancó el streaming.
+  const streamingElapsed = useElapsedSeconds(isStreaming)
   const { currentWordIndex, startSubtitles, stopSubtitles } = useSubtitles()
 
   /**
@@ -344,6 +350,17 @@ export default function Chat() {
     if (!input.trim() || !id || isStreaming) return
     const text = input.trim()
     setInput('')
+    // Capa 2 — toast informativo si el LLM está cold al momento del
+    // SEND. Refuerza el banner del header (Capa 4) en el contexto
+    // exacto del envío para que la persona no se ponga ansiosa cuando
+    // los primeros 30-60s no llegan tokens.
+    if (llm.status === 'cold') {
+      addToast({
+        type: 'warning',
+        message:
+          'Mabel está despertando del descanso — tu respuesta puede tardar 60-90 s, pero ya está procesándose.',
+      })
+    }
     try {
       await sendMessage(id, text)
       await playLastAssistantTtsIfEnabled()
@@ -493,8 +510,14 @@ export default function Chat() {
           )}
         </div>
 
-        {/* Right-side controls: SOS + context popover + more menu */}
+        {/* Right-side controls: estado LLM + SOS + voz + context + menú */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* Capa 4 — chip de estado del LLM (warm/cold/down/unknown).
+              Se actualiza por polling cada 30 s desde useLlmPrewarm. El
+              usuario siempre sabe si Mabel responderá rápido o si va a
+              cold-startar sin tener que enviar un mensaje primero. */}
+          <LlmStatusChip status={llm.status} />
+
           {/* SOS — crisis access pill, always visible in header */}
           <SosButton onClick={openCrisis} />
 
@@ -665,7 +688,7 @@ export default function Chat() {
                   minHeight: 44,
                 }}
                 aria-live="polite"
-                aria-label="Mabel está pensando"
+                aria-label={streamingStatusText(streamingElapsed)}
               >
                 {[0, 1, 2].map((i) => (
                   <span
@@ -686,9 +709,10 @@ export default function Chat() {
                     fontSize: 12,
                     color: 'var(--ink-500)',
                     fontStyle: 'italic',
+                    transition: 'opacity var(--dur-base) var(--ease-out)',
                   }}
                 >
-                  Mabel está pensando…
+                  {streamingStatusText(streamingElapsed)}
                 </span>
               </div>
             </div>
@@ -1078,6 +1102,17 @@ export default function Chat() {
                       }}
                       className="animate-bounce"
                     />
+                    <span
+                      style={{
+                        marginLeft: 10,
+                        fontSize: 12,
+                        color: 'var(--ink-500)',
+                        fontStyle: 'italic',
+                      }}
+                      aria-live="polite"
+                    >
+                      {streamingStatusText(streamingElapsed)}
+                    </span>
                   </div>
                 </div>
               )}
