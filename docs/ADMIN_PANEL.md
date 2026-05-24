@@ -833,7 +833,7 @@ Validación post-fix: re-ejecutar el code-review skill sobre los archivos tocado
 | Principio | Aplicación |
 |---|---|
 | **D-03**: nunca exponer `messages.content` | Endpoints admin omiten `content`. Reportes solo muestran metadata + `details` libre del estudiante. |
-| **L2**: ocultar `message_id` en frontend | Donde se muestre payload, `REDACTED_KEYS = ['message_id']` lo enmascara. BD lo conserva para forensics (cronjob 30 días post-MVP). |
+| **L2**: ocultar `message_id` en frontend | Donde se muestre payload, `REDACTED_KEYS = ['message_id']` lo enmascara. BD lo conserva 30 días para forensics, después un cron lo redacta del payload (`backend/scripts/redact_old_message_ids.py`, ver `docs/DATA_RETENTION_POLICY.md` §10). |
 | **D-08**: anonimizar IDs en CSV | Toda exportación CSV pasa por `sha256(value)[:16]` en columnas id-like. |
 | **D-14**: hard DELETE de usuarios | `safety_events.user_id` con `ON DELETE SET NULL` preserva eventos anónimos. |
 

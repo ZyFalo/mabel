@@ -50,7 +50,7 @@ El usuario puede consultar su audit trail vía `GET /users/me/export` (ya implem
 
 La interfaz admin muestra ventanas rolling de 30 días (`sessions_per_day_30d`, `mood_distribution_30d`, etc.). Estas son **filtros de visualización**, NO políticas de retención. La data subyacente no se borra a los 30 días — solo deja de aparecer en ese chart específico.
 
-La mención de "cronjob 30 días" en `docs/ADMIN_PANEL.md` (sección L2) es para redaction de `message_id` en payloads de `safety_events`, planeada post-MVP. No aplica al borrado de cuentas ni de sesiones.
+La mención de "cronjob 30 días" en `docs/ADMIN_PANEL.md` (sección L2) es para redaction de `message_id` en payloads de `safety_events`. **Implementado 2026-05-24** — ver §10. No aplica al borrado de cuentas ni de sesiones.
 
 ---
 
@@ -123,3 +123,99 @@ CREATE INDEX idx_sessions_user_visible
 - `MEMORY.md` D-14 (Hard DELETE directo MVP).
 - `MEMORY.md` Evo 005b (safety_events.user_id SET NULL).
 - `docs/ADMIN_PANEL.md` §10 (audit_logs catálogo), §12 (privacidad cruzada).
+
+---
+
+## 10. Cron de redacción L2 — `redact_old_message_ids`
+
+**Implementación**: `backend/scripts/redact_old_message_ids.py` + `railway.cron.toml`.
+**Cadencia**: diaria, 03:00 UTC (22:00 hora Bogotá — off-peak).
+**Service Railway**: separado del web (`uvicorn`), mismo Dockerfile, `restartPolicyType="NEVER"`.
+
+### Qué hace
+
+```sql
+UPDATE safety_events
+SET    payload = payload - 'message_id'
+WHERE  created_at < NOW() - INTERVAL '30 days'
+  AND  payload ? 'message_id';
+```
+
+- **Elimina solo la clave `message_id`** del JSONB `payload`. Resto del payload (`severity`, `matched_keywords`, etc.) intacto.
+- **No borra filas**: el `safety_event` sigue contando para métricas (Tab D, dashboard 24h, conteos históricos).
+- **Idempotente**: cláusula `payload ? 'message_id'` evita re-tocar filas ya redactadas → re-correr el cron es no-op.
+- **Sin índice dedicado**: el único índice con `created_at` (`idx_safety_events_user_time`) es compuesto y lidera con `user_id`, así que Postgres hará seq scan para esta query. Aceptable para el piloto (decenas de filas/día). Si `safety_events` crece a >100k filas tras producción, considerar `CREATE INDEX idx_safety_events_created_at ON safety_events(created_at) WHERE payload ? 'message_id'` (parcial: solo indexa lo que el cron toca).
+
+### Por qué redactar y no borrar
+
+Los `safety_events` son la línea base de alarma de seguridad (suicidio, autolesión, crisis). Eliminarlos rompería:
+
+- Métricas longitudinales (`safety_events_per_day` 14d/30d en panel admin).
+- Auditoría legal: si Defensoría del Pueblo pide ver el agregado de eventos de risk_detected históricos, deben existir.
+- Investigación de la tesis (anonymizada — el `user_id` ya pudo quedar NULL por D-14, ver Evo 005b).
+
+Redactar solo el `message_id` rompe la correlación con un turno específico (que el estudiante puede haber borrado) sin perder señal estadística.
+
+### Operación manual
+
+```bash
+# Local
+cd backend && source .venv/bin/activate
+python -m scripts.redact_old_message_ids
+
+# Producción (Railway shell del cron service)
+python -m scripts.redact_old_message_ids
+```
+
+### Validación / smoke test
+
+Reproducible en local con Postgres corriendo:
+
+```python
+# 1. Seed
+import asyncio, asyncpg, json, uuid
+async def seed():
+    c = await asyncpg.connect('postgresql://USER:PASS@localhost:5432/mabel_ia')
+    await c.execute("DELETE FROM safety_events WHERE event_type='test_redact'")
+    for days, payload in [
+        (38, {'message_id': str(uuid.uuid4()), 'severity': 'high'}),    # debe redactarse
+        (45, {'message_id': str(uuid.uuid4()), 'severity': 'medium'}),  # debe redactarse
+        (60, {'message_id': str(uuid.uuid4()), 'extra': 'x'}),          # debe redactarse, extra preservado
+        (40, {'severity': 'high'}),                                     # ya redactado, no-op
+        (5,  {'message_id': str(uuid.uuid4()), 'severity': 'high'}),    # reciente, intacto
+        (15, {'message_id': str(uuid.uuid4()), 'severity': 'medium'}),  # reciente, intacto
+    ]:
+        await c.execute(
+            f"INSERT INTO safety_events (event_type, payload, created_at) "
+            f"VALUES ('test_redact', $1, NOW() - INTERVAL '{days} days')",
+            json.dumps(payload),
+        )
+    await c.close()
+asyncio.run(seed())
+```
+
+```bash
+# 2. Run
+cd backend && source .venv/bin/activate
+python -m scripts.redact_old_message_ids
+# → "[redact_message_ids] redacted message_id from 3 safety_events older than 30 days"
+
+# 3. Re-run (idempotencia)
+python -m scripts.redact_old_message_ids
+# → "[redact_message_ids] redacted message_id from 0 safety_events older than 30 days"
+
+# 4. Cleanup
+psql -c "DELETE FROM safety_events WHERE event_type='test_redact';"
+```
+
+Resultado esperado: las 3 filas viejas con `message_id` quedan con payload reducido (clave `extra` se preserva), la fila vieja ya redactada queda igual, las 2 recientes con `message_id` quedan intactas.
+
+### Cuándo cambiar `RETENTION_DAYS`
+
+La constante está al inicio de `backend/scripts/redact_old_message_ids.py` (buscar `RETENTION_DAYS =`). Si se mueve, actualizar también — todos los puntos donde el número "30" aparece junto a "días" o "retención":
+
+- `docs/ADMIN_PANEL.md` § 12.1 (fila L2 de la tabla de privacidad).
+- `docs/DATA_RETENTION_POLICY.md`: el cuerpo de §10 y el bloque SQL al inicio de §10.
+- Manual técnico y de usuario (si mencionan la ventana).
+
+> Nota: §4 de este documento describe **ventanas de visualización de UI**, no la ventana de retención de payloads. Cambiar `RETENTION_DAYS` no obliga a editar §4.

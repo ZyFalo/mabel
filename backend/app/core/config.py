@@ -8,7 +8,13 @@ _env_file = Path(__file__).resolve().parents[3] / ".env"
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    JWT_SECRET: str
+    # JWT_SECRET tiene default "" para que procesos auxiliares (cron de
+    # retención, scripts de mantenimiento) puedan importar `settings`
+    # sin necesitar la variable. El web service la requiere y la valida
+    # en su lifespan (`app/main.py`), abortando boot si está vacía.
+    # Antes era `str` sin default → cron crasheaba al import con
+    # ValidationError aunque no usa JWT. Audit 2026-05-24.
+    JWT_SECRET: str = ""
     # --- LLM provider selection (OpenAI-compatible by default) -----------
     # `openai_compat` works for: Gemini OpenAI-compat endpoint, OpenAI,
     # vLLM/Ollama, OpenRouter, or any service exposing /v1/chat/completions.

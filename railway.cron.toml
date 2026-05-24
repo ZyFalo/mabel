@@ -1,0 +1,67 @@
+# Railway config para el servicio CRON (separado del web service).
+#
+# Cómo se conecta esto a Railway
+# ------------------------------
+# Railway no soporta "un railway.toml con múltiples servicios". El web
+# service (uvicorn) sigue usando el Dockerfile por defecto, sin
+# railway.toml. Este archivo se aplica SOLO al servicio cron, que se
+# crea aparte en el dashboard.
+#
+# Pasos UI (una sola vez, post-deploy del web):
+#   1. En el proyecto de Railway → New → GitHub Repo → mismo repo.
+#   2. Settings → Source → Config Path = `railway.cron.toml`.
+#   3. Settings → Variables → "Add Reference" → conectar `DATABASE_URL`
+#      a la misma DB del web. No hace falta JWT_SECRET ni LLM_API_KEY
+#      (el cron solo lee/escribe Postgres; el web es quien firma JWTs).
+#      `app/core/config.py` da default vacío a JWT_SECRET justamente
+#      para que esto funcione sin truco; el web valida en su lifespan.
+#   4. Save. Railway lo levantará, ejecutará el script una vez, y
+#      luego correrá según `cronSchedule` (no permanece encendido).
+#
+# Comportamiento esperado
+# -----------------------
+# - Cada ejecución dura <1s (UPDATE indexado por created_at).
+# - Si falla (DB down, query inválida), Railway NO reintenta:
+#   restartPolicyType="NEVER" porque los crons deben terminar y la
+#   próxima corrida es la siguiente ranura del schedule.
+# - Logs: visibles en Railway → Service → Deployments → último run.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Diario a las 03:00 UTC = 22:00 hora Bogotá (off-peak para
+# estudiantes — el panel admin no recibe consultas a esa hora).
+cronSchedule = "0 3 * * *"
+
+# El startCommand del Dockerfile (uvicorn) NO aplica aquí — lo
+# sobrescribimos. Estructura:
+#
+#   alembic upgrade head    → defensa contra el día-0 race: el web
+#                             corre el mismo upgrade pero el cron
+#                             puede dispararse antes de que termine
+#                             la primera migración tras un deploy
+#                             frío; correrlo aquí también evita
+#                             `UndefinedTable` en la primera ejecución.
+#                             Alembic es naturalmente idempotente
+#                             (no-op si ya está en head).
+#   python -m scripts.x     → la redacción real. Forma módulo (no
+#                             `python scripts/x.py` directo): el `-m`
+#                             agrega cwd a sys.path antes de importar,
+#                             lo que hace funcionar `from app.core.config
+#                             import settings` tanto en el container
+#                             (donde PYTHONPATH=/app ya está fijado)
+#                             como en local sin tocar el entorno.
+#                             `backend/scripts/__init__.py` declara el
+#                             paquete formalmente.
+#
+# Notas operacionales:
+# - Railway dispara este startCommand TAMBIEN una vez por deploy
+#   (no solo en cada `cronSchedule`). La idempotencia del UPDATE
+#   (cláusula `payload ? 'message_id'`) hace que esto sea seguro.
+startCommand = "alembic upgrade head && python -m scripts.redact_old_message_ids"
+
+# Los crons deben terminar. Si reinicia "ALWAYS" o "ON_FAILURE",
+# Railway loopearía la tarea fuera de horario y dispararía costos.
+restartPolicyType = "NEVER"

@@ -42,7 +42,19 @@ async def lifespan(app: FastAPI):
     `/admin/config` §05). The lifespan fires exactly once per worker
     boot — survives test re-imports and tooling that might otherwise
     rebind module-level singletons.
+
+    Validamos aquí (no en config.py) que `JWT_SECRET` esté presente:
+    el web emite y verifica JWTs, así que arrancar sin el secreto es
+    una falla de seguridad. Procesos auxiliares (cron de retención)
+    importan `settings` sin necesitar JWT y deben poder hacerlo —
+    por eso config.py le da default vacío.
     """
+    if not settings.JWT_SECRET:
+        raise RuntimeError(
+            "JWT_SECRET no está configurado. El web service no puede "
+            "arrancar sin el secreto de firma de JWTs. Configúralo en "
+            ".env (local) o en las variables del servicio en Railway."
+        )
     mark_process_started()
     yield
 
