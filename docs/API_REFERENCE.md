@@ -136,7 +136,7 @@ Este documento es el catálogo verificable de cada endpoint REST expuesto por el
   ```
 - **Response 200**: `{"message": "Contrasena actualizada exitosamente"}`
 - **Errores**: 401 `"Contrasena actual incorrecta"` (WRONG_PASSWORD); 400 `"La nueva contrasena debe ser diferente a la actual"` (SAME_PASSWORD); 422 validación.
-- **Audit log**: ⚠️ **NO emite audit_log al 2026-05-24** (`AccountService.change_password` actualiza la contraseña sin trail). Gap de compliance Ley 1581/2012 art. 25 — DR pendiente Fase 10. La acción `⚠ no-audit (pendiente)` NO existe en `ALLOWED_ACTIONS`; añadirla + emitir es trabajo futuro.
+- **Audit log**: `action="password_changed"`, `actor_role=current_user.role`, `target_type="user"`, `target_id=current_user.id`. Emitido por `auth_router.py` antes del commit (atomicidad D-12). Cubre Ley 1581/2012 art. 25 (registro de operaciones sobre data personal). Fix DR-fix Ley1581 (2026-05-24).
 - **Implementación**: `auth_router.py:188` → `AccountService.change_password()`
 
 ---
@@ -215,7 +215,7 @@ Este documento es el catálogo verificable de cada endpoint REST expuesto por el
 - **Response 200**:
   - JSON: shape exportado por `AccountService.export_data` (todas las tablas del usuario).
   - CSV: `Content-Type: text/csv`, `Content-Disposition: attachment; filename=mabel-datos.csv`.
-- **Audit log**: ⚠️ **NO emite audit_log al 2026-05-24** (`users_router.py:46` pass-through a `AccountService.export_data` sin trail). Gap de compliance Ley 1581/2012 art. 25 — DR pendiente Fase 10. El string canónico `"export_data"` SÍ existe en `ALLOWED_ACTIONS` (usado por exports admin); pendiente añadir la emisión también al export self-service.
+- **Audit log**: `action="export_data"`, `actor_role="student"`, `target_type="user"`, `target_id=current_user.id`, `details={resource:"self", format:"json|csv"}`. Emitido por `users_router.py` después del fetch exitoso (si `export_data()` raise, no se loguea). El matiz "self" vs export admin se ve en `details.resource`, no en `target_type` (mantiene vocabulario consistente con `account_service.delete_account`). Cubre Ley 1581/2012 art. 25.
 - **Implementación**: `users_router.py:46`
 
 ---
@@ -835,7 +835,7 @@ Este documento es el catálogo verificable de cada endpoint REST expuesto por el
 | POST | /api/v1/auth/forgot-password | pública | password_reset_requested |
 | GET | /api/v1/auth/reset-password/{token} | pública | — |
 | POST | /api/v1/auth/reset-password | pública | password_reset_completed |
-| PUT | /api/v1/auth/change-password | JWT | ⚠ no-audit (pendiente) |
+| PUT | /api/v1/auth/change-password | JWT | password_changed |
 | GET | /api/v1/consent-versions/active | JWT | — |
 | POST | /api/v1/consents | JWT (student) | consent_granted |
 | PATCH | /api/v1/consents/current | JWT (student) | consent_* |

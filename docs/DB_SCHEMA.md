@@ -50,16 +50,16 @@ Tabla maestra de cuentas. Soporta dos roles (`student`, `admin`), bloqueo admini
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `email` | TEXT | NO | — | UNIQUE; correo institucional UMB |
-| `hashed_password` | TEXT | NO | — | bcrypt hash (cost 12) |
-| `display_name` | TEXT | SÍ | — | Nombre visible (opcional) |
-| `role` | TEXT | NO | `'student'` | `student` \| `admin` |
-| `disabled_at` | TIMESTAMPTZ | SÍ | — | Bloqueo admin (login responde 403) |
-| `disabled_reason` | TEXT | SÍ | — | Obligatoria si `disabled_at` no es NULL |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
-| `deleted_at` | TIMESTAMPTZ | SÍ | — | Reservada para post-MVP (hoy se hace hard DELETE) |
-| `cohort` | TEXT | SÍ | — | Marcador del estudio (Evo 006): `piloto-fase1`, `dev`, `control`, etc. |
+| `id` | UUID | NO | `gen_random_uuid()` | PK generada server-side por `pgcrypto`. Se referencia desde 11 tablas hijas (preferences, sessions, consents, audit_logs.actor_id, etc.). El generar UUID en Postgres y no en Python evita colisiones por clock-skew en múltiples workers. |
+| `email` | TEXT | NO | — | UNIQUE. Correo institucional UMB (regla aplicada en `backend/app/schemas/auth.py` `RegisterRequest`, no en BD — se permite cualquier email para el flujo de invitación admin). Caso-insensitivo a nivel de búsqueda (`func.lower()` en `users_service.list_paginated`). |
+| `hashed_password` | TEXT | NO | — | bcrypt hash (cost 12) generado en `auth_service.register_student`. Nunca expuesto fuera del backend; no aparece en `users/me` (Pydantic schema lo omite). Lo regenera el flujo de reset y el `PATCH /users/me/password`. |
+| `display_name` | TEXT | SÍ | — | Nombre visible. NULL cuando el admin invita un usuario sin nombre o cuando se importa un alta legacy. Frontend hace fallback a `email.split('@')[0]` o "Usuario" (ver `StudentSidebarV3.tsx:560`, `UserMenu.tsx:161`). Pre-MVP el registro lo exige (`auth.RegisterRequest`); por eso usuarios self-served siempre lo tienen. |
+| `role` | TEXT | NO | `'student'` | `student` \| `admin` (CHECK `chk_users_role`). Decisión D-01: login unificado, el JWT incluye `role` y el frontend redirige con `RoleGuard`. **No hay roles intermedios** (rater/tutor) — los empathy_ratings los hace cualquier admin. Cambiar el rol es operación manual (no hay endpoint). |
+| `disabled_at` | TIMESTAMPTZ | SÍ | — | Bloqueo administrativo. NULL = cuenta activa. NOT NULL = `auth_service.login` responde 403. Set por `admin/users_service.disable_user`. La sesión JWT existente no se invalida server-side (stateless): el bloqueo solo aplica al próximo login. Para forzar logout inmediato habría que rotar `JWT_SECRET`. |
+| `disabled_reason` | TEXT | SÍ | — | Texto libre del admin (visible en `UserDetailDrawer`). CHECK `chk_users_disabled_reason` la fuerza obligatoria cuando `disabled_at IS NOT NULL` — invariante de BD, no se puede bypassear desde código. Auditada en `audit_logs.detail.reason`. |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Server-side default. Usada en métricas de altas semanales (`metrics_service.users_new_this_week`). |
+| `deleted_at` | TIMESTAMPTZ | SÍ | — | **Reservada — sin uso operativo al 2026-05-24**. D-14 fuerza hard DELETE: `account_service.delete_account` ejecuta `DELETE FROM users` directo (CASCADE en hijas). Se mantiene la columna para post-MVP si se decide soft delete. **No leer en queries** — el flujo asume "si la fila existe, está viva". |
+| `cohort` | TEXT | SÍ | — | Marcador del estudio cuasi-experimental (Evo 006). Valores observados: `piloto-fase1`, `dev`, `control`, `intervention`. Sin CHECK constraint — texto libre para flexibilidad. Filtro principal del panel de métricas (`metrics_service` acepta `cohort=`). Índice parcial `idx_users_cohort` omite NULL (admin no participa del estudio). Editable desde `PATCH /admin/users/{id}/cohort` (auditado como `target_type='user_cohort'`). |
 
 **CHECK constraints**
 - `chk_users_role`: `role IN ('student', 'admin')`
@@ -80,12 +80,12 @@ Almacena tokens de recuperación de contraseña (hash SHA-256 nunca el token en 
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `user_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE |
-| `token_hash` | TEXT | NO | — | SHA-256 del token enviado al usuario; UNIQUE |
-| `expires_at` | TIMESTAMPTZ | NO | — | Caducidad típica: 60 min |
-| `used_at` | TIMESTAMPTZ | SÍ | — | Marca el consumo (idempotencia) |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. Identificador interno; no se devuelve al usuario (el usuario solo ve el `token` en claro, que NO se guarda). |
+| `user_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE. El CASCADE permite que al eliminar la cuenta los tokens pendientes desaparezcan automáticamente (D-10: tokens en tabla separada, no como columnas en `users`). |
+| `token_hash` | TEXT | NO | — | SHA-256 hex del token aleatorio (`secrets.token_urlsafe`). **El token en claro nunca toca disco** — solo el hash. UNIQUE garantiza que dos solicitudes no pueden generar el mismo hash. Validación en `auth_service.reset_password`: hashea el token recibido y busca por igualdad. |
+| `expires_at` | TIMESTAMPTZ | NO | — | Caducidad típica: 60 min (configurable en `auth_service`). `expires_at < now()` invalida el token aunque siga sin usarse. No hay cron de limpieza — se purgan al delete del user. |
+| `used_at` | TIMESTAMPTZ | SÍ | — | Marca el consumo. NULL = token disponible. NOT NULL = ya redimido (`auth_service.reset_password` lo setea atómicamente con el cambio de password). El índice parcial `idx_prt_token_active` solo cubre filas `used_at IS NULL` para acelerar la búsqueda del path feliz. **Idempotente**: re-usar un token usado devuelve 400, no error de BD. |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Server-side default. Usado por `idx_prt_user_created` para mostrar el historial de solicitudes ordenado descendiente. |
 
 **Índices**
 - PK
@@ -105,14 +105,14 @@ Documento legal del consentimiento informado (Ley 1581/2012). Cada versión guar
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `version` | TEXT | NO | — | UNIQUE (ej. `1.0`) |
-| `title` | TEXT | NO | — | Título visible al usuario |
-| `body` | TEXT | NO | — | Texto legal completo |
-| `status` | TEXT | NO | `'draft'` | `draft` \| `active` \| `archived` |
-| `published_at` | TIMESTAMPTZ | SÍ | — | Fecha de publicación |
-| `created_by` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. Referenciada por `consents.consent_version_id` con `ON DELETE RESTRICT` (no se puede borrar una versión que tenga aceptaciones — protege evidencia legal). |
+| `version` | TEXT | NO | — | UNIQUE. Identificador semántico (ej. `1.0`, `1.1`, `2.0`). Texto libre, no semver enforced. Usado por humanos en el panel admin para distinguir versiones; el código nunca parsea el formato. |
+| `title` | TEXT | NO | — | Título visible al usuario en la pantalla de consentimiento (`/consent`). Se muestra como heading del documento. |
+| `body` | TEXT | NO | — | Texto legal **completo**, formato Markdown (renderizado en frontend con `marked` o equivalente). **Inmutable en producción**: una vez activada, modificar el body invalidaría la evidencia legal de aceptación. Para cambiar el texto se crea una versión nueva (D-09). Tamaño esperado: 5-20 KB. |
+| `status` | TEXT | NO | `'draft'` | `draft` \| `active` \| `archived` (CHECK `chk_consent_versions_status`). **Invariante**: solo una versión puede estar `active` a la vez. El índice parcial `idx_consent_versions_active` permite el lookup `WHERE status='active'` sin scan. `admin/config_service.activate_consent_version` (línea 248-258) hace UPDATE atómico: archiva la actual y activa la nueva en la misma transacción para mantener el invariante. |
+| `published_at` | TIMESTAMPTZ | SÍ | — | Fecha de publicación (cuando pasó de `draft` a `active`). NULL = nunca publicada. Se conserva al pasar a `archived` para auditoría histórica. |
+| `created_by` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL. Admin que redactó la versión. SET NULL preserva el documento si la cuenta del admin se elimina (versión legal sobrevive a la persona). |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Fecha de creación del registro (no de publicación — para eso `published_at`). |
 
 **CHECK**
 - `chk_consent_versions_status`: `status IN ('draft','active','archived')`
@@ -133,12 +133,12 @@ Aceptación del consentimiento por usuario. Re-aceptación post-revocación se h
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `user_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE |
-| `scope` | TEXT | NO | — | `solo_uso` \| `uso_mejora_anon` |
-| `accepted_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
-| `revoked_at` | TIMESTAMPTZ | SÍ | — | NULL = activo; revocación temporal sin perder historial |
-| `consent_version_id` | UUID | NO | — | FK `consent_versions.id` ON DELETE RESTRICT |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. Identificador interno; en logs y exports se usa el par `(user_id, consent_version_id)` como llave semántica. |
+| `user_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE. CASCADE porque el consentimiento sin user no tiene sentido legal (y la evidencia del acto se preserva via `audit_logs` con `target_type='consent'`). |
+| `scope` | TEXT | NO | — | `solo_uso` \| `uso_mejora_anon` (CHECK `chk_consents_scope`). **Semántica**: `solo_uso` = el usuario solo permite usar sus datos para su propia experiencia; los mensajes >30 días deben redactarse (Cron L2 pendiente, ver §6). `uso_mejora_anon` = permite uso agregado anonimizado para investigación/mejora del modelo. Leído por `history_service` y servicios de métricas para decidir qué datos incluir. PO-Q1 cubre la decisión. |
+| `accepted_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Timestamp del acto de aceptación (server-side). Es la **fuente legal** del consentimiento — D-09 exige scroll hasta el final antes de aceptar; el frontend solo dispara el POST cuando esa condición se cumple. |
+| `revoked_at` | TIMESTAMPTZ | SÍ | — | NULL = consentimiento activo. NOT NULL = revocado. **Modelo de re-aceptación** (PO-Q1, Evo 005): tras revocar, si el usuario vuelve a aceptar la MISMA versión, se hace UPDATE `SET revoked_at = NULL, accepted_at = now()` (no INSERT — UNIQUE `(user_id, consent_version_id)` lo prohibiría). Si aparece una versión nueva, sí se inserta una fila nueva. |
+| `consent_version_id` | UUID | NO | — | FK `consent_versions.id` ON DELETE RESTRICT. **Invariante crítico** (Evo 005): NOT NULL desde 2026-02-24. RESTRICT garantiza que ninguna versión con aceptaciones pueda eliminarse — protege evidencia bajo Ley 1581/2012. La columna legacy `version` TEXT se eliminó en Evo 005 por redundancia con esta FK. |
 
 **CHECK**
 - `chk_consents_scope`: `scope IN ('solo_uso','uso_mejora_anon')`
@@ -162,13 +162,13 @@ Configuración 1:1 por usuario. El PK es directamente `user_id` (sin columna `id
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `user_id` | UUID | NO | — | PK + FK `users.id` ON DELETE CASCADE |
-| `save_history` | BOOLEAN | NO | `false` | Toggle de retención de historial (D-04) |
-| `ui_language` | TEXT | NO | `'es'` | Idioma de UI (solo `es` en MVP) |
-| `tts_voice` | TEXT | SÍ | — | ID de voz Piper (placeholder hasta TTS final) |
-| `accessibility` | JSONB | SÍ | — | Toggles de accesibilidad (subtítulos, etc.) |
-| `checkin_enabled` | BOOLEAN | NO | `true` | Permitir check-in pre-sesión |
-| `preferred_chat_mode` | TEXT | NO | `'chat'` | `chat` \| `avatar` (Avatar 2D/3D, Evo 003) |
+| `user_id` | UUID | NO | — | PK + FK `users.id` ON DELETE CASCADE. **No hay columna `id` separada** — la tabla es 1:1 con `users` por diseño (decisión Ag.03). Permite `INSERT ON CONFLICT (user_id) DO UPDATE` idempotente al actualizar preferencias. |
+| `save_history` | BOOLEAN | NO | `false` | Toggle de retención del historial conversacional. **`false` (default privacy-first)** = los mensajes NO se persisten (`chat_service` ramifica en `if save_history:` antes de cada INSERT a `messages`); la conversación es efímera, solo vive en el contexto del request. **`true`** = mensajes persisten en BD, sidebar muestra el historial. Decisión de "privacy by default": el usuario debe optar IN explícitamente (D-04 en MEMORY hace referencia a esto; D-14 política de retención hard-DELETE complementa). Cambiar de `true` → `false` no borra retroactivamente; solo el flag detiene nuevas escrituras (la limpieza activa va por `history_service`). |
+| `ui_language` | TEXT | NO | `'es'` | **Reservada** para futuras versiones multi-idioma. En el MVP solo `es` (es-CO). Leída por `preference_service.get_preferences` para pasar al frontend, pero `frontend/src/i18n` no existe — siempre vuelve `es`. **Cuándo cambiar**: cuando se implemente i18n (post-Fase 10), aquí va el código del locale (`es-CO`, `es-MX`, etc.). |
+| `tts_voice` | TEXT | SÍ | — | ID de voz Piper (ej. `es_ES-mls_9972-low`). **Placeholder hasta el modelo 2D/avatar animado** (ver MEMORY `onboarding-pending-when-voice-avatar-lands`). En el MVP solo hay 1 voz instalada; el selector está oculto en Settings (Onboarding.tsx:32) y siempre escribe NULL. `admin/users_service.py:253-254` lee `tts_enabled = pref.tts_voice is not None` como proxy "voz habilitada". NULL = TTS off. |
+| `accessibility` | JSONB | SÍ | — | Bag JSON para toggles de accesibilidad. **Shape esperado**: `{"contrast": "normal"\|"high", "font_size": "sm"\|"md"\|"lg", "subtitles": bool, ...}`. Settings.tsx:354/404 escribe estas keys; Chat.tsx:105 las lee para activar subtítulos en burbujas. Los 3 toggles documentados están comentados/deshabilitados en UI hasta que se cierre la decisión de avatar 2D animado (ver `onboarding-pending`); el JSONB sigue aceptando escrituras para no perder datos cuando se rehabiliten. NULL = todos los defaults. |
+| `checkin_enabled` | BOOLEAN | NO | `true` | Permite que el flujo de chat presente el check-in pre-sesión (estados: ánimo, energía, estrés, sueño...). Si `false`, el flujo salta el modal y arranca chat directo. Default `true` porque el check-in es central al objetivo psicoeducativo (alimenta `sessions.checkin_payload` que se inyecta al system prompt). |
+| `preferred_chat_mode` | TEXT | NO | `'chat'` | `chat` \| `avatar` (CHECK `chk_preferences_chat_mode`, Evo 003). `chat` = burbujas tradicionales. `avatar` = renderiza el avatar 2D/3D con lip-sync (Fase 9, pendiente). En el MVP solo `chat` está implementado; `avatar` es un toggle reservado. Cuando una sesión se inicia bajo modo `avatar`, `sessions.avatar_used = true` queda como marca histórica. |
 
 **CHECK**
 - `chk_preferences_chat_mode`: `preferred_chat_mode IN ('chat','avatar')`
@@ -185,18 +185,18 @@ Hilo de conversación del usuario. UNIQUE parcial garantiza una sesión activa p
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `user_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE |
-| `started_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
-| `ended_at` | TIMESTAMPTZ | SÍ | — | NULL = activa |
-| `topic_hint` | TEXT | SÍ | — | Sugerencia inicial de tema |
-| `meta` | JSONB | SÍ | — | Metadatos libres |
-| `checkin_opt_in` | BOOLEAN | NO | `true` | El usuario aceptó el check-in pre-sesión |
-| `checkin_payload` | JSONB | SÍ | — | Respuestas del check-in |
-| `checkin_completed_at` | TIMESTAMPTZ | SÍ | — | |
-| `avatar_used` | BOOLEAN | NO | `false` | Esta sesión usó modo avatar (Evo 003) |
-| `hidden_at` | TIMESTAMPTZ | SÍ | — | NULL = visible. NOT NULL = oculta del sidebar del usuario (Evo 012) |
-| `hidden_reason` | TEXT | SÍ | — | Origen del hide (audit trail) |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. Aparece en URLs (`/chat/:sessionId`) y como `session_id` en los SSE streams. |
+| `user_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE. CASCADE arrastra mensajes, attachments y session_ratings al eliminar la cuenta (D-14 hard delete). Para safety_events conserva NULL via SET NULL (evidencia anónima). |
+| `started_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Server-side. Define el orden de la lista del sidebar (índices `idx_sessions_user_time` y `idx_sessions_user_visible` ambos usan esta columna). |
+| `ended_at` | TIMESTAMPTZ | SÍ | — | NULL = sesión activa. NOT NULL = cerrada. **Invariante**: UNIQUE parcial `uq_sessions_user_active` (Evo 005b) — un usuario solo puede tener UNA sesión con `ended_at IS NULL`. Si intenta abrir otra, `chat_service.create_session` debería cerrar la anterior primero (race-safe vía CONSTRAINT, no via lógica). |
+| `topic_hint` | TEXT | SÍ | — | Texto libre que el usuario aporta al crear la sesión desde el modal de nuevo chat (input "¿De qué quieres hablar?"). Lo envía `POST /sessions` con `body.topic_hint` (`session_router.py:64`). **No se inyecta al system prompt directamente** — solo aparece como sub-título de la sesión en el sidebar (UI hint). NULL = sesión sin tema declarado. |
+| `meta` | JSONB | SÍ | — | Bag JSON libre. **Uso actual al 2026-05-24**: vacío en práctica — no hay grep activo de keys específicas en el código. Reservado para extender la sesión con metadata (ej. `{"source": "checkin_modal", "campaign": "midterm-stress"}`) sin migrar el schema. |
+| `checkin_opt_in` | BOOLEAN | NO | `true` | Snapshot del consentimiento al check-in en el momento de crear la sesión (independiente de `preferences.checkin_enabled` que puede cambiar después). Default `true`. Si el usuario rechazó el check-in en el modal, queda `false` y `checkin_payload` queda NULL. |
+| `checkin_payload` | JSONB | SÍ | — | Respuestas del check-in pre-sesión. **Shape**: `{"mood": int, "energy": int, "stress": int, "sleep_quality": "good"\|..., "sleep": float, "loneliness": int, "focus": [str], "focus_other": str, "note": str}` (ver `services/llm/prompts.py:159-187` y `metrics_service.py:670-694`). Inyectado al system prompt vía `build_system_prompt(session.checkin_payload)` (`chat_service.py:297`). NULL si el usuario saltó el check-in. Métricas agregadas vía cast JSONB→Float en `metrics_service`. |
+| `checkin_completed_at` | TIMESTAMPTZ | SÍ | — | Timestamp del envío del check-in. NULL = check-in no completado (incluye casos de opt-out y abandono del modal). |
+| `avatar_used` | BOOLEAN | NO | `false` | Marca histórica: esta sesión utilizó el modo avatar (Evo 003). Setea `true` cuando `preferences.preferred_chat_mode='avatar'` al momento de crear la sesión. Útil para métricas A/B chat vs avatar cuando Fase 9 esté implementada. En el MVP siempre `false`. |
+| `hidden_at` | TIMESTAMPTZ | SÍ | — | Evo 012. Soft-hide controlado por el usuario. NULL = visible en su sidebar. NOT NULL = el usuario eligió ocultarla (toggle "Guardar historial" off, o "Quitar" en el menú 3-puntos). **El admin sigue viendo todo** (panel de métricas usa `select(SessionModel)` directo). El índice parcial `idx_sessions_user_visible` cubre la query del sidebar. Operación **one-way** — no hay UI para "des-ocultar". Ver `docs/DATA_RETENTION_POLICY.md`. |
+| `hidden_reason` | TEXT | SÍ | — | Audit trail del hide. CHECK `ck_sessions_hidden_reason` admite `user_toggle_off` (toggle global preferences off), `user_per_session` (menú 3-puntos en una sesión específica) o `admin_action` (reservada — admin no oculta hoy). Set por `history_service.py:82` y `:170`. |
 
 **CHECK**
 - `ck_sessions_hidden_reason`: `hidden_reason IS NULL OR hidden_reason IN ('user_toggle_off','user_per_session','admin_action')`
@@ -217,20 +217,20 @@ Mensajes del hilo (system / user / assistant). La latencia se desglosa desde Evo
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `session_id` | UUID | NO | — | FK `sessions.id` ON DELETE CASCADE |
-| `role` | TEXT | NO | — | `system` \| `user` \| `assistant` |
-| `content` | TEXT | NO | — | Texto del mensaje |
-| `content_sha256` | TEXT | SÍ | — | Hash opcional para deduplicación |
-| `meta` | JSONB | SÍ | — | Metadatos libres (incluye `greeting=true` para mensajes de saludo) |
-| `safety_flags` | JSONB | SÍ | — | Resultado del pipeline de guardrails |
-| `tokens_prompt` | INT | SÍ | — | Tokens consumidos por el prompt |
-| `tokens_completion` | INT | SÍ | — | Tokens generados |
-| `latency_ms` | INT | SÍ | — | Latencia end-to-end (assistant) |
-| `asr_latency_ms` | INT | SÍ | — | Latencia ASR (Whisper) — Evo 006 |
-| `llm_latency_ms` | INT | SÍ | — | Latencia LLM (Gemini/OpenAI-compat) — Evo 006 |
-| `tts_latency_ms` | INT | SÍ | — | Latencia TTS (Piper) — Evo 006 |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. Referenciada por `message_reports`, `attachments`, `empathy_ratings` (todas CASCADE). |
+| `session_id` | UUID | NO | — | FK `sessions.id` ON DELETE CASCADE. Index `idx_messages_session_time(session_id, created_at)` soporta la query principal del repo (`list_by_session` ordenado ASC). |
+| `role` | TEXT | NO | — | `system` \| `user` \| `assistant` (CHECK `chk_messages_role`). En el MVP solo se persisten `user` y `assistant`; `system` está reservado por compatibilidad con el patrón OpenAI/Gemini pero no se inserta — el system prompt va inline al request del LLM, no al historial. |
+| `content` | TEXT | NO | — | Texto del mensaje. Para `assistant` es la respuesta completa concatenada del SSE stream. Para `user` es el input tal cual (post-transcripción ASR si fue audio). Sin sanitización HTML server-side — el frontend renderiza como texto plano. |
+| `content_sha256` | TEXT | SÍ | — | Hash SHA-256 hex del content. Generado siempre en `chat_service` (`hashlib.sha256(content.encode()).hexdigest()`, líneas 267, 421, 586). **Sin UNIQUE constraint** — NO previene duplicados activamente. Sirve para futuras deduplicaciones offline y para verificar integridad si se exporta el historial. NULL solo en filas históricas pre-Fase 8. |
+| `meta` | JSONB | SÍ | — | Metadatos libres del LLM. **Shape observado**: `{"model": "<LLM_MODEL>"}` para mensajes regulares; `{"model": "...", "greeting": true}` para el saludo inicial. La key `"greeting"` es **load-bearing**: el UNIQUE parcial `uq_messages_session_greeting` la usa para deduplicar el saludo automático (Evo 009, race contra React StrictMode que invoca `useEffect` dos veces). El predicado del índice usa `meta->>'greeting' = 'true'` (text equality) intencionalmente. |
+| `safety_flags` | JSONB | SÍ | — | Resultado del pipeline de guardrails para este mensaje. **Shape**: `{"risk_detected": bool, "keywords": [str], "severity": int}` (1-5). NULL = el mensaje pasó sin trigger o guardrails estaban deshabilitados. Set en `chat_service.py:268-272` (pre-filter en user msg) y `:408` (post-filter en assistant msg). El registro en `safety_events` es paralelo — esta columna es el snapshot del mensaje, `safety_events` el log temporal. |
+| `tokens_prompt` | INT | SÍ | — | Tokens consumidos por el prompt (input). Devuelto por el LLM provider en su response. NULL si el provider no lo reporta o si el mensaje es del usuario. Usado para métricas de costo/uso en el admin. |
+| `tokens_completion` | INT | SÍ | — | Tokens generados (output). Solo poblado para `role='assistant'`. Acumulado atómico en el greeting via `update(Message)` directo en `chat_service.py:631-638` para evitar race en concurrent turns. |
+| `latency_ms` | INT | SÍ | — | Latencia **end-to-end** del turno assistant (medida server-side desde inicio de procesamiento hasta último chunk del SSE). `time.time() - start_time` x1000 en `chat_service.py:401`. Es el KPI principal del criterio de éxito ("mediana ≤ 20s"). NULL en mensajes user y en assistant pre-Evo 006. Índice parcial `idx_messages_latency` cubre solo `role='assistant'` para queries de métricas. |
+| `asr_latency_ms` | INT | SÍ | — | Latencia del Whisper transcribiendo audio del usuario (Evo 006). Medida en `asr_service` antes de pasar el texto a `chat_service`. NULL si el turno fue texto puro. Permite separar tiempo "transcripción" vs "modelo" en el dashboard. |
+| `llm_latency_ms` | INT | SÍ | — | Latencia pura del LLM (Evo 006). Hoy igual a `latency_ms` porque el LLM domina el pipeline y ASR/TTS son out-of-band (`chat_service.py:425-427` documenta esto). Cuando el TTS pase a ser síncrono, este campo divergerá de `latency_ms`. |
+| `tts_latency_ms` | INT | SÍ | — | Latencia del Piper sintetizando audio (Evo 006). NULL si el turno no usó TTS o si fue out-of-band. Permite aislar el costo de voz en el dashboard. |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Server-side. Define el orden estricto de la conversación (índice `idx_messages_session_time`). |
 
 **CHECK**
 - `chk_messages_role`: `role IN ('system','user','assistant')`
@@ -251,15 +251,15 @@ Reportes del estudiante sobre mensajes del asistente (alucinación, dañino, pri
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `message_id` | UUID | NO | — | FK `messages.id` ON DELETE CASCADE |
-| `reporter_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE |
-| `reason` | TEXT | NO | — | `hallucination` \| `harmful` \| `privacy` \| `low_empathy` \| `other` |
-| `details` | TEXT | SÍ | — | Texto libre del reporte |
-| `status` | TEXT | NO | `'open'` | `open` \| `triaged` \| `resolved` \| `dismissed` |
-| `severity` | INT | SÍ | — | 1-5 (asignada al triage) |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
-| `updated_at` | TIMESTAMPTZ | SÍ | — | Set por el admin al cambiar status |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. |
+| `message_id` | UUID | NO | — | FK `messages.id` ON DELETE CASCADE. Si el mensaje desaparece (raro — solo via hard delete de la cuenta), el reporte también: no tiene sentido un reporte huérfano. |
+| `reporter_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE. CASCADE intencional — al eliminar la cuenta del reporter, sus reportes desaparecen (D-14). Los hallazgos accionables quedan registrados en `audit_logs` (que sí es SET NULL). |
+| `reason` | TEXT | NO | — | CHECK `chk_message_reports_reason`: `hallucination` (info falsa) \| `harmful` (contenido dañino) \| `privacy` (filtración de datos) \| `low_empathy` (tono frío) \| `other`. Estos 5 valores son los que renderiza el modal de reporte en `frontend/src/components/chat/ReportModal`. Métricas: `low_empathy` cruza con el criterio de éxito "empatía ≥ 4/5 en ≥ 80%". |
+| `details` | TEXT | SÍ | — | Texto libre opcional del reporter explicando el motivo. NULL = solo se marcó el motivo sin comentario. Visible al admin en `admin/reports_service`. |
+| `status` | TEXT | NO | `'open'` | CHECK `chk_message_reports_status`: `open` (recién creado) → `triaged` (admin lo revisó y asignó severidad) → `resolved` (acción tomada) o `dismissed` (descartado). Las transiciones son one-way en práctica; el código no impone máquina de estados estricta. Indice `idx_message_reports_status` soporta el filtro de la cola admin. |
+| `severity` | INT | SÍ | — | 1-5 (CHECK `chk_message_reports_severity`). NULL en estado `open` — solo el admin la asigna al triage (`admin/reports_service.py:151,221`). 5 = crítico (puede disparar revisión inmediata del modelo); 1 = ruido. |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Cuándo el reporter lo creó. |
+| `updated_at` | TIMESTAMPTZ | SÍ | — | Cuándo el admin cambió status/severidad por última vez. NULL = nunca tocado por admin (sigue `open`). El backend lo setea manualmente — no hay trigger. |
 
 **CHECK**
 - `chk_message_reports_reason`
@@ -283,12 +283,12 @@ Adjuntos por mensaje (audio ASR, imagen, doc). `kind` controlado por CHECK.
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `message_id` | UUID | NO | — | FK `messages.id` ON DELETE CASCADE |
-| `kind` | TEXT | NO | — | `audio` \| `image` \| `doc` |
-| `path` | TEXT | NO | — | Ruta relativa en `UPLOAD_DIR` |
-| `meta` | JSONB | SÍ | — | Metadatos (duración, tamaño, MIME, etc.) |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. |
+| `message_id` | UUID | NO | — | FK `messages.id` ON DELETE CASCADE. Al borrar el mensaje, el adjunto desaparece de la BD; **el archivo físico en disco NO se borra automáticamente** (sin trigger ni job). Es deuda — para MVP los uploads son <1GB total. |
+| `kind` | TEXT | NO | — | CHECK `chk_attachments_kind`: `audio` \| `image` \| `doc`. En el MVP **solo `audio` está implementado** (vía ASR — `attachment_repository.create_audio` lo hardcodea). `image` y `doc` están reservados para post-MVP cuando se habilite upload manual. |
+| `path` | TEXT | NO | — | Ruta relativa dentro de `UPLOAD_DIR` (ver `core/config.py`, default `uploads/audio/`). Formato típico: `<uuid>.wav` o `<uuid>.webm`. **Path traversal NO validado a nivel de BD** — el backend confía en que el código de upload genere paths seguros (siempre UUID-based). |
+| `meta` | JSONB | SÍ | — | Bag JSON para duración (ms), MIME type, tamaño en bytes, codec, sample rate, etc. Shape no estandarizado al 2026-05-24 — uso poco frecuente. NULL en mayoría de filas; el backend no depende de él. |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Server-side. |
 
 **CHECK**
 - `chk_attachments_kind`: `kind IN ('audio','image','doc')`
@@ -309,13 +309,13 @@ Eventos de seguridad detectados por guardrails o disparados por el usuario (SOS 
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `user_id` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL |
-| `session_id` | UUID | SÍ | — | FK `sessions.id` ON DELETE SET NULL |
-| `event_type` | TEXT | NO | — | Texto libre (`guardrail_trigger`, `sos_manual`, etc.) — sin CHECK |
-| `payload` | JSONB | SÍ | — | Detalle del evento (keywords matched, severidad, etc.) |
-| `status` | TEXT | NO | `'active'` | `active` \| `reviewed` \| `resolved` |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. Referenciada por `audit_logs.target_id` cuando un admin actualiza el evento (`target_type='safety_event'`). |
+| `user_id` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL (Evo 005c, D-14). NULLABLE permite preservar el evento como **evidencia anónima** tras hard DELETE de la cuenta — clave para auditoría legal y métricas globales. Inserción siempre con `user_id` real; queda NULL solo post-CASCADE. |
+| `session_id` | UUID | SÍ | — | FK `sessions.id` ON DELETE SET NULL. Mismo principio: evidencia sobrevive al borrado de la sesión. NULL = sesión ya eliminada o evento que no nació en una sesión (raro). |
+| `event_type` | TEXT | NO | — | **Texto libre sin CHECK** — extensibilidad sobre estricteza. **Valores reales observados al 2026-05-24**: `risk_detected` (guardrails pre o post — `guardrails_service.py:33,68`), `user_report` (estudiante reportó mensaje — `report_service.py:54`). El admin agrega tipos custom via `admin/safety_events_service`. Índice `idx_safety_events_type` para filtros. |
+| `payload` | JSONB | SÍ | — | Detalle del evento. **Shape para `risk_detected`**: `{"keywords": [str], "severity": int, "message_id": str\|null, "filter": "pre"\|"post"}` (ver `guardrails_service.py:34-39`). **Shape para `user_report`**: `{"report_id": str}` (`report_service.py:55`). `metrics_service.py:1151` extrae `payload->>'keywords'` para top-N agregado (anonimizado). |
+| `status` | TEXT | NO | `'active'` | CHECK `chk_safety_events_status`: `active` (sin atención) \| `reviewed` (admin lo vio) \| `resolved` (acción tomada). Default `active` para que toda fila nueva entre a la cola. Indice `idx_safety_events_status` soporta el filtro del badge "alertas pendientes". |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Usado para ventanas temporales (`safety_events_24h`, `safety_events_per_day` en métricas — `metrics_service.py:395,1091`). |
 
 **CHECK**
 - `chk_safety_events_status`: `status IN ('active','reviewed','resolved')`
@@ -338,15 +338,15 @@ Respuestas a instrumentos del estudio cuasi-experimental (SUS, rúbrica de empat
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `user_id` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL (preserva agregados post-eliminación) |
-| `instrument` | TEXT | NO | — | `sus` \| `empathy_rubric` \| `wellbeing_pre` \| `wellbeing_post` |
-| `phase` | TEXT | NO | — | `pre` \| `post` |
-| `score` | NUMERIC(5,2) | SÍ | — | Puntaje agregado |
-| `raw_data` | JSONB | SÍ | — | Respuestas crudas |
-| `administered_at` | TIMESTAMPTZ | NO | — | Cuándo se aplicó al participante |
-| `imported_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Cuándo se cargó al sistema |
-| `imported_by` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. |
+| `user_id` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL. **Crítico para investigación**: preservar agregados aunque el participante elimine su cuenta. El índice parcial `idx_survey_user WHERE user_id IS NOT NULL` filtra solo respuestas todavía vinculadas. |
+| `instrument` | TEXT | NO | — | CHECK `chk_survey_responses_instrument`: `sus` (System Usability Scale, 10 ítems Likert 1-5; criterio éxito SUS≥70) \| `empathy_rubric` (rúbrica de empatía aplicada externamente, D-11) \| `wellbeing_pre`/`wellbeing_post` (instrumento de bienestar pre/post intervención, mide el effect size ≥0.3 del criterio de éxito). |
+| `phase` | TEXT | NO | — | CHECK `chk_survey_responses_phase`: `pre` \| `post`. **Importante**: la combinación con `instrument` no es libre — `wellbeing_pre` debería tener `phase='pre'` y `wellbeing_post` `phase='post'`. UNIQUE `(user_id, instrument, phase)` previene aplicaciones duplicadas. |
+| `score` | NUMERIC(5,2) | SÍ | — | Puntaje agregado (ej. SUS 0-100). NULL si solo se almacenaron las respuestas crudas y el agregado se calcula al vuelo. Numeric con 2 decimales para precisión sin pérdida. |
+| `raw_data` | JSONB | SÍ | — | Respuestas crudas del instrumento. Shape libre — depende del instrumento (típicamente `{"q1": 4, "q2": 5, ...}` para SUS, o JSON estructurado para wellbeing). Permite recalcular el score si cambia la fórmula. NULL si solo se importó el agregado. |
+| `administered_at` | TIMESTAMPTZ | NO | — | Cuándo se aplicó al participante en la realidad (externo al sistema). **D-11**: instrumentos SUS/Empatía se administran fuera de la app (Google Forms u otro) y se importan vía CSV. Esta es la fecha "real" del evento. |
+| `imported_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Cuándo el admin cargó la respuesta al sistema. Es ≥ `administered_at`. Útil para auditoría de la carga de datos. |
+| `imported_by` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL. Admin que ejecutó la importación. SET NULL para preservar la fila si el admin se elimina. |
 
 **CHECK**
 - `chk_survey_responses_instrument`
@@ -370,13 +370,13 @@ Calificaciones de empatía por evaluador entrenado (rater) sobre mensajes del as
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `message_id` | UUID | NO | — | FK `messages.id` ON DELETE CASCADE |
-| `rater_id` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL |
-| `score` | INT | NO | — | 1-5 |
-| `criteria` | JSONB | SÍ | — | `{"empathic_tone":true,"validation":true,"hallucination":false}` |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
-| `updated_at` | TIMESTAMPTZ | SÍ | — | Set por `PATCH /admin/empathy-ratings/{id}` cuando el rater edita (Evo 009) |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. Usada como `target_id` en `audit_logs` (`target_type='empathy_rating'`). |
+| `message_id` | UUID | NO | — | FK `messages.id` ON DELETE CASCADE. Si el mensaje desaparece (hard delete del user), las calificaciones también — la unidad de evaluación deja de existir. |
+| `rater_id` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL. **Permite inter-rater reliability**: el mismo mensaje puede tener N filas con distinto rater. NULL = el rater fue eliminado pero la calificación persiste para análisis histórico. |
+| `score` | INT | NO | — | 1-5 (CHECK `chk_empathy_ratings_score`). **Semántica**: 1 = nada empático, 5 = altamente empático. Criterio de éxito del estudio: ≥4 en ≥80% de los mensajes calificados. |
+| `criteria` | JSONB | SÍ | — | Checklist desglosada del rater. **Shape**: `{"empathic_tone": bool, "validation": bool, "hallucination": bool}` y opcionalmente más keys (ver `schemas/admin.py:386` "free-form checklist"). Permite analizar el "por qué" de un score bajo (ej. ¿fue por tono o por alucinación?). NULL = rater solo dio score sin checklist. |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Cuándo se creó la calificación inicial. |
+| `updated_at` | TIMESTAMPTZ | SÍ | — | Set por `PATCH /admin/empathy-ratings/{id}` cuando el rater edita score o criteria (Evo 009). NULL = nunca editada (created_at sigue siendo la fuente única del timestamp original). El servicio compara con `criteria is not None` para decidir si actualiza (`empathy_service.py:323-325`). |
 
 **CHECK**
 - `chk_empathy_ratings_score`: `score BETWEEN 1 AND 5`
@@ -399,12 +399,12 @@ Calificación del estudiante a una sesión (1-5 corazones, más = mejor). UPSERT
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `session_id` | UUID | NO | — | FK `sessions.id` ON DELETE CASCADE |
-| `user_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE |
-| `rating` | INT | NO | — | 1-5 |
-| `created_at` | TIMESTAMPTZ | NO | `now()` | |
-| `updated_at` | TIMESTAMPTZ | NO | `now()` | Refleja la última edición |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. |
+| `session_id` | UUID | NO | — | FK `sessions.id` ON DELETE CASCADE. Al cerrar/borrar sesión, su rating desaparece. |
+| `user_id` | UUID | NO | — | FK `users.id` ON DELETE CASCADE. Garantiza que el rating no sobrevive a la cuenta. La UNIQUE `(session_id, user_id)` formalmente admite que distintos usuarios califiquen la misma sesión, pero el modelo de negocio actual es 1:1 sesión-usuario (la sesión pertenece a un solo user), así que en práctica hay máx. 1 rating por sesión. |
+| `rating` | INT | NO | — | 1-5 corazones (CHECK `ck_session_ratings_range`). **Semántica**: 1 = muy mala experiencia, 5 = excelente. UI: header del chat (visible incluso en sesiones cerradas). El estudiante puede **editar las veces que quiera** (UPSERT idempotente via UNIQUE). |
+| `created_at` | TIMESTAMPTZ | NO | `now()` | Cuándo se hizo el primer rating de la sesión. NOT NULL. |
+| `updated_at` | TIMESTAMPTZ | NO | `now()` | Refleja la última edición. Igual a `created_at` si nunca se editó. **NOT NULL** (distinto a otras tablas) — el UPSERT setea ambos en el INSERT inicial. |
 
 **CHECK**
 - `ck_session_ratings_range`: `rating BETWEEN 1 AND 5`
@@ -429,15 +429,15 @@ Tabla inmutable de auditoría (no se eliminan, no se actualizan). Evo 008 renomb
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `id` | UUID | NO | `gen_random_uuid()` | PK |
-| `actor_id` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL (renombrada desde `admin_id` en Evo 008) |
-| `actor_role` | TEXT | NO | — | `admin` \| `student` \| `system` (Evo 008; sin server_default — backfill de filas históricas fue `'admin'` y luego se removió el DEFAULT) |
-| `action` | TEXT | NO | — | Identificador semántico de la acción (sin CHECK por extensibilidad) |
-| `target_type` | TEXT | SÍ | — | Tipo de entidad apuntada (polimórfico) |
-| `target_id` | UUID | SÍ | — | UUID del target (sin FK por polimorfismo) |
-| `detail` | JSONB | SÍ | — | Payload arbitrario de la acción |
-| `ip_address` | TEXT | SÍ | — | Soporta IPv4/IPv6 |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
+| `id` | UUID | NO | `gen_random_uuid()` | PK. Es la única forma de referirse a una entrada concreta — el resto es búsqueda por filtros. |
+| `actor_id` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL (renombrada desde `admin_id` en Evo 008). SET NULL preserva la entrada inmutable aunque la cuenta se elimine — los logs son la **evidencia legal**, sobreviven a la persona. NULL legítimo cuando: (a) acción del sistema (job, migration), (b) actor ya borrado, (c) acción anónima (pre-auth). |
+| `actor_role` | TEXT | NO | — | CHECK `chk_audit_logs_actor_role`: `admin` \| `student` \| `system`. Evo 008 introdujo `student` y `system` (antes solo había `admin`). **Sin `server_default`** intencional: forzar al código a ser explícito sobre el rol (`audit_service.py:64-94`); un INSERT que omita actor_role falla con NOT NULL en vez de silenciosamente marcar como `admin`. Backfill histórico fue `'admin'` y luego DROP DEFAULT. Indice `idx_audit_logs_role_time` soporta el filtro "por rol" del panel. |
+| `action` | TEXT | NO | — | **Texto libre sin CHECK** — la extensibilidad pesa más que la estricteza. Valores observados: `register`, `login`, `login_failed`, `delete_account`, `consent_grant`, `consent_revoke`, `password_reset`, `disable_user`, `enable_user`, `update_cohort`, `update_safety_event`, `delete_safety_event`, `create_empathy_rating`, `update_empathy_rating`, etc. La validación de coherencia (actor_role + action) NO se enforce en BD ni en código deliberadamente (`audit_service.py:9-10`). |
+| `target_type` | TEXT | SÍ | — | Tipo de entidad apuntada (polimorfismo intencional). Valores observados: `user`, `user_cohort`, `safety_event`, `message`, `empathy_rating`, `consent`. NULL para acciones globales (login, logout, system jobs). |
+| `target_id` | UUID | SÍ | — | UUID del target. **Sin FK** porque es polimórfico — puede apuntar a `users.id`, `safety_events.id`, etc. La consecuencia: si la entidad target se elimina, el UUID aquí queda **huérfano** (no se limpia automáticamente). Aceptable porque audit_logs son inmutables y los UUIDs nunca se reciclan. |
+| `detail` | JSONB | SÍ | — | Payload contextual arbitrario. Ejemplos: `{"reason": "..."}` (disable_user), `{"old": "cohort_a", "new": "cohort_b"}` (update_cohort), `{"score": 4, "criteria": {...}}` (empathy_rating), `{"reason": "...", "bulk": true}` (bulk ops), `{"previous": {...}}` (updates con diff). NULL = acción sin detalle extra (raro). |
+| `ip_address` | TEXT | SÍ | — | IP del request (cuando aplica). Soporta IPv4 e IPv6 (por eso TEXT, no INET). NULL para acciones del sistema o cuando no se capturó. Útil para investigaciones forenses. |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Inmutable. Define el orden cronológico — todos los índices (`idx_audit_logs_*`) ordenan DESC para mostrar lo más reciente primero. |
 
 **CHECK**
 - CHECK constraint `actor_role IN ('admin','student','system')`. **⚠️ Naming dual (deuda DR-11)**: el modelo SQLAlchemy declara `name='audit_logs_actor_role_check'` (`backend/app/models/audit_log.py:16`) mientras la migración 008 crea `chk_audit_logs_actor_role` (`backend/alembic/versions/008_audit_logs_actor.py:124`). **No son alias** — son nombres distintos en Postgres; según el orden de aplicación puede crearse uno u otro (o duplicarse si Postgres ya tiene la otra por autogenerate previo). Verificar con `\d audit_logs` post-deploy.
@@ -462,12 +462,12 @@ Configuración runtime ajustable por admin sin redeploy. PK es TEXT (clave semá
 
 | Columna | Tipo | Nullable | Default | Descripción |
 |---|---|---|---|---|
-| `key` | TEXT | NO | — | PK (ej. `safety_keywords`) |
-| `value` | JSONB | NO | — | Valor estructurado o escalar |
-| `description` | TEXT | SÍ | — | Documentación inline |
-| `updated_by` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL |
-| `updated_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
-| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | |
+| `key` | TEXT | NO | — | PK semántica (no UUID — decisión de arbitraje Ag.02). Las keys son identificadores conocidos en código (`get_sos_threshold`, `get_guardrails_enabled`, etc.). Permite UPSERT idempotente desde seeds. |
+| `value` | JSONB | NO | — | Valor estructurado o escalar (JSONB acepta `true`, `4`, `"str"`, `[...]`, `{...}`). NOT NULL — todas las keys deben tener un valor. **Validación por key** en `admin/config_service.py:113-128` (ej. `validate_sos_severity_threshold` exige int 1-5). Ver tabla de shapes abajo. |
+| `description` | TEXT | SÍ | — | Documentación inline visible al admin en el panel. Texto libre. NULL aceptado pero los seeds siempre la pueblan. |
+| `updated_by` | UUID | SÍ | — | FK `users.id` ON DELETE SET NULL. Admin que hizo el último cambio. NULL para seeds iniciales (no había usuario admin todavía) y para cambios del sistema. |
+| `updated_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Refleja la última escritura. El backend lo setea explícitamente al UPSERT — no hay trigger. |
+| `created_at` | TIMESTAMPTZ | NO | `CURRENT_TIMESTAMP` | Cuándo se creó la key originalmente (típicamente: seed migration). Inmutable post-creación. |
 
 **Índices**: solo PK.
 

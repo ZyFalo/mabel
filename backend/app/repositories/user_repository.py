@@ -33,10 +33,15 @@ class UserRepository:
         return user
 
     async def update_password(self, user_id: uuid.UUID, hashed_password: str) -> None:
+        # NO commit aquí (D-12 atomicity): el caller (auth_router.change_password,
+        # auth_router.reset_password) emite el audit_log_action y hace commit final
+        # para que el UPDATE del hash y el audit_logs row queden en la misma TX.
+        # Hasta 2026-05-24 sí commiteaba aquí, lo que rompía el patrón post-D-12 y
+        # permitía que el audit quedara perdido si fallaba tras el password update.
         user = await self.get_by_id(user_id)
         if user:
             user.hashed_password = hashed_password
-            await self.db.commit()
+            await self.db.flush()
 
     async def delete(self, user_id: uuid.UUID) -> bool:
         result = await self.db.execute(delete(User).where(User.id == user_id))

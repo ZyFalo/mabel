@@ -28,8 +28,12 @@ class PasswordResetRepository:
         return result.scalar_one_or_none()
 
     async def mark_used(self, token_id: uuid.UUID) -> None:
+        # NO commit aquí (D-12 atomicity, 2026-05-24): el caller
+        # (auth_router.reset_password) emite audit_log_action y hace commit
+        # final para que el used_at update y el audit queden en la misma TX.
+        # Antes commiteaba aquí y el audit quedaba en otra TX (no atómico).
         result = await self.db.execute(select(PasswordResetToken).where(PasswordResetToken.id == token_id))
         token = result.scalar_one_or_none()
         if token:
             token.used_at = datetime.now(UTC)
-            await self.db.commit()
+            await self.db.flush()

@@ -13,7 +13,13 @@ class AuditLog(Base):
     __table_args__ = (
         CheckConstraint(
             "actor_role IN ('admin', 'student', 'system')",
-            name="audit_logs_actor_role_check",
+            # Alineado con el name que usa la migración 008
+            # (chk_audit_logs_actor_role). Antes el modelo declaraba
+            # 'audit_logs_actor_role_check' (autogenerate de SQLAlchemy)
+            # mientras la migración creaba 'chk_*'; resultado: dos CHECKs
+            # con misma definición pero distintos names podían quedar en
+            # la BD según orden. Audit fix DR-11 (2026-05-24).
+            name="chk_audit_logs_actor_role",
         ),
         Index("idx_audit_logs_actor_time", "actor_id", text("created_at DESC")),
         Index("idx_audit_logs_action_time", "action", text("created_at DESC")),

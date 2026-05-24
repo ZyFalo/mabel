@@ -188,12 +188,26 @@ async def reset_password(
 @router.put("/change-password")
 async def change_password(
     request: ChangePasswordRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = AccountService(UserRepository(db), db)
     try:
         await service.change_password(current_user, request.current_password, request.new_password)
+        # Audit trail Ley 1581 art. 25 (registro de operaciones sobre data
+        # personal). El servicio NO emite — se hace aquí para mantener D-12
+        # atomicidad: el commit del audit va junto al UPDATE del password.
+        await audit_log_action(
+            db,
+            actor_id=current_user.id,
+            actor_role=current_user.role,
+            action="password_changed",
+            target_type="user",
+            target_id=current_user.id,
+            ip=http_request.client.host if http_request.client else None,
+        )
+        await db.commit()
         return {"message": "Contrasena actualizada exitosamente"}
     except ValueError as e:
         msg = str(e)

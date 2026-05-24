@@ -41,6 +41,7 @@ ALLOWED_ACTIONS = frozenset(
         "consent_revoked",
         "password_reset_requested",
         "password_reset_completed",
+        "password_changed",  # PUT /auth/change-password (DR-fix Ley 1581 art. 25, 2026-05-24)
         # --- student: control de datos (mig 012, 2026-05-23) ---
         # Documentado en docs/DATA_RETENTION_POLICY.md.
         "history_toggle_off",

@@ -120,7 +120,20 @@ CREATE TABLE sessions (
   checkin_payload      JSONB,
   checkin_completed_at TIMESTAMPTZ,
 
-  avatar_used          BOOLEAN NOT NULL DEFAULT FALSE
+  avatar_used          BOOLEAN NOT NULL DEFAULT FALSE,
+
+  -- Migración Alembic 012_sessions_hidden (2026-05-23):
+  -- soft-hide. NULL = visible; NOT NULL = oculta del sidebar del usuario.
+  -- Política de retención: ver docs/DATA_RETENTION_POLICY.md §6.
+  hidden_at            TIMESTAMPTZ,
+  hidden_reason        TEXT,
+  -- Naming: `ck_*` para alinear con el name que usa el modelo SQLAlchemy
+  -- (session.py:35) y la migración 012. Antes el DDL usaba `chk_*` que
+  -- difería del modelo → drift de constraint name según fuente de bootstrap.
+  CONSTRAINT ck_sessions_hidden_reason CHECK (
+    hidden_reason IS NULL
+    OR hidden_reason IN ('user_toggle_off', 'user_per_session', 'admin_action')
+  )
 );
 
 CREATE INDEX idx_sessions_user_time ON sessions(user_id, started_at);
@@ -128,6 +141,11 @@ CREATE INDEX idx_sessions_user_time ON sessions(user_id, started_at);
 -- Evo 005b: Enforcement de sesion unica activa por usuario
 CREATE UNIQUE INDEX uq_sessions_user_active ON sessions(user_id)
                                              WHERE ended_at IS NULL;
+
+-- Migración Alembic 012: índice parcial para queries del sidebar
+-- (que filtran sesiones visibles). Cubre list_by_user en hot path.
+CREATE INDEX idx_sessions_user_visible ON sessions(user_id, started_at DESC)
+                                       WHERE hidden_at IS NULL;
 
 CREATE TABLE messages (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -250,7 +268,12 @@ CREATE INDEX idx_prt_token_active   ON password_reset_tokens(token_hash)
 CREATE TABLE audit_logs (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+  -- CHECK con name EXPLÍCITO: si se declara anónimo, Postgres autonombra
+  -- `audit_logs_actor_role_check` que difiere de lo que crea la migración
+  -- 008 (`chk_audit_logs_actor_role`) y de lo que declara el modelo
+  -- SQLAlchemy. Fix DR-13 (2026-05-24).
   actor_role   TEXT NOT NULL DEFAULT 'admin'
+               CONSTRAINT chk_audit_logs_actor_role
                CHECK (actor_role IN ('admin', 'student', 'system')),
   action       TEXT NOT NULL,
   target_type  TEXT,
@@ -331,3 +354,24 @@ CREATE TABLE empathy_ratings (
 
 CREATE INDEX idx_empathy_ratings_message ON empathy_ratings(message_id);
 CREATE INDEX idx_empathy_ratings_rater   ON empathy_ratings(rater_id);
+
+-- =========================
+-- 9) RATINGS DE SESION (Mig 011, 2026-05-23)
+-- =========================
+-- session_ratings: calificacion del ESTUDIANTE (1-5 corazones) a SU
+-- propia sesion. Distinta de empathy_ratings (inter-rater admin).
+-- UPSERT idempotente vía UNIQUE constraint (session_id, user_id).
+
+CREATE TABLE session_ratings (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id  UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+  rating      INTEGER NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_session_ratings_range CHECK (rating >= 1 AND rating <= 5),
+  CONSTRAINT uq_session_ratings_session_user UNIQUE (session_id, user_id)
+);
+
+CREATE INDEX idx_session_ratings_session ON session_ratings(session_id);
+CREATE INDEX idx_session_ratings_user    ON session_ratings(user_id);

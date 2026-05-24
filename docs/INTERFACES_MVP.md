@@ -548,6 +548,751 @@ Para el detalle completo y discusiones véase `docs/DECISIONES.md` (o memoria pe
 
 ---
 
+## 12. Acciones / Botones / Opciones — inventario por pantalla
+
+Inventario exhaustivo de controles interactivos por pantalla (#01–#44), derivado directamente del código en `frontend/src/pages/**` + `frontend/src/components/**` (snapshot 2026-05-24). Solo se listan controles que el usuario puede activar — no decoraciones ni indicadores pasivos. Cuando un control depende de un estado o preferencia, se indica en la columna "Visible cuando".
+
+> **Atajos globales** (`frontend/src/hooks/useKeyboardShortcuts.ts`): el hook detecta `cmd+b`, `cmd+,` y `esc` (cmd/ctrl detectado vía `metaKey || ctrlKey`). Solo dispara cuando el foco NO está en `<input>/<textarea>/<select>/contenteditable` salvo que el caller pase `allowInInputs: true`. Hoy el único consumer registrado es `Settings` (modal) que escucha `esc` para cerrar cuando no hay sub-modal activo.
+
+> **FAB SOS global**: presente en todas las pantallas envueltas por `StudentLayout` (Home, CheckIn, Chat, Voice, SessionEnd, SessionDetail). Abre el `SosPanel` superpuesto. Pulsa `onMouseDown` (botón rojo 56px). En pantallas que usan `SosButton variant="floating"` (Home, CheckIn, SessionEnd, SessionDetail) el botón es local; en Chat/Voice el SOS se invoca desde un botón de la TopBar (`openCrisis` del outlet context).
+
+---
+
+### #01 — Landing / Bienvenida
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Iniciar sesion" | Link | navega a `/login` | siempre |
+| "Registrarme" | Link | navega a `/register` | siempre |
+
+---
+
+### #02 — Registro
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Volver al inicio" | Link | navega a `/` | siempre |
+| Input "Nombre completo" | text | actualiza `form.display_name` | siempre |
+| Input "Correo institucional" | email | valida regex `@umb.edu.co` | siempre |
+| Input "Contraseña" | password | calcula barra de fortaleza (Débil/Regular/Buena/Fuerte) | siempre |
+| Input "Confirmar contraseña" | password | valida match | siempre |
+| "Crear mi cuenta" | botón submit | `POST /auth/register` → `/login` con toast | siempre (deshabilitado mientras `loading`) |
+| "Iniciar sesión" (link inferior) | Link | navega a `/login` | siempre |
+
+---
+
+### #03 — Login
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Volver al inicio" | Link | navega a `/` | siempre |
+| Input "Correo institucional" | email | actualiza `form.email` | siempre |
+| Input "Contraseña" | password | actualiza `form.password` | siempre |
+| "¿Olvidaste tu contraseña?" | Link | navega a `/forgot-password` | siempre |
+| Checkbox "Recordarme" | checkbox | flag `remember_me` en el payload | siempre |
+| "Iniciar sesión" | botón submit | `POST /auth/login` → `/admin` o `/home` según `user.role` | siempre (deshabilitado mientras `loading`) |
+| "Crear cuenta nueva" | Link | navega a `/register` | siempre |
+
+---
+
+### #04 — Recuperar contraseña
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Volver al inicio de sesión" | Link | navega a `/login` | siempre |
+| Input "Correo institucional" | email | actualiza `email` local | `!sent` |
+| "Enviar enlace" | botón submit | `POST /auth/forgot-password` (siempre devuelve OK por D-03 anti-enumeración) | `!sent` |
+
+---
+
+### #05 — Restablecer contraseña
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Input "Nueva contraseña" | password | actualiza `form.password` + barra de fortaleza | `valid === true` |
+| Input "Confirmar contraseña" | password | actualiza `form.confirm` | `valid === true` |
+| "Cambiar contraseña" | botón submit | `POST /auth/reset-password` → `/login` con toast | `valid === true` |
+| "Solicitar nuevo enlace" | Link | navega a `/forgot-password` | `valid === false` (token expirado/inválido) |
+
+---
+
+### #06 — Consentimiento informado
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Caja scroll del documento legal | div con `onScroll` | activa `scrolledToEnd` al llegar al final (auto-pasa si el body cabe sin scroll) | siempre que hay versión |
+| Radio "Solo uso" | radio | `setScope('solo_uso')` | siempre |
+| Radio "Uso + mejora anónima" | radio | `setScope('uso_mejora_anon')` | siempre |
+| Tooltip (i) por scope (`InfoHint`) | hover popover | despliega copy largo | siempre |
+| Checkbox "He leído y acepto…" | checkbox | habilita `accepted` (sólo activable si `scrolledToEnd`) | siempre |
+| "Rechazo" | botón | navega a `/consent/rejected` | siempre |
+| "Acepto y continuar" | botón submit | si `status==='revoked'` → `PATCH /consents/current {action:'re-accept', scope}`; si no → `POST /consents {consent_version_id, scope}` → `/home` | `canSubmit` (scrolledToEnd && accepted && scope!=='') |
+| "Cerrar sesión" | botón | `logout()` + navega a `/` | sólo en variante `noVersion` (no hay versión activa) |
+
+---
+
+### #07 — Onboarding
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Toggle "Guardar historial de conversaciones" | toggle | `update('save_history', v)` | paso 1 (Privacidad) |
+| Toggle "Check-in emocional al inicio" | toggle | `update('checkin_enabled', v)` | paso 1 |
+| Toggle "Voz de Mabel" (master) | toggle | `update('voice_enabled', v)` | paso 2 (Voz y experiencia) |
+| Toggle "Modo voz 2D" | toggle | `update('voice_mode_enabled', v)` (gated por `voice_enabled`) | paso 2 |
+| Toggle "Mabel lee sus respuestas en chat texto" | toggle | `update('tts_enabled', v)` (gated) | paso 2 |
+| Toggle "Resaltar palabras mientras Mabel habla" | toggle | `update('subtitles', v)` (gated) | paso 2 |
+| Tooltips (i) por opción (`InfoHint`) | hover popover | copy largo explicativo | siempre |
+| "Anterior" | botón | `setStep(step-1)` | `step > 0` |
+| "Omitir" | botón | si no es último paso → avanza; si es último → `PUT /preferences` con defaults y navega a `/home` | siempre |
+| "Continuar" | botón | `setStep(step+1)` | `step < STEPS.length-1` |
+| "Comenzar" | botón submit | `PUT /preferences` con coerción si voice off → navega a `/home` | último paso |
+
+---
+
+### #08 — Home / Dashboard estudiante
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `SosButton variant="floating"` | botón flotante | abre `SosPanel` vía `openCrisis` | siempre |
+| Card "Empezar con un check-in breve" | botón | navega a `/checkin/new` (lazy: sin crear sesión) | `preferences.checkin_enabled === true` |
+| `Composer` compact | textarea + send | `Enter` envía, `Shift+Enter` salto de línea; submit → `createSession()` + `navigate('/session/{id}/chat', {state:{pendingMessage}})` | siempre |
+| 4 `SuggestionChip` ("Cómo me siento hoy", "Quiero hablar de algo", "Tengo estrés académico", "Necesito motivación") | botón | `createSession()` + navega a chat con `pendingMessage` del prompt | siempre (deshabilitados durante `creating`) |
+| FAB SOS (StudentLayout) | botón | abre `SosPanel` | siempre |
+
+---
+
+### #09 — Check-in pre-sesión
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `SosButton variant="floating"` | botón flotante | abre `SosPanel` | siempre |
+| 5 botones mood (radiogroup, iconos) | radio | `toggleMood(lvl)` (click sobre la seleccionada deselecciona) | siempre |
+| Segmented "Energía" (4 opciones) | radio | `toggleEnergy` | siempre |
+| Segmented "Estrés" (4 opciones) | radio | `toggleStress` | siempre |
+| Segmented "Calidad de sueño" (mal/regular/bien/muy_bien) | radio | `toggleSleepQuality` | siempre |
+| "También puedo decir las horas" / "Quitar horas exactas" | botón toggle | abre/cierra input numérico de horas | siempre |
+| Input "horas" (number 0–24, step 0.5) | number | actualiza `sleepHours` | `sleepHoursOpen === true` |
+| Segmented "Soledad/conexión" (4 opciones) | radio | `toggleLoneliness` | siempre |
+| Chips de "focos" multi-select | botones aria-pressed | `toggleFocus(value)` | siempre |
+| Input "Otro foco" (max 80 chars) | text | actualiza `focusOther` | `focus.includes('Otro')` |
+| Textarea "Algo más que quieras compartir" (max 500) | textarea | actualiza `note` | siempre |
+| "Saltar todo" | botón | si `isDraft` → navega a `/home`; si edit → navega a `/session/{id}/chat` | siempre |
+| "Continuar" | botón submit | si payload vacío → `handleSkip`; si draft → `createSession({checkinPayload})` + navega a chat; si edit → `PATCH /sessions/{id}` + navega a chat | siempre (deshabilitado mientras `submitting`) |
+| FAB SOS (StudentLayout) | botón | abre `SosPanel` | siempre |
+
+---
+
+### #10 — Chat principal
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `HeartRating` (1–5 corazones) | botones | `PUT /sessions/{id}/rating` — `session_ratings` | `sessionEnded === true` |
+| `LlmStatusChip` (TopBar) | popover ARIA | abre detalle del estado LLM (ok/cold/down/checking/unknown) | siempre |
+| `SosButton` (TopBar) | botón pill | `openCrisis()` → abre `SosPanel` | siempre |
+| Botón "Hablar" (TopBar) | botón | `navigate('/session/{id}/voice')` | `!sessionEnded && voiceModeEnabled` (master `voice_enabled` && sub `voice_mode_enabled`) |
+| `CheckinContextPopover` (TopBar) | popover | muestra el `checkin_payload` de la sesión | siempre |
+| Botón 3-puntos `MoreVertical` (TopBar) | dropdown | abre menú con "Finalizar sesión" | siempre |
+| Menú > "Finalizar sesión" | menuitem | abre `ConfirmModal` → `endSession(id)` → `/session/{id}/end` | menú abierto, `!sessionEnded` |
+| **Composer**: Textarea (max 2000) | textarea | `setInput` con cap; `Enter` envía, `Shift+Enter` salto | siempre (deshabilitado si `isStreaming || isRecording || sessionEnded || awaitingFirstResponse`) |
+| **Composer**: Botón micrófono | toggle button | `handleMicToggle` → `useAudioRecorder` start/stop → `POST /asr/transcribe` → `sendMessage` | siempre que `onMicToggle` esté presente |
+| **Composer**: Botón mute (Volume2/VolumeX) | toggle | `toggleMute()` (TTS) | `ttsEnabled === true` |
+| **Composer**: Botón enviar (ArrowRight circular) | botón submit | `handleSend` → `POST /api/v1/sessions/{id}/messages` (SSE stream) | `value.trim() && !disabled` |
+| Hover por burbuja asistente — botón "Copiar" | botón | `navigator.clipboard.writeText(content)` + toast | hover sobre burbuja assistant terminada |
+| Hover por burbuja asistente — botón "Reportar" (Flag) | botón | `setReportMessageId(msg.id)` → abre `ReportModal` (#11) | hover sobre burbuja, `!isReported` |
+| Banner "Mabel está despertando" | indicador pasivo | — | `llm.status === 'cold'` |
+| FAB SOS (StudentLayout) | botón | abre `SosPanel` | siempre |
+| `ConfirmModal` "¿Finalizar sesión?" | modal | `handleEndSession` (PATCH endSession) | `showEndModal` |
+| `ReportModal` | modal | ver #11 | `reportMessageId !== null` |
+| `SosPanel` | overlay | auto al `riskDetected` o manual desde SOS button | `showSos` |
+
+---
+
+### #11 — Modal de reporte de mensaje
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Backdrop click | div | `onClose()` | siempre |
+| Botón X cerrar | botón | `onClose()` | siempre |
+| Radios "Motivo" (hallucination / harmful / privacy / low_empathy / other) | radio group | `setReason` | siempre |
+| Input/Slider severidad (opcional 1–5) | slider | `setSeverity` | siempre |
+| Textarea "Detalles" | textarea | `setDetails` | siempre |
+| "Cancelar" | botón | `onClose()` | siempre |
+| "Enviar reporte" | botón submit | `POST /messages/{id}/reports` con `{reason, severity, details}` → `onReported` → cierra modal | siempre (respeta UNIQUE message_id+reporter_id) |
+
+---
+
+### #12 — Panel SOS / Crisis (overlay)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `SosFab` (botón flotante 56px, bottom-right) | FAB | abre el `SosPanel` | siempre en layouts estudiante autenticados |
+| Backdrop click | div | `onClose()` | siempre |
+| Botón X cerrar (header) | botón | `onClose()` | siempre |
+| Lista de líneas — botón por línea (Línea 106, 141, UMB) | `<a href="tel:{number}">` | abre `tel:` deeplink al sistema operativo | siempre (data viene de `GET /sos` → `sos_hotline_numbers` system_config) |
+| "Cerrar" (footer) | botón | `onClose()` | siempre |
+
+---
+
+### #13 — Historial (fusionado en StudentSidebarV3)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "+ Nueva sesión" | botón | `handleNewSession` → `/checkin/new` (lazy) o `/home` según prefs | siempre |
+| Botón buscar (icono Search) | botón | abre `SessionSearchModal` (Cmd/Ctrl+K) | siempre |
+| Botón "Home" | botón | `navigate('/home')` | siempre |
+| Botón "Ajustes" | botón | `onOpenSettings()` (abre modal Settings) | siempre |
+| Filas de sesión (por grupo temporal) | botón | `navigate('/session/{id}/chat')` o `/detail` | siempre |
+| Menú 3-puntos por sesión | dropdown | abre "Ocultar" + "Eliminar" | hover/click en la fila |
+| Menú > "Ocultar conversación" | menuitem | `PATCH /sessions/{id}/hide` | menú abierto |
+| Menú > "Eliminar" | menuitem | abre `ConfirmDeleteSessionModal` → `DELETE /sessions/{id}` | menú abierto |
+| Botón usuario (footer) | dropdown | abre `UserMenu` (ver #33 abajo) | siempre |
+| Botón colapsar/expandir sidebar (ChevronLeft/Right) | toggle | `onToggle()` → alterna ancho 268/60px | siempre |
+| `SessionSearchModal` | modal | ver más abajo (#34B) | `searchOpen` |
+
+---
+
+### #14 — Detalle de sesión
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `SosButton variant="floating"` | botón flotante | abre `SosPanel` | siempre |
+| Breadcrumb "Inicio" | botón | `navigate('/home')` | siempre |
+| `HeartRating` (1–5) | botones | `PUT /sessions/{id}/rating` | `session.ended_at` |
+| "Volver" | botón | `navigate('/home')` | siempre |
+| "Eliminar sesión" | botón | abre `ConfirmDeleteSessionModal` → `DELETE /sessions/{id}` → `/home` | siempre |
+| `ConfirmDeleteSessionModal` | modal | `handleConfirmDelete` | `deleteOpen` |
+| FAB SOS (StudentLayout) | botón | abre `SosPanel` | siempre |
+
+---
+
+### #15 — Settings (modal global)
+
+> Apertura: `useOutletContext().openSettings(tab?)` desde Header/UserMenu/StudentSidebarV3. Tabs reales: `privacy | voice | account | arco` (la TabId `accessibility` queda en el tipo pero NO en `VALID_TABS`; bookmarks viejos caen a `privacy`).
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Backdrop click | div | `handleClose()` (con guard: no cierra si hay submodal) | sin submodal abierto |
+| Atajo `Esc` (`useKeyboardShortcuts`) | atajo teclado | `handleClose()` | `open && !anySubModalOpen` |
+| Botón X cerrar (header) | botón | `handleClose()` | siempre |
+| Nav sidebar — `SettingsNavItem` por tab (Privacidad / Voz / Cuenta / Mis datos) | botón | `setActiveTab(id)` | siempre |
+| **Tab Privacidad**: Toggle "Guardar historial" | toggle | si ON→OFF abre `ConfirmHideHistoryModal`; OFF→ON `POST /users/me/history/toggle-on` + re-hidrata store | tab activa |
+| **Tab Privacidad**: Toggle "Check-in emocional al inicio" | toggle | `setCheckinEnabled` | tab activa |
+| **Tab Privacidad**: `SaveBar` "Guardar" | botón | `savePrivacy` → `PUT /preferences { checkin_enabled }` | tab activa |
+| **Tab Voz**: Toggle "Voz de Mabel" (master) | toggle | `setVoiceEnabled` | tab activa |
+| **Tab Voz**: "Probar voz" | botón | `previewVoice` → `GET /tts/synthesize?text=…` → reproduce blob | `voiceEnabled` |
+| **Tab Voz**: Toggle "Modo voz 2D" | toggle | `setVoiceModeEnabled` (gated) | tab activa |
+| **Tab Voz**: Toggle "Mabel lee sus respuestas en chat texto" | toggle | `setTtsEnabled` (gated) | tab activa |
+| **Tab Voz**: Toggle "Resaltar palabras mientras Mabel habla" | toggle | `setSubtitles` (gated) | tab activa |
+| **Tab Voz**: `SaveBar` "Guardar" | botón | `saveVoice` → `PUT /preferences {tts_voice, preferred_chat_mode, accessibility}` con coerción si voice off | tab activa |
+| **Tab Cuenta**: "Cambiar contrasena" | botón | abre `ChangePasswordModal` (#42) | tab activa |
+| **Tab Cuenta**: campo Email (read-only) | display | — | tab activa |
+| **Tab Cuenta**: "Eliminar cuenta" (danger zone) | botón | abre `DeleteAccountModal` (#16) | tab activa |
+| **Tab Mis datos (ARCO)**: "Ver mis datos" | botón | abre `ArcoExportModal` (#40) | tab activa |
+| **Tab Mis datos (ARCO)**: "Revocar consentimiento" | botón | abre `RevokeConsentModal` (#17) | tab activa |
+| `ConfirmHideHistoryModal` | modal | `POST /users/me/history/toggle-off` → muestra `soft_hide`/`hard_delete` según scope | toggle "Guardar historial" → OFF |
+
+---
+
+### #16 — Modal eliminación de cuenta
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Backdrop click | div | `onClose()` | siempre |
+| Botón X cerrar (header) | botón | `onClose()` | siempre |
+| Input "Escribe ELIMINAR para confirmar" | text | habilita botón cuando match exacto | siempre |
+| "Cancelar" | botón | `onClose()` | siempre |
+| "Eliminar cuenta" (danger) | botón | `handleDelete` → `DELETE /users/me` (hard DELETE, D-14) → `logout()` → `/` | input === 'ELIMINAR' |
+
+---
+
+### #17 — Modal revocación de consentimiento
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Backdrop click | div | `onClose()` | siempre |
+| Botón X cerrar (header) | botón | `onClose()` | siempre |
+| "Reducir alcance a 'solo uso'" | botón | `handleReduceScope` → `PATCH /consents/current {action:'reduce_scope'}` | `currentScope === 'uso_mejora_anon'` |
+| "Revocar consentimiento" | botón danger | `handleRevoke` → `PATCH /consents/current {action:'revoke'}` (`revoked_at=NOW()`) → redirige a `/consent-required` variante B | siempre |
+| "Cancelar" (footer) | botón | `onClose()` | siempre |
+
+---
+
+### #18 — Pantalla de sesión finalizada
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `SosButton variant="floating"` | botón flotante | abre `SosPanel` | siempre |
+| "Comenzar una nueva conversación" | botón primario | `navigate('/home')` (lazy-create; no crea sesión hasta enviar) | siempre |
+| "Ir al inicio" | botón secundario | `navigate('/home')` | siempre |
+| FAB SOS (StudentLayout) | botón | abre `SosPanel` | siempre |
+
+---
+
+### #19 — Error 404
+
+Sin pantalla dedicada. `App.tsx` catch-all `path="*"` resuelve `<Navigate to="/" replace />`. **Sin controles propios.**
+
+---
+
+### #20 — Error de conexión (componente inline `ConnectionError`)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Reintentar" | botón | callback del consumer (re-ejecuta la request fallida con backoff exponencial) | siempre que se monta el componente |
+
+---
+
+### #21 — Modal sesión expirada (JWT 401)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Iniciar sesión" | botón | `onLogin` → limpia auth y navega a `/login` | siempre que se dispare desde `api/client.ts` 401 handler |
+
+---
+
+### #22 — Consentimiento requerido (3 variantes)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Ir al consentimiento" | Link | navega a `/consent` | variante A `no_consent` |
+| "Re-aceptar consentimiento" | Link | navega a `/consent` | variante B `revoked` |
+| "Revisar nueva versión" | Link | navega a `/consent` | variante C `new_version_required` |
+| "Cerrar sesión" | botón | `handleLogout` → `logout()` + `/` | variantes B y C |
+
+---
+
+### #23 — Login admin
+
+No existe ruta separada. Unificado con #03 (D-01). **Sin controles propios.**
+
+---
+
+### #24 — Dashboard admin
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Actualizar" (header) | botón | `fetchDashboard()` → `GET /admin/dashboard` (polling automático cada 30 s) | siempre |
+| `MetricCard` "Safety events 24h" | card clickeable | `navigate('/admin/safety-events')` | `kpis.safety_events_24h > 0` |
+| `MetricCard` "Reportes pendientes" | card clickeable | `navigate('/admin/reports')` | `kpis.reports_pending > 0` |
+| "Ver todos →" (widget últimas 5 sesiones) | botón | `navigate('/admin/safety-events')` | siempre |
+| Fila de sesión en la tabla "Últimas 5" | fila clickeable | `navigate('/admin/safety-events')` | sesiones disponibles |
+| "Reintentar" (banner error) | botón | `fetchDashboard()` | `errorMsg !== null` |
+
+---
+
+### #25 — Panel safety events
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `FilterBar` > Input "Tipo evento" | text | actualiza filtro | siempre |
+| `FilterBar` > Select "Severidad" (1–5 / todos) | select | actualiza filtro | siempre |
+| `FilterBar` > Select "Estado" (active / reviewed / resolved / todos) | select | actualiza filtro | siempre |
+| `FilterBar` > Input "Desde" (date) | date | actualiza filtro | siempre |
+| `FilterBar` > Input "Hasta" (date) | date | actualiza filtro | siempre |
+| `FilterBar` > "Reset" | botón | restablece filtros | `activeFilterCount > 0` |
+| Tab "Por sesión" / "Lista de eventos" | tablist | `setViewMode` (re-paginación) | siempre |
+| Fila/card de evento (expandible) | botón | expande detalle inline | siempre |
+| `ExpandedDetail` > chips de transición de estado (active→reviewed, reviewed→resolved, etc.) | botón aria-pressed | `setSelectedTarget(target)` | dentro de detalle expandido |
+| `ExpandedDetail` > Textarea "Notas (opcional)" | textarea | `setNotes` | con transición seleccionada |
+| `ExpandedDetail` > "Cancelar" | botón | resetea `selectedTarget` + notas | con transición seleccionada |
+| `ExpandedDetail` > "Confirmar" | botón submit | `PATCH /admin/safety-events/{id}` con `{status, notes}` | con transición seleccionada |
+| `Pagination` (page, page_size) | controles | actualiza page state | siempre |
+| "Reintentar" (error banner) | botón | `fetchEvents` | `errorMsg !== null` |
+
+---
+
+### #26 — Panel reportes (triaje)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `FilterBar` > Select "Motivo" (hallucination/harmful/privacy/low_empathy/other/todos) | select | actualiza filtro | siempre |
+| `FilterBar` > Select "Severidad" (1–5/todos) | select | actualiza filtro | siempre |
+| `FilterBar` > Select "Estado" (open/triaged/resolved/dismissed/todos) | select | actualiza filtro | siempre |
+| `FilterBar` > Input "Desde" / "Hasta" (date) | date | actualiza filtro | siempre |
+| `FilterBar` > "Reset" | botón | restablece filtros | `activeFilterCount > 0` |
+| Fila de reporte (expandible) | botón | expande detalle inline | siempre |
+| `ExpandedDetail` > chips de transición de estado | botón aria-pressed | `setSelectedTarget(target)` | dentro de detalle |
+| `ExpandedDetail` > Textarea "Notas" | textarea | `setNotes` | con transición seleccionada |
+| `ExpandedDetail` > "Cancelar" / "Confirmar" | botón | `PATCH /admin/reports/{id}` con `{status, notes}` | con transición seleccionada |
+| `Pagination` | controles | `setPage` / `setPageSize` | siempre |
+| "Reintentar" (banner error) | botón | `fetchReports` | `errorMsg !== null` |
+
+---
+
+### #27 — Panel métricas
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `ExportCsvButton` (header) | botón | descarga `/admin/metrics/export.csv?tab=…&from=…&to=…&cohort=…` | siempre |
+| Toolbar > Input "Desde" (date) | date | actualiza `draft.from` | siempre |
+| Toolbar > Input "Hasta" (date) | date | actualiza `draft.to` | siempre |
+| Toolbar > "Aplicar" | botón | `applyRange()` (commit del draft al `range` real) | siempre |
+| Toolbar > "Actualizar" | botón | `refresh()` (incrementa `refreshKey` para re-fetch sin cambiar params) | siempre |
+| Toolbar > Select "Cohorte" | select | `setCohort(value)` (deshabilitado hasta `cohortsLoaded`) | siempre |
+| Toolbar > "Limpiar filtros" | botón | `clearAllFilters()` (rango 30d + cohorte '') | `filtersDirty` |
+| Tabs A–E (Uso / Bienestar / Técnicas / Seguridad / Estudio) | tablist | `changeTab(t.key)` (actualiza `?tab=` searchParam) | siempre |
+| Tab Estudio > controles SUS/Cohen's d específicos | inputs varios | endpoints dedicados por tab (`/admin/metrics/usage|wellbeing|technical|safety|study`) | dentro de cada tab |
+| Tooltips (i) `InfoHint` por métrica/chart | hover popover | despliega definición de la métrica | siempre |
+
+---
+
+### #28 — Admin Users
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `FilterBar` > Input "Buscar" (email o nombre) | text | `updateFilter('q', …)` | siempre |
+| `FilterBar` > Select "Estado" (todos/active/disabled) | select | `updateFilter('status', …)` | siempre |
+| `FilterBar` > Select "Consentimiento" (todos/ok/no_consent/revoked/new_version_required) | select | `updateFilter('consent_status', …)` | siempre |
+| `FilterBar` > Select "Cohorte" | select | `updateFilter('cohort', …)` | siempre |
+| `FilterBar` > Input "Registro desde" (date) | date | `updateFilter('created_from', …)` | siempre |
+| `FilterBar` > Input "Registro hasta" (date) | date | `updateFilter('created_to', …)` | siempre |
+| `FilterBar` > "Reset" | botón | `handleResetFilters` | `activeFilterCount > 0` |
+| Checkbox header "Select all in page" (tri-state) | checkbox | `toggleAllInPage` (excluye admins) | siempre |
+| Checkbox por fila | checkbox | `toggleRow(id)` (filas admin no tienen checkbox) | `row.role !== 'admin'` |
+| Click sobre fila estudiante | fila clickeable | `setDrawerUserId(row.id)` → abre `UserDetailDrawer` | `row.role !== 'admin'` |
+| Bulk bar > "Asignar cohorte ▾" | dropdown | abre menú con cohortes existentes + "+ Nueva cohorte…" + "Quitar cohorte" | `selectedIds.size > 0` |
+| Menú cohorte > opción cohorte existente | menuitem | `applyBulkCohort(c, c)` → `PATCH /admin/users/cohort/bulk` | menú abierto |
+| Menú cohorte > "+ Nueva cohorte…" | menuitem | `window.prompt` + `applyBulkCohort(cohort, cohort)` | menú abierto |
+| Menú cohorte > "Quitar cohorte" (danger) | menuitem | `applyBulkCohort(null, 'sin cohorte')` | menú abierto |
+| Bulk bar > "Acciones ▾" | dropdown | abre menú con Deshabilitar / Reactivar / Eliminar permanentemente | `selectedIds.size > 0` |
+| Menú acciones > "Deshabilitar seleccionados…" | menuitem | `setBulkActionMode('disable')` → `BulkActionModal` | menú abierto |
+| Menú acciones > "Reactivar seleccionados" | menuitem | `setBulkActionMode('enable')` → `BulkActionModal` | menú abierto |
+| Menú acciones > "Eliminar permanentemente…" (danger) | menuitem | `setBulkActionMode('delete')` → `BulkActionModal` | menú abierto |
+| Bulk bar > "Limpiar selección" | botón | `clearSelection` | `selectedIds.size > 0` |
+| `Pagination` | controles | `setPage` / `setPageSize` | siempre |
+| `UserDetailDrawer` | drawer lateral | ver #29 abajo | `drawerUserId !== null` |
+| `BulkActionModal` | modal | confirma acción masiva → único endpoint `POST /admin/users/bulk-action` con `{action:"disable"\|"enable"\|"delete", user_ids:[...], reason?:"..."}` (NO son 3 rutas separadas — el `action` field discrimina) | `bulkActionMode !== null` |
+| "Reintentar" (banner error) | botón | `fetchUsers` | `errorMsg !== null` |
+
+---
+
+### #29 — Admin UserDetail (+ Drawer)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Volver a usuarios" (breadcrumb) | Link | `navigate('/admin/users')` | siempre |
+| "Deshabilitar cuenta" (hero) | botón danger | abre `DisableUserModal` | `canDisable` (user activo, no admin) |
+| "Reactivar cuenta" (hero) | botón success | abre `EnableUserModal` | usuario deshabilitado (no admin) |
+| "Eliminar permanentemente" (hero) | botón ghost danger | abre `BulkActionModal action="delete"` con `selected=[user]` | usuario deshabilitado (no admin) |
+| `CohortEditor` > Input texto cohorte | text | `setValue(value)` | siempre |
+| `CohortEditor` > "Guardar cohorte" | botón | `PATCH /admin/users/{id}/cohort` con `{cohort: trimmed||null}` | `dirty && !saving` |
+| `CohortEditor` > "Eliminar cohorte" | botón | `PATCH /admin/users/{id}/cohort` con `{cohort: null}` | `currentCohort !== null` |
+| "Reintentar" (banner error) | botón | `fetchUser` | `errorMsg !== null` |
+| `DisableUserModal`: Textarea "Razón" | textarea | obligatoria | abierto |
+| `DisableUserModal`: "Cancelar" / "Deshabilitar" | botón | `PATCH /admin/users/{id}/disable` con `{reason}` + `audit_log` → `navigate('/admin/users')` | abierto |
+| `EnableUserModal`: Textarea "Motivo" | textarea | obligatoria | abierto |
+| `EnableUserModal`: "Cancelar" / "Reactivar" | botón | `PATCH /admin/users/{id}/enable` con `{reason}` + `audit_log` | abierto |
+| `BulkActionModal` (delete con N=1): Input "CONFIRMAR" + "Eliminar permanentemente" | botón | `POST /admin/users/bulk/delete` (hard DELETE D-14) → `/admin/users` | abierto |
+| **`UserDetailDrawer`** (cuando se abre desde #28): backdrop click | div | `onClose()` | abierto |
+| **Drawer**: Botón X cerrar | botón | `onClose()` | siempre |
+| **Drawer**: "Ver ficha completa" | botón | `navigate('/admin/users/{id}')` | siempre |
+| **Drawer**: "Cerrar" (footer) | botón | `onClose()` | siempre |
+
+---
+
+### #30 — Admin Config
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| **Sección 01 — Consentimiento** | | | |
+| `VersionBodyToggle` (active/draft/cada archived) | botón | expande/colapsa preview del body | siempre por versión |
+| Input "Version" | text | `setForm.version` | sub-sección "Crear nueva versión" |
+| Input "Titulo" | text | `setForm.title` | sub-sección "Crear nueva versión" |
+| Textarea "Contenido legal" (rows=12) | textarea | `setForm.body` | sub-sección "Crear nueva versión" |
+| "Crear borrador" | botón | `POST /admin/consent-versions` | sub-sección |
+| "Publicar versión" | botón warning | activa confirm step | hay `draft` |
+| "Confirmar publicación" | botón warning | `POST /admin/consent-versions/{id}/publish` | `confirmPublishId === draft.id` |
+| "Cancelar" (publish) | botón | `setConfirmPublishId(null)` | confirm step |
+| "Eliminar borrador" | botón danger ghost | activa confirm step | hay `draft` |
+| "Confirmar eliminación" | botón danger | `DELETE /admin/consent-versions/{id}` | `confirmDeleteId === draft.id` |
+| "Cancelar" (delete) | botón | `setConfirmDeleteId(null)` | confirm step |
+| `<details>` Versiones archivadas | summary clickeable | abre/cierra historial | `archived.length > 0` |
+| **Sección 02 — Guardrails** | | | |
+| Toggle "Bloqueo de configuración para estudio" (study_lock) | switch role | `setStudyLock(!v)` | siempre |
+| "Aplicar" (study_lock) | botón | `saveStudyLock` → `PATCH /admin/config/study_lock_enabled` | `studyLockDirty` |
+| Toggle "Filtro de guardrails activo" (enabled) | switch | `setEnabled(!v)` | siempre (gated por studyLock — requiere override) |
+| "Aplicar" (enabled) | botón | `saveEnabled` → `PATCH /admin/config/guardrails_enabled` (con header `X-Study-Lock-Override` si study_lock on) | `enabledDirty` |
+| Slider "Umbral severidad" (1–5) | range | `setThreshold(Number(e.target.value))` | siempre (gated) |
+| "Aplicar umbral" | botón | `saveThreshold` → `PATCH /admin/config/sos_severity_threshold` (override header si lock) | `thresholdDirty` |
+| Input "Agregar palabra clave" + Enter | text + Enter | `addKeyword()` | siempre (gated) |
+| Checkbox "Crítica" (pre-add) | checkbox | `setNewKeywordCritical` | siempre |
+| "Agregar" | botón | `addKeyword()` | siempre |
+| Chip palabra clave (click) | botón | `toggleKeywordCritical(kw)` | siempre |
+| Chip palabra clave × (remove) | botón | `removeKeyword(kw)` | siempre |
+| "Guardar lista" | botón | `saveKeywords` → `PATCH /admin/config/safety_keywords` (override header si lock) | `keywordsDirty` |
+| **`OverrideConfirmModal`** | modal | "Cancelar" / "Confirmar override" — ejecuta el patch con `X-Study-Lock-Override: true` | `pendingOverride !== null` |
+| **Sección 03 — Líneas SOS** | | | |
+| Por cada fila: Input "Nombre" | text | `updateRow(i, 'name', …)` | siempre |
+| Por cada fila: Input "Numero" | text inputMode=numeric | `updateRow(i, 'number', …)` (valida 7–12 dígitos) | siempre |
+| Por cada fila: "Eliminar" | botón | `removeRow(i)` | siempre |
+| "+ Agregar linea" | botón | `addRow()` | siempre |
+| "Guardar lineas" | botón | `save` → `PATCH /admin/config/sos_hotline_numbers` | `dirty` (validación cliente: nombre + número válido) |
+| **Sección 04 — Proveedor LLM** | | | |
+| "Probar conexión" | botón | `runTest` → `POST /admin/config/gemini/test` (persiste `last_test` con `_persist_last_test` SAVEPOINT D-12) | siempre |
+| "Reintentar" (banner load error) | botón | `loadInfo` → `GET /admin/llm-info` | `!info && loadError` |
+| **Sección 05 — Estado del sistema** | | | |
+| "Volver a comprobar" | botón | `fetchHealth` → `GET /admin/services-health` | siempre |
+| Header > "Reintentar" (banner general error) | botón | `loadConfig` → `GET /admin/config` | `errorMsg !== null` |
+
+---
+
+### #31 — Admin AuditLogs
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `FilterBar` > Input "Actor (email o ID)" | text | `updateFilter('actor', …)` | siempre |
+| `FilterBar` > Select "Rol" (todos/admin/student/system) | select | `updateFilter('actor_role', …)` | siempre |
+| `FilterBar` > Select "Acción" (con optgroups Admin/Estudiante/Control de datos/Sistema) | select | `updateFilter('action', …)` | siempre |
+| `FilterBar` > Input "Desde" / "Hasta" (date) | date | `updateFilter('from'\|'to', …)` | siempre |
+| `FilterBar` > "Reset" | botón | `handleResetFilters` | `activeFilterCount > 0` |
+| Fila de log (expandible) | botón | expande `ExpandedDetail` (JSON metadata) | siempre |
+| `Pagination` | controles | `setPage` / `setPageSize` | siempre |
+| "Reintentar" (error banner) | botón | `fetchLogs` → `GET /admin/audit-logs` | `errorMsg !== null` |
+
+---
+
+### #32 — Acceso denegado (/403)
+
+Solo botones de navegación. **Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Volver al inicio" | Link | navega a `/home` | siempre |
+
+---
+
+### #33 — Header / Navbar + UserMenu
+
+**Acciones / Botones / Opciones** (`Header.tsx` + `UserMenu.tsx` estudiante; `AdminHeader.tsx` admin):
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Botón avatar `UmbAvatar` (estudiante) | dropdown | abre `UserMenu` | siempre |
+| `UserMenu` > items "Perfil" / "Privacidad" / "Mis datos" / "Voz" | menuitem | `handleSelectSettings(tab)` → `openSettings(tab)` | menú abierto |
+| `UserMenu` > "Cerrar sesión" | botón | `handleLogout` → `useAuthStore.logout()` + `navigate('/login')` | menú abierto |
+| Click fuera del UserMenu | document listener | cierra el menú | menú abierto |
+| `AdminHeader` > Badges (safety events, reports pendientes) | indicador clickeable | `navigate('/admin/safety-events'\|'/admin/reports')` con polling | siempre |
+| `AdminHeader` > menú admin / avatar | dropdown | "Cerrar sesión" → `navigate('/login')` | siempre |
+| Note: SOS **no** vive en el header (sólo FAB), por decisión D-02. | | | |
+
+---
+
+### #34A — AdminSidebar
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| `NavLink` por sección (Dashboard, Users, Reports, Safety Events, Metrics, Empathy Ratings, Config, Audit Logs) | Link | navega al path correspondiente | siempre |
+| Badges polling (eventos, reportes) | indicador pasivo | refresh periódico (sin click) | siempre |
+| "Cerrar sesión" (footer) | botón | `handleLogout` → `navigate('/login')` | siempre |
+
+### #34B — StudentSidebarV3
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "+ Nueva sesión" | botón | `handleNewSession` → `navigate('/checkin/new')` o `/home` según prefs | siempre |
+| Botón Search | botón | `setSearchOpen(true)` → abre `SessionSearchModal` | siempre |
+| Botón Home | botón | `navigate('/home')` | siempre |
+| Botón Settings | botón | `onOpenSettings()` (modal global) | siempre |
+| Fila de sesión (groupByDate) | botón | `handleSessionClick(s)` → `/session/{id}/chat` o `/detail` | siempre |
+| Menú 3-puntos por sesión > "Ocultar" | menuitem | `PATCH /sessions/{id}/hide` | menú abierto |
+| Menú 3-puntos por sesión > "Eliminar" | menuitem | abre `ConfirmDeleteSessionModal` | menú abierto |
+| Footer > Botón usuario | botón | `setUserMenuOpen(v)` → abre `UserMenu` | siempre |
+| Botón colapsar/expandir (ChevronLeft/Right) | botón | `onToggle()` | siempre |
+| **`SessionSearchModal`** | modal | (no atajo `Cmd+K` registrado en hook actual — se abre sólo desde botón Search del sidebar) | `searchOpen` |
+| `SessionSearchModal` > Input búsqueda fuzzy | text | filtra sesiones cliente-side | abierto |
+| `SessionSearchModal` > Fila resultado | botón | navega a `/session/{id}/chat` | abierto |
+| `ConfirmDeleteSessionModal` > "Cancelar" / "Eliminar" | botón | `DELETE /sessions/{id}` | abierto |
+
+---
+
+### #35 — Footer
+
+No renderizado en ningún layout actual. **Sin controles.**
+
+---
+
+### #36 — Toast (`Toast.tsx` + `toastStore`)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Botón X cerrar por toast | botón | `removeToast(id)` | siempre (auto-hide por timer también) |
+
+---
+
+### #37 — Modal genérico de confirmación (`ConfirmModal`)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Cancelar" | botón | `onCancel` | siempre |
+| Botón confirm (label personalizable) | botón | `onConfirm` | siempre |
+| Backdrop click | div | `onCancel` (en variante simple) | siempre |
+| Input "type-to-confirm" (en variante destructiva) | text | habilita botón confirm cuando match | variante con `confirmPhrase` |
+
+---
+
+### #38 — Skeleton loaders
+
+Sin controles. **Solo indicador visual.**
+
+---
+
+### #39 — Empty states
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Botón acción primaria (opcional, label/handler vía prop) | botón | callback del consumer (D-08: empty states con acción sugerida) | si el consumer pasa `actionLabel` + `onAction` |
+
+---
+
+### #40 — Modal exportar mis datos (ARCO)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Backdrop click | div | `onClose()` | siempre |
+| Botón X cerrar (header) | botón | `onClose()` | siempre |
+| "Descargar JSON" | botón | `downloadJson` → `GET /users/me/export?format=json` → descarga blob | siempre |
+| "Descargar CSV" | botón | `downloadCsv` → `GET /users/me/export?format=csv` → descarga blob | siempre |
+| "Cerrar" (footer) | botón | `onClose()` | siempre |
+
+---
+
+### #41 — Rechazo de consentimiento (página)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Volver a revisar el consentimiento" | Link | navega a `/consent` | siempre |
+| "Cerrar sesión" | botón | `handleLogout` → `logout()` + `/` | siempre |
+
+---
+
+### #42 — Modal cambio de contraseña
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Backdrop click | div | `onClose` | siempre |
+| Botón X cerrar (header) | botón | `onClose` | siempre |
+| Input "Contraseña actual" | password | actualiza state | siempre |
+| Input "Nueva contraseña" | password | actualiza state + barra fortaleza | siempre |
+| Input "Confirmar nueva contraseña" | password | valida match | siempre |
+| "Cancelar" | botón | `onClose` | siempre |
+| "Cambiar contraseña" | botón submit (`PrimaryButton`) | `PUT /auth/change-password` | `isValid && !saving` |
+
+---
+
+### #43 — Voice (modo voz 2D)
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| "Volver" (TopBar) | botón | `handleExit` → `stopTts()` + `navigate('/session/{id}/chat')` | siempre |
+| `LlmStatusChip` (TopBar) | popover ARIA | ver estado LLM (polling 30 s) | siempre |
+| Timer 00:00 | display pasivo | — | siempre |
+| Botón Mute (`ControlButton` Volume2/VolumeX) | toggle | `toggleMute()` (TTS) | siempre |
+| Botón Mic principal (`ControlButton` lg) | toggle button | `handleMicToggle` → `useAudioRecorder` start/stop → `POST /asr/transcribe` (formData con `session_id`) → `sendMessage(id, text, {voiceMode:true})` → SSE | siempre (deshabilitado durante `isProcessing || thinking || speaking`; guard MIN_RECORDING_MS=800) |
+| Botón Terminar (`ControlButton` X, danger) | botón | `handleExit` → vuelve al chat texto | siempre |
+| Subtítulos / burbujas live | display | renderiza últimas 2 burbujas + streaming preview | activo durante interacción |
+| Banner `micError` | indicador pasivo | — | `micError !== null` |
+| **Guard**: si `voiceModeEnabled === false` redirige a `/session/{id}/chat` antes de montar mic. | | | |
+| FAB SOS (StudentLayout) | botón | abre `SosPanel` | siempre |
+
+---
+
+### #44 — Admin EmpathyRatings
+
+**Acciones / Botones / Opciones**:
+
+| Elemento | Tipo | Acción / Endpoint | Visible cuando |
+|---|---|---|---|
+| Select "Cohorte" | select | `setCohort(value)` (cohorte requerida — sin ella stats/queue no se cargan) | siempre |
+| "Quitar filtro" | botón | `setCohort('')` | `cohort !== ''` |
+| "Actualizar" | botón | `fetchStats()` + `fetchQueue()` | siempre |
+| "Reintentar" (banner stats) | botón | `fetchStats` → `GET /admin/empathy-ratings/stats?cohort=…` | `statsError !== null` |
+| Tab "Pendientes (N)" | botón tab | `setActiveTab('pending')` → `GET /admin/empathy-ratings/queue?cohort=…` | siempre |
+| Tab "Calificadas (N)" | botón tab | `setActiveTab('rated')` → `GET /admin/empathy-ratings/rated?cohort=…` | siempre |
+| **Por mensaje pendiente**: 5 botones puntaje (1–5) | botón | `setScore(n)` (sólo si `!readOnly`) | tab pendientes |
+| **Por mensaje pendiente**: chips de criterios (validación, escucha activa, claridad, calidez, no juicio, etc.) | botón role=checkbox | `toggleCriterion(key)` | tab pendientes |
+| **Por mensaje pendiente**: "Enviar calificación" | botón submit | `POST /admin/empathy-ratings` con `{message_id, score, criteria[]}` | tab pendientes (con score elegido) |
+| "Cargar más" (paginación pendientes) | botón | `fetchQueue({append:true})` | `queue.length < totalPending` |
+| "Cargar más" (paginación rated) | botón | `fetchRated({append:true})` | `ratedItems.length < ratedTotal` |
+| Click en mensaje calificado | fila | despliega rating previo (read-only) | tab calificadas |
+
+---
+
 ## Apéndice — Cómo mantener este catálogo
 
 1. Cada vez que se agrega/quita una ruta en `frontend/src/App.tsx`, actualizar §2 y la entrada correspondiente.
@@ -555,3 +1300,4 @@ Para el detalle completo y discusiones véase `docs/DECISIONES.md` (o memoria pe
 3. Cuando aterrice una decisión D-N nueva, agregar fila en §8 con interfaces afectadas.
 4. Mantener `docs/INTERFACES_MVP_CATALOGO.md` como referencia histórica hasta validación PO, luego eliminar.
 5. El conteo "44 interfaces" se reajustará cuando se cierre el drift (#19, #23, #35) o ingresen nuevas pantallas.
+6. Cuando se agregue/quite un control interactivo en cualquier `.tsx` de `frontend/src/pages/**` o de un componente que renderiza un control visible al usuario (botón, dropdown, toggle, atajo de teclado, modal), actualizar la entrada correspondiente en §12.

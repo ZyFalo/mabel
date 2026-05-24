@@ -31,7 +31,8 @@ class EmpathyRating(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP")
     )
-    # [Evolución 008] Set by PATCH /admin/empathy-ratings/{id} when the rater
+    # [Migración Alembic 009_greeting_unique_empathy_updated] Set by PATCH
+    # /admin/empathy-ratings/{id} when the rater
     # edits an existing rating. NULL means "never edited"; created_at remains
     # the single source for the original timestamp.
     updated_at: Mapped[datetime | None] = mapped_column(
