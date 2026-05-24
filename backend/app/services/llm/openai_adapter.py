@@ -34,6 +34,12 @@ logger = logging.getLogger(__name__)
 
 COLD_START_MAX_RETRIES = 8
 COLD_START_BACKOFF_SECONDS = 10
+# Transient errors (429/502/504) — el SDK los retiraba por default (2x)
+# pero ahora `max_retries=0` los suprime. Compensamos manualmente con
+# backoff exponencial corto: 1s, 2s, 4s. Cubre quota spikes breves y
+# blips de red sin sumar latencia visible para el usuario.
+TRANSIENT_MAX_RETRIES = 3
+TRANSIENT_BASE_BACKOFF_SECONDS = 1.0
 
 
 class OpenAICompatAdapter:
@@ -111,36 +117,46 @@ class OpenAICompatAdapter:
             raise ValueError(f"LLM_ERROR: {e}") from e
 
     async def _create_with_cold_start_retry(self, kwargs: dict):
-        """Crea el stream con tolerancia a cold start del provider.
+        """Crea el stream con tolerancia a cold start + transient errors.
 
-        Modal.com (donde vive Mabel-Gemma4) apaga el worker tras 5 min
-        de inactividad. Reanudarlo toma 60-90 s y devuelve HTTP 503
-        con body `{"error":{"message":"Loading model"}}`. Reintentamos
-        cada 10 s hasta 8 veces (~80 s = budget suficiente para el
-        cold start típico). Otros 503 (rate limit, hard error) burbujan
-        tras un solo intento.
+        Dos políticas de retry distintas según el tipo de error:
 
-        Para providers warm (Gemini, OpenAI directo) la primera llamada
-        funciona y no hay overhead — `for attempt in range(MAX)` corta
-        al primer éxito.
+        1) 503 con body que contiene la frase exacta 'loading model':
+           es el patrón documentado de Modal cold start. Reintentamos
+           8 × 10s = 80s. Antes el detector usaba 'loading' OR 'model'
+           pero 'model' aparece en casi todo error body OpenAI-compat
+           ('model not found', 'model overloaded', etc.) y bloqueaba
+           80s ante errores permanentes. Audit 2026-05-23.
+
+        2) 429 (rate limit), 502/504 (bad gateway/timeout): retry corto
+           con backoff exponencial (1s, 2s, 4s — 3 intentos total).
+           Restaura la tolerancia del SDK default tras max_retries=0.
+
+        Otros errores (4xx no-429, 5xx no-503/502/504, network hard
+        errors) burbujean tras un solo intento.
         """
         last_err: Exception | None = None
+
+        # Loop principal de cold-start (puede agotar 80s)
         for attempt in range(COLD_START_MAX_RETRIES):
             try:
-                return await self._client.chat.completions.create(**kwargs)
+                return await self._try_create_with_transient_retry(kwargs)
             except APIStatusError as e:
                 last_err = e
                 if e.status_code != 503:
-                    # No es cold start: re-raise inmediato sin esperar.
                     raise
                 body_text = ""
                 try:
                     body_text = str(e.response.text or "")
                 except Exception:  # noqa: BLE001
                     pass
-                is_loading = "loading" in body_text.lower() or "model" in body_text.lower()
-                if not is_loading:
-                    # 503 no relacionado a cold start (proxy down, etc.)
+                # Detección estricta del patrón Modal cold start. La
+                # frase exacta del doc es "Loading model". Aceptamos
+                # case-insensitive para tolerar variantes.
+                is_cold_start = "loading model" in body_text.lower()
+                if not is_cold_start:
+                    # 503 de otra causa (rate limit hard, proxy abajo) —
+                    # bubble out inmediato.
                     raise
                 logger.info(
                     "LLM cold start in progress, retrying in %ds (attempt %d/%d)",
@@ -149,8 +165,37 @@ class OpenAICompatAdapter:
                     COLD_START_MAX_RETRIES,
                 )
                 await asyncio.sleep(COLD_START_BACKOFF_SECONDS)
-        # Agotamos retries: re-raise el ultimo error con contexto.
+
         raise ValueError(
             f"LLM cold start no respondio tras {COLD_START_MAX_RETRIES} "
             f"intentos de {COLD_START_BACKOFF_SECONDS}s. ultimo error: {last_err}"
         )
+
+    async def _try_create_with_transient_retry(self, kwargs: dict):
+        """Retry corto para errores transientes (429/502/504).
+
+        Backoff exponencial: 1s, 2s, 4s entre intentos (max 3 totales).
+        Total worst-case extra: ~7s antes de bubble — invisible para
+        cold start (80s) pero suficiente para resistir un blip de
+        rate limit / gateway. Cualquier otro error burbujea inmediato.
+        """
+        for attempt in range(TRANSIENT_MAX_RETRIES):
+            try:
+                return await self._client.chat.completions.create(**kwargs)
+            except APIStatusError as e:
+                # 429 rate limit y 502/504 gateway → retry.
+                # 503 lo deja salir para que el outer loop decida cold-start.
+                if e.status_code in (429, 502, 504) and attempt < TRANSIENT_MAX_RETRIES - 1:
+                    backoff = TRANSIENT_BASE_BACKOFF_SECONDS * (2 ** attempt)
+                    logger.info(
+                        "LLM transient error %d, retrying in %.1fs (attempt %d/%d)",
+                        e.status_code,
+                        backoff,
+                        attempt + 1,
+                        TRANSIENT_MAX_RETRIES,
+                    )
+                    await asyncio.sleep(backoff)
+                    continue
+                raise
+        # Defensive — never reached, el loop siempre return o raise antes
+        raise RuntimeError("transient retry loop fell through")

@@ -13,6 +13,11 @@ import {
 import { useAuthStore } from '../stores/authStore'
 import { useChatStore } from '../stores/chatStore'
 import { usePreferencesStore } from '../stores/preferencesStore'
+// Pre-warm Mabel-Gemma4 desde Home — el flow más común es Home → composer
+// → /chat con pendingMessage, y si esperamos al mount de Chat para
+// dispararlo, el primer mensaje ya está en vuelo cuando arranca el
+// prewarm. Aquí da head-start real al cold start de Modal.
+import useLlmPrewarm from '../hooks/useLlmPrewarm'
 import { useToastStore } from '../stores/toastStore'
 import Composer from '../components/chat/Composer'
 import SuggestionChip from '../components/chat/SuggestionChip'
@@ -56,6 +61,12 @@ export default function Home() {
   const user = useAuthStore((s) => s.user)
   const createSession = useChatStore((s) => s.createSession)
   const addToast = useToastStore((s) => s.addToast)
+  // Pre-warm fire-and-forget: si Modal está cold, este ping arranca
+  // el cold start en paralelo a que la persona lee el saludo y elige
+  // su sugerencia. No usamos `status` aquí porque Home no muestra
+  // banner — el indicador vive en Chat/Voice cuando ya estamos
+  // dentro de la sesión.
+  useLlmPrewarm()
 
   // Read the user's check-in preference so the "Llenar check-in" CTA
   // only renders for students who have it enabled. If `checkin_enabled`

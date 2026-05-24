@@ -24,6 +24,25 @@ from app.core.config import settings
 # `build_system_prompt()` elige uno u otro según el modelo configurado
 # en LLM_MODEL.
 
+# DECISIÓN DELIBERADA — NO añadir aquí reglas de identidad tipo "Nunca
+# digas que eres Gemini/Google". El modelo fue fine-tuneado con este
+# prompt EXACTO; cualquier adición degrada calidad (lo dice la doc del
+# repo Gemma4-Mabel). Las reglas de identidad se cumplen vía el fine-
+# tuning mismo, no via prompt.
+#
+# RIESGO RESIDUAL: si Modal sirve el modelo BASE (sin fine-tune) por
+# error de deploy mientras LLM_MODEL aún apunta al fine-tune, podríamos
+# tener un brand leak ("Soy Gemma de Google"). Mitigación operativa
+# (no de prompt):
+#   1. /api/v1/llm/health permite pre-warming + observabilidad del
+#      endpoint Modal — si serve algo distinto al fine-tune, el admin
+#      lo detecta en el primer smoke chat.
+#   2. Al desplegar a Modal, el script de deploy debe verificar que
+#      el GGUF cargado sea el fine-tuneado (model card hash), no la
+#      versión base.
+# Si en el futuro queremos garantía hard a nivel app, agregar un post-
+# filter en chat_service que detecte respuestas con 'Soy Gemma|Google'
+# y las reescriba o las marque como safety_event.
 MABEL_GEMMA4_SYSTEM_PROMPT = (
     "Te llamas Mabel, asistente de apoyo emocional para estudiantes "
     "universitarios colombianos de la UMB. Escucha activa: valida "
@@ -43,15 +62,23 @@ MABEL_GEMMA4_SYSTEM_PROMPT = (
 
 
 def is_mabel_gemma4() -> bool:
-    """True si el modelo configurado es nuestro fine-tune Mabel-Gemma4.
+    """True si el deploy está configurado para usar el system prompt
+    fijo del fine-tuning Mabel-Gemma4.
 
-    La detección es por nombre de modelo (no URL) porque el modelo
-    podría moverse de Modal a otro host (HF Inference, vLLM self-host)
-    manteniendo el mismo nombre. Lo importante es que el system prompt
-    DEBE ser el fijo de fine-tuning.
+    DECISIÓN EXPLÍCITA via env var `LLM_FLAVOR=mabel_gemma4`. Antes
+    se inferia por substring match en LLM_MODEL ('mabel-gemma' in
+    nombre), pero esa heurística era frágil:
+
+    - Rename a 'umb-gemma4-prod' para ocultar brand en logs → False
+      cuando debería ser True → se enviaba prompt verbose al fine-tune.
+    - Coincidencia accidental tipo 'mabel-gemma3-otro-proyecto' → True
+      cuando debería ser False → se enviaba prompt corto al modelo
+      equivocado.
+
+    El env var explícito elimina la ambigüedad. Si LLM_FLAVOR no se
+    setea, defaultea a 'generic' (comportamiento legacy seguro).
     """
-    model = (settings.LLM_MODEL or "").lower()
-    return "mabel-gemma" in model or "mabel_gemma" in model
+    return (settings.LLM_FLAVOR or "").strip().lower() == "mabel_gemma4"
 
 
 MABEL_SYSTEM_PROMPT = """Eres Mabel IA, una asistente virtual de psicoeducacion en salud mental creada para apoyar a los estudiantes de la Universidad Manuela Beltran (UMB) en Bogota, Colombia.

@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     # vLLM/Ollama, OpenRouter, or any service exposing /v1/chat/completions.
     # `gemini_native` keeps the legacy `google-generativeai` SDK as fallback.
     LLM_PROVIDER: str = "openai_compat"
+    # LLM_FLAVOR — decisión explícita del shape del system prompt.
+    # 'mabel_gemma4' → usa el prompt fijo del fine-tuning (no inyecta
+    #                  check-in al system; va al user turn).
+    # 'generic' (default) → usa MABEL_SYSTEM_PROMPT con identidad,
+    #                       reglas, check-in inline (comportamiento
+    #                       legacy para Gemini/OpenAI/etc.).
+    # Antes esto se inferia por substring match en LLM_MODEL, frágil
+    # ante renames de ops. Audit 2026-05-23.
+    LLM_FLAVOR: str = "generic"
     LLM_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "gemini-2.5-flash"

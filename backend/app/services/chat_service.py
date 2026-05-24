@@ -85,18 +85,25 @@ _MD_PATTERNS = [
 def _inject_checkin_into_first_user_turn(
     messages: list[dict], checkin_payload: dict | None
 ) -> list[dict]:
-    """Inyecta el bloque del check-in como prefijo del PRIMER user turn.
+    """Prefija el check-in al primer user turn del PAYLOAD (no de la sesión).
 
     Razón: Mabel-Gemma4 fue fine-tuneada con un system prompt fijo. Si
     le metiéramos el check-in al system, el modelo lo mezcla con sus
     propias reglas internas y degrada (pierde anclaje del fine-tuning).
-    En cambio, pasarlo como información que "el usuario aporta" al
-    inicio de la conversación es un patrón natural que el modelo ya
-    sabe manejar (cualquier LLM aprendió eso de los datos web).
+    En cambio, pasarlo como info "del usuario" es un patrón que el
+    modelo ya sabe manejar.
 
-    No muta `messages` (devuelve nueva lista). Solo toca el PRIMER
-    user message: turnos posteriores ya tienen el contexto en la
-    historia.
+    DURABILIDAD: el prefijo se aplica al primer user turn DENTRO de la
+    ventana de contexto enviada al LLM en CADA llamada. Como la BD
+    guarda el content original sin prefijo, en cada turno reaplicamos
+    sobre el oldest-user-in-window. Esto significa que aunque la
+    ventana deslice (turn 12, 18, …), el check-in sigue presente en
+    cada request — no evapora silenciosamente como pasaría si lo
+    inyectáramos una sola vez. El framing del bracket reconoce esto:
+    no dice "inicio de sesión" (que sonaría mentiroso turno 9 en
+    adelante) sino "contexto del check-in de esta sesión".
+
+    No muta `messages` (devuelve nueva lista).
     """
     block = build_checkin_context_block(checkin_payload)
     if not block:
@@ -106,8 +113,8 @@ def _inject_checkin_into_first_user_turn(
     for m in messages:
         if not injected and m.get("role") == "user":
             prefix = (
-                "[Contexto del check-in de inicio de sesión — para que "
-                "tengas presente cómo me siento al empezar a hablar:\n"
+                "[Contexto del check-in de esta sesión — info que el "
+                "estudiante reportó al empezar:\n"
                 f"{block}\n]\n\n"
             )
             out.append({**m, "content": prefix + m.get("content", "")})
@@ -387,7 +394,7 @@ class ChatService:
                 role="assistant",
                 content=full_response,
                 content_sha256=assistant_hash,
-                meta={"model": settings.GEMINI_MODEL},
+                meta={"model": settings.LLM_MODEL},
                 latency_ms=latency_ms,
                 # Fase 8.1 D-03: latency split. For text-only chat the LLM is the
                 # dominant component, so llm_latency_ms = latency_ms. ASR/TTS
@@ -552,7 +559,7 @@ class ChatService:
                     role="assistant",
                     content=full_response,
                     content_sha256=content_hash,
-                    meta={"model": settings.GEMINI_MODEL, "greeting": True},
+                    meta={"model": settings.LLM_MODEL, "greeting": True},
                     latency_ms=latency_ms,
                     llm_latency_ms=latency_ms,  # Fase 8.1 D-03
                     tokens_prompt=usage_sink.get("prompt_tokens"),

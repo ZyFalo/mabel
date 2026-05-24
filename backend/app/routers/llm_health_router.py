@@ -36,9 +36,16 @@ async def llm_health(current_user: User = Depends(get_current_user)) -> dict:
     recuperar foco si lleva >5 min.
     """
     url = settings.LLM_BASE_URL.rstrip("/") + "/models"
+    # timeout 15s: NO bajar de 12s. El cold start de Modal devuelve 503
+    # con body 'Loading model' DENTRO de ~2-5s (no espera los 90s de
+    # carga completa). Pero proxies/redes pueden tardar varios segundos
+    # en establecer la conexión inicial. Con timeout=5s, el health
+    # check fallaba con TimeoutException durante el cold start mismo,
+    # devolvía 'down' en vez de 'cold' y el banner UX nunca aparecía
+    # (defeat del propósito de la feature). Audit 2026-05-23.
     started = asyncio.get_event_loop().time()
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.get(
                 url,
                 headers={

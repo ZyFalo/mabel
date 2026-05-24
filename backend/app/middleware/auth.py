@@ -42,6 +42,18 @@ async def get_current_user(
     if not user or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido")
 
+    # Cuentas deshabilitadas via panel admin (disabled_at != NULL) NO
+    # deben poder consumir endpoints autenticados — sus tokens viejos
+    # sobreviven hasta expirar (no hay revocación en MVP), así que el
+    # gate va aquí en el middleware. Antes solo se chequeaba en login,
+    # dejando ventana para que un disabled siguiera consumiendo recursos
+    # (incluyendo /llm/health que despierta Modal y cuesta dinero).
+    if user.disabled_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cuenta deshabilitada",
+        )
+
     return user
 
 
