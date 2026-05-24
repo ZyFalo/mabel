@@ -354,22 +354,47 @@ class ChatService:
                 "LLM stream failed in chat_service.run_chat — %s", e
             )
             err_str = str(e)
-            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "rate" in err_str.lower():
+            err_lower = err_str.lower()
+            if "429" in err_str or "resource_exhausted" in err_lower or "rate" in err_lower:
                 user_msg = (
                     "Mabel necesita una pausa breve (limite del proveedor "
                     "alcanzado). Intenta de nuevo en unos minutos."
                 )
-            elif "401" in err_str or "API key" in err_str.lower():
+            elif "401" in err_str or "api key" in err_lower:
                 user_msg = (
                     "Configuracion del modelo no valida. Avisa al administrador."
                 )
-            elif "timeout" in err_str.lower():
+            elif "timeout" in err_lower or "timed out" in err_lower:
                 user_msg = (
-                    "La respuesta tardo demasiado. Intenta de nuevo o "
-                    "acorta tu mensaje."
+                    "La respuesta tardo demasiado. Si Mabel esta despertando, "
+                    "espera unos segundos y vuelve a enviar."
+                )
+            elif "cold start" in err_lower or "loading model" in err_lower:
+                user_msg = (
+                    "Mabel esta despertando (puede tardar 60-90s la primera "
+                    "vez). Espera un momento y reintenta."
+                )
+            elif "model" in err_lower and ("not found" in err_lower or "404" in err_str):
+                user_msg = (
+                    "El modelo configurado no esta disponible. Avisa al "
+                    "administrador (revisar LLM_MODEL en Railway)."
+                )
+            elif "connect" in err_lower or "network" in err_lower or "name or service" in err_lower:
+                user_msg = (
+                    "No pude conectar con Mabel. Revisa tu conexion o "
+                    "avisa al administrador si persiste."
                 )
             else:
-                user_msg = "Error al generar respuesta. Intenta de nuevo."
+                # Incluimos el tipo de excepcion en el mensaje para que
+                # el evaluador de la tesis pueda reportar info util en
+                # lugar del placeholder generico. El traceback completo
+                # queda en logs del backend.
+                err_class = type(e).__name__
+                user_msg = (
+                    f"Error al generar respuesta ({err_class}). "
+                    "Intenta de nuevo o avisa al administrador si "
+                    "persiste."
+                )
             yield f'{{"error": {_json_str(user_msg)}}}'
             return
 
