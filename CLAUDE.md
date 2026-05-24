@@ -185,4 +185,8 @@ Colombian law: Ley 1581/2012 (data protection) + Decreto 1377/2013, Ley 1616/201
 
 ## Where to find more
 
-`docs/README.md` is the master index. Start there if you're not sure where to look. Notion pages are obsolete (>2 months stale) — do not consult them.
+`docs/README.md` is the master index. Start there if you're not sure where to look.
+
+For details on **how the LLM Mabel-Gemma4 was trained, evaluated, and deployed to Modal.com** (dataset, hyperparameters, scorecard pre/post fine-tuning, 8 Modal bugs resolved, etc.): `docs/MODEL_TRAINING.md` is the navigable index to the external repo [`github.com/ZyFalo/Gemma4-Mabel`](https://github.com/ZyFalo/Gemma4-Mabel) (23 docs, ~580 KB). That content is NOT duplicated here to avoid drift.
+
+Notion pages are obsolete (>2 months stale) — do not consult them.

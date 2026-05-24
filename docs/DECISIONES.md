@@ -192,7 +192,7 @@ Estas decisiones se tomaron durante implementación (2026-05) pero la página No
 - **Propuesto por**: Ag.06 (ML/LLM), Ag.11 (DevOps), Ag.04 (Backend)
 - **Decisión**: El modelo fine-tuneado Mabel-Gemma4-E4B (Q4_K_M GGUF ~3.5GB) se hospeda en Modal.com como endpoint serverless (NVIDIA T4 16GB) con scale-to-zero tras 5min de inactividad. El backend de Mabel-IA en Railway consume vía OpenAI-compat (HTTPS).
 - **Motivación**: Modal ofrece GPU bajo demanda sin costo fijo. El proyecto no puede mantener una GPU 24/7. Scale-to-zero introduce cold start de 60-90s que se cubre con UX wait layers (D-20).
-- **Impacto**: env var `LLM_BASE_URL` en producción apunta a Modal. Repo separado `github.com/ZyFalo/Gemma4-Mabel` para el modelo. Check-in inyectado en user-turn (no system) cuando `LLM_FLAVOR=mabel_gemma4` porque el system prompt está fijo en el fine-tune.
+- **Impacto**: env var `LLM_BASE_URL` en producción apunta a Modal. Repo separado [`github.com/ZyFalo/Gemma4-Mabel`](https://github.com/ZyFalo/Gemma4-Mabel) para el modelo (ver `docs/MODEL_TRAINING.md` para índice de sus 23 docs). Check-in inyectado en user-turn (no system) cuando `LLM_FLAVOR=mabel_gemma4` porque el system prompt está fijo en el fine-tune.
 - **Estado**: ✅ implementado.
 
 ### D-19 (propuesta) — Lazy session create

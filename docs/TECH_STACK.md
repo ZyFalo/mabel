@@ -164,7 +164,7 @@ Dos implementaciones activas:
 - Cuantización GGUF Q4_K_M (~3.5 GB de pesos).
 - Hosting: **Modal.com**, NVIDIA T4 16 GB, scale-to-zero **5 min idle**.
 - Cold start: **60–90 s** (carga del modelo + warm-up). Documentado en `openai_adapter.py:18-22` y `useLlmPrewarm.ts:4-7`.
-- Repo separado: `Gemma4-Mabel` (fuera de este monorepo).
+- Repo separado: [`github.com/ZyFalo/Gemma4-Mabel`](https://github.com/ZyFalo/Gemma4-Mabel) (fuera de este monorepo). Para detalles de training/eval/hosting Modal ver `docs/MODEL_TRAINING.md` (índice navegable a los 23 docs del otro repo).
 - Identidad por entrenamiento: el modelo NO necesita instrucciones de "no digas Gemini/Google" en el system prompt.
 
 ### 5.3 Selección de prompt — `LLM_FLAVOR`

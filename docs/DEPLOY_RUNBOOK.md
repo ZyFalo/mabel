@@ -210,7 +210,7 @@ Verificar admin login:
 
 ### 4.1 Setup inicial
 
-El LLM vive en un **repo separado** fuera de este monorepo: `github.com/ZyFalo/Gemma4-Mabel`. El README de ese repo es la fuente de verdad de cómo deployar el modelo. Resumen mínimo aquí para contexto:
+El LLM vive en un **repo separado** fuera de este monorepo: [`github.com/ZyFalo/Gemma4-Mabel`](https://github.com/ZyFalo/Gemma4-Mabel). El README de ese repo es la fuente de verdad de cómo deployar el modelo. Para el detalle completo (training, eval, 8 bugs de Modal resueltos, etc.) ver `docs/MODEL_TRAINING.md` — índice navegable a los 23 docs externos. Resumen mínimo aquí para contexto:
 
 1. Clonar `Gemma4-Mabel`.
 2. Instalar Modal CLI: `pip install modal`.

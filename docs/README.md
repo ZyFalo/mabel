@@ -63,6 +63,7 @@ Si eres una IA **read-only** y detectas que algo en `docs/` está desactualizado
 | `INTERFACES_MVP.md` | Catálogo funcional de las pantallas del MVP (44 interfaces). |
 | `ADMIN_PANEL.md` | Especificación detallada del panel administrativo (Fase 8): tabs, métricas, lifecycle de usuarios, audit logs, configuración. |
 | `AVATAR_3D_DECISION_TECNICA.md` | ADR del avatar 3D (Fase 9 — aprobado, diferido). El MVP usa avatar 2D animado en modo voz. |
+| `MODEL_TRAINING.md` | **Índice navegable** de los 23 docs del repo público externo [`Gemma4-Mabel`](https://github.com/ZyFalo/Gemma4-Mabel) — fine-tuning, evaluación, hosting Modal. NO duplica contenido; mapa con URLs raw directas. |
 
 ### Operaciones (deploy, dev, testing)
 
@@ -169,6 +170,7 @@ bash scripts/install_pre_commit_hook.sh
 | Cómo correr localmente | `LOCAL_DEV_SETUP.md` |
 | Cómo desplegar a producción | `DEPLOY_RUNBOOK.md` |
 | Qué hay (o falta) de testing | `TESTING_STRATEGY.md` |
+| Cómo se entrenó el LLM (dataset, hyperparams, eval, Modal) | `MODEL_TRAINING.md` → repo externo `Gemma4-Mabel` |
 | Por qué decidimos X (D-XX / PO-N / DT-XX) | `DECISIONES.md` + `AGENTES.md` §9 |
 | En qué fase está la implementación | `FASES_IMPLEMENTACION.md` |
 | Qué pantallas tiene la app | `INTERFACES_MVP.md` |
