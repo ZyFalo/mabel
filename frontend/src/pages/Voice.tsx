@@ -31,6 +31,7 @@ import { useToastStore } from '../stores/toastStore'
 import { usePreferencesStore } from '../stores/preferencesStore'
 import useAudioRecorder from '../hooks/useAudioRecorder'
 import useTts from '../hooks/useTts'
+import useLlmPrewarm from '../hooks/useLlmPrewarm'
 import MabelAvatar, { type AvatarState } from '../components/voice/MabelAvatar'
 import ReactiveRings from '../components/voice/ReactiveRings'
 
@@ -50,6 +51,9 @@ export default function Voice() {
   const { isRecording, startRecording, stopRecording, error: micError } =
     useAudioRecorder()
   const { playTts, stopTts, isMuted, toggleMute } = useTts()
+  // Pre-warm Mabel-Gemma4 — vital en voice porque el cold start de 60s
+  // sentado mirando un avatar inerte es peor UX que en chat texto.
+  const llm = useLlmPrewarm()
 
   // Route guard: si el usuario llega a /voice con sus preferencias
   // diciendo que NO quiere modo voz (master `voice_enabled` off o
@@ -277,10 +281,19 @@ export default function Voice() {
   const fmtTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
+  // Si el LLM está cold (worker apagado en Modal), el chip dice
+  // "despertando" en lugar del estado normal, así el usuario sabe
+  // que la primera respuesta puede tardar más.
   const stateLabel: Record<AvatarState, string> = {
-    idle: isProcessing ? 'Procesando…' : 'Toca el micrófono para hablar',
+    idle: isProcessing
+      ? 'Procesando…'
+      : llm.status === 'cold'
+        ? 'Mabel está despertando (~60 s)…'
+        : 'Toca el micrófono para hablar',
     listening: 'Escuchando…',
-    thinking: 'Mabel está pensando',
+    thinking: llm.status === 'cold'
+      ? 'Mabel está despertando (~60 s)…'
+      : 'Mabel está pensando',
     speaking: 'Mabel está hablando',
     error: 'Hubo un problema',
   }

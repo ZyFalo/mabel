@@ -13,7 +13,11 @@ from app.models.message import Message
 from app.repositories.message_repository import MessageRepository
 from app.repositories.preference_repository import PreferenceRepository
 from app.repositories.session_repository import SessionRepository
-from app.services.llm.prompts import build_system_prompt
+from app.services.llm.prompts import (
+    build_checkin_context_block,
+    build_system_prompt,
+    is_mabel_gemma4,
+)
 from app.services.llm.provider import LLMProvider
 
 
@@ -76,6 +80,41 @@ _MD_PATTERNS = [
     (re.compile(r"^\d+[.)]\s+", re.MULTILINE), ""),  # 1.
     (re.compile(r"\[([^\]]+)\]\([^)]+\)"), r"\1"),  # [text](url)
 ]
+
+
+def _inject_checkin_into_first_user_turn(
+    messages: list[dict], checkin_payload: dict | None
+) -> list[dict]:
+    """Inyecta el bloque del check-in como prefijo del PRIMER user turn.
+
+    Razón: Mabel-Gemma4 fue fine-tuneada con un system prompt fijo. Si
+    le metiéramos el check-in al system, el modelo lo mezcla con sus
+    propias reglas internas y degrada (pierde anclaje del fine-tuning).
+    En cambio, pasarlo como información que "el usuario aporta" al
+    inicio de la conversación es un patrón natural que el modelo ya
+    sabe manejar (cualquier LLM aprendió eso de los datos web).
+
+    No muta `messages` (devuelve nueva lista). Solo toca el PRIMER
+    user message: turnos posteriores ya tienen el contexto en la
+    historia.
+    """
+    block = build_checkin_context_block(checkin_payload)
+    if not block:
+        return messages
+    out: list[dict] = []
+    injected = False
+    for m in messages:
+        if not injected and m.get("role") == "user":
+            prefix = (
+                "[Contexto del check-in de inicio de sesión — para que "
+                "tengas presente cómo me siento al empezar a hablar:\n"
+                f"{block}\n]\n\n"
+            )
+            out.append({**m, "content": prefix + m.get("content", "")})
+            injected = True
+        else:
+            out.append(m)
+    return out
 
 
 def _strip_assistant_markdown(messages: list[dict]) -> list[dict]:
@@ -242,19 +281,41 @@ class ChatService:
         else:
             messages = [{"role": "user", "content": content}]
 
-        # Build system prompt with check-in context
+        # System prompt: depende del motor.
+        # - Mabel-Gemma4 (fine-tuned): prompt FIJO del entrenamiento. El
+        #   contexto del check-in se inyecta como prefijo invisible al
+        #   PRIMER user turn del payload (no aquí).
+        # - Modelos genéricos (Gemini fallback): prompt rico que ya
+        #   incluye el bloque de check-in inline.
         system_prompt = build_system_prompt(session.checkin_payload)
+        gemma4 = is_mabel_gemma4()
+
+        if gemma4:
+            # Inyecta el check-in como prefijo al PRIMER user turn de
+            # la ventana de contexto. Patrón equivalente a "agentic
+            # memory injection": el modelo ve el contexto de la sesion
+            # como información que el usuario aporta en el primer
+            # mensaje, sin contaminar el system prompt fijo. Solo
+            # toca el PRIMER user message para no inflar cada turno.
+            messages = _inject_checkin_into_first_user_turn(
+                messages, session.checkin_payload
+            )
 
         if voice_mode:
-            # Anexa instrucciones explicitas al system prompt para que
-            # las respuestas suenen naturales en TTS.
-            system_prompt += _voice_mode_system_suffix()
+            if not gemma4:
+                # Anexa instrucciones explicitas al system prompt para
+                # que las respuestas suenen naturales en TTS. SOLO se
+                # aplica a modelos genéricos: Mabel-Gemma4 ya fue
+                # fine-tuneado para responder breve / sin markdown /
+                # sin emojis, por lo que repetirlo en el system prompt
+                # confunde al modelo y degrada calidad.
+                system_prompt += _voice_mode_system_suffix()
             # IMPORTANT: el historial puede tener turnos previos del modo
             # texto con markdown/emojis/bullets. Si los mandamos crudos,
             # Gemini ve "system dice no markdown pero mi historial esta
-            # lleno" → mirrors prior style. Limpiamos los assistant
-            # messages para que el contexto sea coherente con la nueva
-            # consigna.
+            # lleno" → mirrors prior style. Mabel-Gemma4 también se
+            # beneficia: aprendió a NO usar markdown, recibir historial
+            # contaminado puede confundirlo.
             messages = _strip_assistant_markdown(messages)
 
         # Stream from LLM
@@ -363,10 +424,13 @@ class ChatService:
         save_history = prefs.save_history if prefs else False
 
         system_prompt = build_system_prompt(session.checkin_payload)
-        if voice_mode:
+        if voice_mode and not is_mabel_gemma4():
             # Sin esto, el PRIMER mensaje en voice mode se genera con el
             # prompt de texto (bullets, emojis, parrafos largos) y suena
             # robotico al TTS — primera impresion rota del modo voz.
+            # NOTA: Mabel-Gemma4 ya está fine-tuneada para responder
+            # breve/sin markdown/sin emojis, así que el suffix sobra y
+            # puede confundirla.
             system_prompt += _voice_mode_system_suffix()
 
         # Build the greeting instruction. Two distinct shapes:

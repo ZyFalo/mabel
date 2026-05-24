@@ -6,20 +6,34 @@ Single implementation that works against ANY provider exposing the OpenAI
 - Google Gemini via its OpenAI-compat endpoint
   (https://generativelanguage.googleapis.com/v1beta/openai/)
 - OpenAI itself
+- Mabel-Gemma4 fine-tuned (Modal.com serverless, repo Gemma4-Mabel)
 - A self-hosted fine-tuned model (vLLM, Ollama, llama.cpp, FastAPI wrapper, …)
 - Any aggregator (OpenRouter, Groq, Together, …)
 
 Switching providers requires changing only the `LLM_BASE_URL`, `LLM_API_KEY`
-and `LLM_MODEL` env vars — no code change. The Mabel/Gemini identity policy
-(never expose the underlying brand) is honored by `prompts.build_system_prompt`,
-which is upstream of this adapter.
+and `LLM_MODEL` env vars — no code change. La identidad de Mabel (nunca
+exponer el modelo subyacente) la garantiza `prompts.build_system_prompt`,
+upstream del adapter.
+
+COLD START handling: Modal.com serverless apaga el worker tras 5 min idle.
+Reanudarlo toma 60-90 s y devuelve HTTP 503 con `Loading model`. El adapter
+implementa retry manual de 8 × 10 s específico para ese caso. Cualquier
+otro 503 (rate limit, hard error) burbujea como ValueError tras un reintento.
 """
 
+import asyncio
+import logging
 from collections.abc import AsyncGenerator
 
-from openai import AsyncOpenAI
+from openai import APIStatusError, AsyncOpenAI
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+COLD_START_MAX_RETRIES = 8
+COLD_START_BACKOFF_SECONDS = 10
 
 
 class OpenAICompatAdapter:
@@ -30,6 +44,11 @@ class OpenAICompatAdapter:
             api_key=settings.effective_llm_api_key,
             base_url=settings.LLM_BASE_URL,
             timeout=settings.LLM_TIMEOUT_MS / 1000,
+            # max_retries=0 porque manejamos retries manualmente: el
+            # SDK no diferencia 503 "modelo cargando" (esperar) de 503
+            # "servicio caído" (avisar). Lo nuestro distingue por
+            # status_code + body.
+            max_retries=0,
         )
         self._model = settings.LLM_MODEL
 
@@ -69,7 +88,7 @@ class OpenAICompatAdapter:
                 kwargs["max_tokens"] = config["max_output_tokens"]
 
         try:
-            stream = await self._client.chat.completions.create(**kwargs)
+            stream = await self._create_with_cold_start_retry(kwargs)
             async for chunk in stream:
                 # The terminal usage chunk has empty `choices` but populated
                 # `usage`. We must check usage BEFORE the early-continue on
@@ -90,3 +109,48 @@ class OpenAICompatAdapter:
                     yield delta.content
         except Exception as e:  # noqa: BLE001 — wrap upstream class without leaking it
             raise ValueError(f"LLM_ERROR: {e}") from e
+
+    async def _create_with_cold_start_retry(self, kwargs: dict):
+        """Crea el stream con tolerancia a cold start del provider.
+
+        Modal.com (donde vive Mabel-Gemma4) apaga el worker tras 5 min
+        de inactividad. Reanudarlo toma 60-90 s y devuelve HTTP 503
+        con body `{"error":{"message":"Loading model"}}`. Reintentamos
+        cada 10 s hasta 8 veces (~80 s = budget suficiente para el
+        cold start típico). Otros 503 (rate limit, hard error) burbujan
+        tras un solo intento.
+
+        Para providers warm (Gemini, OpenAI directo) la primera llamada
+        funciona y no hay overhead — `for attempt in range(MAX)` corta
+        al primer éxito.
+        """
+        last_err: Exception | None = None
+        for attempt in range(COLD_START_MAX_RETRIES):
+            try:
+                return await self._client.chat.completions.create(**kwargs)
+            except APIStatusError as e:
+                last_err = e
+                if e.status_code != 503:
+                    # No es cold start: re-raise inmediato sin esperar.
+                    raise
+                body_text = ""
+                try:
+                    body_text = str(e.response.text or "")
+                except Exception:  # noqa: BLE001
+                    pass
+                is_loading = "loading" in body_text.lower() or "model" in body_text.lower()
+                if not is_loading:
+                    # 503 no relacionado a cold start (proxy down, etc.)
+                    raise
+                logger.info(
+                    "LLM cold start in progress, retrying in %ds (attempt %d/%d)",
+                    COLD_START_BACKOFF_SECONDS,
+                    attempt + 1,
+                    COLD_START_MAX_RETRIES,
+                )
+                await asyncio.sleep(COLD_START_BACKOFF_SECONDS)
+        # Agotamos retries: re-raise el ultimo error con contexto.
+        raise ValueError(
+            f"LLM cold start no respondio tras {COLD_START_MAX_RETRIES} "
+            f"intentos de {COLD_START_BACKOFF_SECONDS}s. ultimo error: {last_err}"
+        )

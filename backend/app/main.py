@@ -22,6 +22,7 @@ from app.routers.asr_router import router as asr_router
 from app.routers.auth_router import router as auth_router
 from app.routers.consent_router import router as consent_router
 from app.routers.data_control_router import router as data_control_router
+from app.routers.llm_health_router import router as llm_health_router
 from app.routers.preference_router import router as preference_router
 from app.routers.report_router import router as report_router
 from app.routers.safety_event_router import router as safety_event_router
@@ -67,6 +68,7 @@ app.include_router(safety_event_router, prefix="/api/v1")
 app.include_router(system_config_router, prefix="/api/v1")
 app.include_router(tts_router, prefix="/api/v1")
 app.include_router(data_control_router, prefix="/api/v1")
+app.include_router(llm_health_router, prefix="/api/v1")
 
 # Admin routers (grouped at the end)
 app.include_router(admin_users_router, prefix="/api/v1")

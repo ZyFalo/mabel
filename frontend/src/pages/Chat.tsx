@@ -19,6 +19,7 @@ import Markdown from '../components/ui/Markdown'
 import useAudioRecorder from '../hooks/useAudioRecorder'
 import useTts from '../hooks/useTts'
 import useSubtitles from '../hooks/useSubtitles'
+import useLlmPrewarm from '../hooks/useLlmPrewarm'
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleTimeString('es-CO', {
@@ -120,6 +121,10 @@ export default function Chat() {
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder()
   const { playTts, stopTts, isMuted, toggleMute } = useTts()
+  // Pre-warm Mabel-Gemma4 al montar el chat — si el worker de Modal
+  // está dormido, esto inicia el cold start de 60-90s en paralelo al
+  // tiempo que el usuario tarda en leer el saludo y escribir.
+  const llm = useLlmPrewarm()
   const { currentWordIndex, startSubtitles, stopSubtitles } = useSubtitles()
 
   /**
@@ -1092,6 +1097,39 @@ export default function Chat() {
         }}
       >
         <div style={{ maxWidth: 760, margin: '0 auto' }}>
+          {/* Banner discreto cuando Mabel-Gemma4 está cold en Modal.
+              El usuario sigue pudiendo escribir; el indicador solo le
+              avisa que la primera respuesta puede tardar más de lo
+              normal (60-90s vs ~3s). Se autoesconde una vez warm. */}
+          {llm.status === 'cold' && (
+            <div
+              style={{
+                marginBottom: 8,
+                padding: '8px 12px',
+                background: 'var(--warn-50)',
+                color: 'var(--warn-700)',
+                border: '1px solid var(--warn-200)',
+                borderRadius: 10,
+                fontSize: 12.5,
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  background: 'var(--warn-600)',
+                  animation: 'blink 1.2s ease-in-out infinite',
+                }}
+              />
+              Mabel está despertando — la primera respuesta puede tardar
+              hasta un minuto.
+            </div>
+          )}
           <Composer
             value={input}
             onChange={setInput}

@@ -1,3 +1,59 @@
+from app.core.config import settings
+
+
+# ─────────────────────────────────────────────────────────────────────
+# System prompts por modelo
+# ─────────────────────────────────────────────────────────────────────
+#
+# Mabel tiene DOS motores LLM soportados con system prompts distintos:
+#
+# 1. `MABEL_GEMMA4_SYSTEM_PROMPT` — el prompt B+ EXACTO con el que se
+#    fine-tuneó el modelo propio `mabel-gemma4-e4b-Q4_K_M` (hosteado en
+#    Modal.com). Cambiar este string degrada la calidad del modelo:
+#    según la doc del repo Gemma4-Mabel, los safety guardrails se
+#    debilitan, el estilo deja de ser conversacional y el modelo puede
+#    empezar a diagnosticar. NUNCA editar a la ligera. Si necesitamos
+#    inyectar contexto (check-in, voice mode) lo hacemos como prefijo
+#    al primer turno del usuario, no aquí.
+#
+# 2. `MABEL_SYSTEM_PROMPT` — versión rica usada con LLMs no entrenados
+#    para Mabel (Gemini, OpenAI, etc., como fallback). Incluye reglas
+#    de identidad, personalidad y límites porque esos modelos no los
+#    conocen por entrenamiento.
+#
+# `build_system_prompt()` elige uno u otro según el modelo configurado
+# en LLM_MODEL.
+
+MABEL_GEMMA4_SYSTEM_PROMPT = (
+    "Te llamas Mabel, asistente de apoyo emocional para estudiantes "
+    "universitarios colombianos de la UMB. Escucha activa: valida "
+    "emociones primero y haz preguntas exploratorias para entender lo "
+    "que pasa. Cuando tenga sentido, ofrece 1-2 sugerencias prácticas "
+    "breves en prosa, sin imponer. No eres psicóloga profesional, no "
+    "diagnosticas ni das planes terapéuticos. Tampoco resuelves tareas "
+    "académicas, código, traducciones, resúmenes ni preguntas "
+    "factuales: si te las piden, valida la emoción detrás y redirige "
+    "sin sermonear. Responde en español colombiano, breve (máx 4-5 "
+    "frases), conversacional, puede usar negrita y cursiva para "
+    "énfasis, sin headings ni listas con bullets ni emojis. Si hay "
+    "crisis (suicidio, autolesión), mantén la calma, valida, deriva a "
+    "Línea 123, Línea 106, Línea 155 o Bienestar UMB y pregunta por "
+    "persona de confianza."
+)
+
+
+def is_mabel_gemma4() -> bool:
+    """True si el modelo configurado es nuestro fine-tune Mabel-Gemma4.
+
+    La detección es por nombre de modelo (no URL) porque el modelo
+    podría moverse de Modal a otro host (HF Inference, vLLM self-host)
+    manteniendo el mismo nombre. Lo importante es que el system prompt
+    DEBE ser el fijo de fine-tuning.
+    """
+    model = (settings.LLM_MODEL or "").lower()
+    return "mabel-gemma" in model or "mabel_gemma" in model
+
+
 MABEL_SYSTEM_PROMPT = """Eres Mabel IA, una asistente virtual de psicoeducacion en salud mental creada para apoyar a los estudiantes de la Universidad Manuela Beltran (UMB) en Bogota, Colombia.
 
 REGLAS DE IDENTIDAD (NUNCA violar):
@@ -73,8 +129,93 @@ def _format_focus(focus, focus_other: str | None) -> str | None:
     return base
 
 
+def build_checkin_context_block(checkin_payload: dict | None) -> str:
+    """Serializa el check-in a un bloque de texto reutilizable.
+
+    Devuelve string vacío si no hay payload o no hay campos válidos.
+    Se usa en DOS escenarios:
+
+    1. Concatenado al MABEL_SYSTEM_PROMPT cuando el motor es Gemini /
+       OpenAI (build_system_prompt lo hace internamente).
+    2. Inyectado como prefijo al primer turno del USER cuando el motor
+       es Mabel-Gemma4 (chat_service.send_message lo invoca directo
+       para evitar tocar el system prompt fijo del fine-tuning).
+
+    Misma serialización de los 7 campos del check-in actual:
+      - mood (0-10), energy (1-4), stress (1-4), sleep_quality (str),
+        sleep (float, opcional), loneliness (1-4), focus (str|list),
+        focus_other (str), note (str).
+    """
+    if not checkin_payload:
+        return ""
+
+    mood = checkin_payload.get("mood")
+    energy = checkin_payload.get("energy")
+    stress = checkin_payload.get("stress")
+    sleep_quality = checkin_payload.get("sleep_quality")
+    sleep = checkin_payload.get("sleep")
+    loneliness = checkin_payload.get("loneliness")
+    focus_raw = checkin_payload.get("focus")
+    focus_other = checkin_payload.get("focus_other")
+    note = checkin_payload.get("note")
+
+    parts: list[str] = []
+    if mood is not None:
+        parts.append(f"- Estado de animo: {mood}/10")
+    if energy in _ENERGY_LABEL:
+        parts.append(f"- Energia para hoy: {_ENERGY_LABEL[energy]} ({energy}/4)")
+    if stress in _STRESS_LABEL:
+        parts.append(f"- Nivel de agobio hoy: {_STRESS_LABEL[stress]} ({stress}/4)")
+    if sleep_quality in _SLEEP_QUALITY_LABEL:
+        sleep_line = f"- Calidad de sueño anoche: {_SLEEP_QUALITY_LABEL[sleep_quality]}"
+        if sleep is not None:
+            sleep_line += f" (~{sleep} h)"
+        parts.append(sleep_line)
+    elif sleep is not None:
+        parts.append(f"- Horas de sueno: {sleep}")
+    if loneliness in _LONELINESS_LABEL:
+        parts.append(f"- Sensacion de conexion social: {_LONELINESS_LABEL[loneliness]}")
+    focus_str = _format_focus(focus_raw, focus_other if isinstance(focus_other, str) else None)
+    if focus_str:
+        parts.append(f"- Foco de preocupacion: {focus_str}")
+    if note:
+        parts.append(f"- Nota adicional: {note}")
+
+    return "\n".join(parts)
+
+
 def build_system_prompt(checkin_payload: dict | None = None) -> str:
-    """Inyecta el contexto del check-in al system prompt de Mabel.
+    """Construye el system prompt para enviar al LLM.
+
+    Lógica:
+    - Si el modelo es Mabel-Gemma4 (fine-tuned), devuelve el prompt FIJO
+      del fine-tuning sin modificación. El check-in NO se inyecta aquí
+      (el caller debe usar `build_checkin_context_block` y prefijar al
+      primer user turn). Modificar este prompt degrada calidad.
+    - Si el modelo es genérico (Gemini, OpenAI), devuelve el prompt
+      rico con identidad + reglas + check-in concatenado, mismo
+      comportamiento que antes del split.
+
+    Acepta los 7 campos del check-in actual (todos opcionales):
+      - mood (0-10)            ánimo, vía 5 caritas en UI
+      - energy (1-4)           recursos para el día
+      - stress (1-4)           qué tan abrumada/o se siente hoy
+      - sleep_quality (str)    calidad subjetiva — predice mejor que horas
+      - sleep (float)          horas exactas, opcional, complementa quality
+      - loneliness (1-4)       conexión / soledad UCLA single-item
+      - focus (str | list)     multi-select, ahora con Pareja y Futuro
+      - focus_other (str)      texto libre cuando focus incluye 'Otro'
+      - note (str)             texto libre
+    """
+    # Motor con identidad por entrenamiento: NO tocar el system prompt.
+    if is_mabel_gemma4():
+        return MABEL_GEMMA4_SYSTEM_PROMPT
+
+    return _build_system_prompt_generic(checkin_payload)
+
+
+def _build_system_prompt_generic(checkin_payload: dict | None = None) -> str:
+    """Versión original para LLMs no entrenados — preserva el contrato.
 
     Acepta los 7 campos del check-in actual (todos opcionales):
       - mood (0-10)            ánimo, vía 5 caritas en UI
