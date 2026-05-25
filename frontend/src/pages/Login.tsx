@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react'
 import apiClient from '../api/client'
 import { useAuthStore } from '../stores/authStore'
+import { useIsPWA } from '../hooks/useIsPWA'
 import AuthShell from '../components/auth/AuthShell'
 import Input from '../components/settings/primitives/Input'
 
@@ -10,6 +11,7 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const login = useAuthStore((s) => s.login)
+  const isPWA = useIsPWA()
   const [form, setForm] = useState({ email: '', password: '', remember_me: false })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -35,7 +37,16 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const res = await apiClient.post('/auth/login', form)
+      // F4 (2026-05-25): si la app corre instalada como PWA, forzamos
+      // remember_me=true para que el JWT dure 7 días en lugar de 24h.
+      // Razón: al cerrar la PWA el localStorage NO se borra, pero el
+      // token sí expira por el `exp` del JWT — el usuario percibe eso
+      // como "se desloguea al cerrar". El techo práctico en iOS es de
+      // 7 días por ITP, por lo que extender más allá no aporta sin
+      // refresh tokens (decisión PO: no introducir refresh tokens en
+      // esta iteración).
+      const payload = isPWA ? { ...form, remember_me: true } : form
+      const res = await apiClient.post('/auth/login', payload)
       login(res.data.access_token, res.data.user)
       const target = res.data.user.role === 'admin' ? '/admin' : '/home'
       navigate(target, { replace: true })
@@ -178,25 +189,30 @@ export default function Login() {
             />
           </div>
 
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 13,
-              color: 'var(--ink-700)',
-              cursor: 'pointer',
-              marginTop: 2,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={form.remember_me}
-              onChange={(e) => setForm({ ...form, remember_me: e.target.checked })}
-              style={{ accentColor: 'var(--mabel-600)', width: 16, height: 16 }}
-            />
-            Recordarme
-          </label>
+          {/* En modo PWA forzamos remember_me=true implícitamente, por
+              eso ocultamos el control para no exponer una opción que
+              no tiene efecto (decisión PO 2026-05-25). */}
+          {!isPWA && (
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 13,
+                color: 'var(--ink-700)',
+                cursor: 'pointer',
+                marginTop: 2,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.remember_me}
+                onChange={(e) => setForm({ ...form, remember_me: e.target.checked })}
+                style={{ accentColor: 'var(--mabel-600)', width: 16, height: 16 }}
+              />
+              Recordarme
+            </label>
+          )}
 
           <button
             type="submit"

@@ -196,6 +196,36 @@ html, body {
      usan flex con overflow-y-auto). Evitamos que el body funcione como
      un scroll alternativo cuando algún descendiente excede `h-screen`. */
   overflow: hidden;
+  /* iOS Safari + Android Chrome: previene auto-zoom al rotar el
+     dispositivo. El "ligero zoom+" reportado en mobile (2026-05-25) era
+     consecuencia de esta heurística móvil sumada a algún input con
+     font-size < 16px. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html {
+  /* Hard guard contra overflow horizontal — cualquier descendiente que
+     exceda el viewport (modal con min-w fijo, tabla admin, imagen sin
+     max-width) se recortaría visualmente pero NO forzaría a la UI a
+     hacer shrink-to-fit, que es lo que el usuario percibía como "todo
+     se ve con zoom". Si en el futuro alguna feature LEGÍTIMA necesita
+     scroll horizontal local (ej. tabla admin scrolleable), debe contener
+     el scroll en su propio wrapper con `overflow-x: auto`. */
+  overflow-x: hidden;
+}
+
+/* iOS Safari aplica un AUTOZOOM al hacer focus en inputs con font-size
+   < 16px (regla histórica de WebKit para legibilidad). Eso reposiciona
+   el viewport y se siente como un "ligero zoom" indeseado. Forzamos
+   16px en mobile para neutralizarlo SIN tocar la tipografía visual del
+   resto de la UI. Aplica a TODOS los controles editables. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 button, input, select, textarea {

@@ -55,6 +55,15 @@ function isAuthPathWithoutToken(url: string | undefined): boolean {
   })
 }
 
+// CR-06+07 (review 2026-05-25): flag de módulo para que un burst de
+// 403s concurrentes (Home dispara 3-4 GETs en paralelo) NO encolen
+// múltiples `window.location.href = ...`. El primer 403 marca el
+// flag, el navigate se difiere al próximo tick para dejar que el
+// callstack actual termine cleanup (SSE readers, drafts) antes de
+// abandonar la página. Cualquier 403 posterior solo registra y deja
+// que el navigate ya programado complete.
+let consentRedirecting = false
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -75,6 +84,33 @@ apiClient.interceptors.response.use(
         onSessionExpired()
       } else {
         window.location.href = '/login'
+      }
+    } else if (error.response?.status === 403) {
+      // Consent desactualizado: el backend (middleware/auth.py
+      // `require_consent`) responde 403 con detail = {message,
+      // consent_status} cuando el usuario tiene una version aceptada
+      // distinta de la activa, o no tiene consent. Redirigir a
+      // /consent-required para que re-acepte. NO limpiamos el token
+      // (la sesion sigue valida, solo falta re-aceptar).
+      // Otros 403 (role insuficiente "Acceso denegado", cuenta
+      // deshabilitada — detail string en vez de objeto) se propagan
+      // tal cual; el chequeo `typeof === 'object'` los descarta.
+      const detail = error.response?.data?.detail
+      const consentStatus =
+        typeof detail === 'object' && detail !== null ? detail.consent_status : undefined
+      if (
+        consentStatus &&
+        !consentRedirecting &&
+        window.location.pathname !== '/consent-required'
+      ) {
+        consentRedirecting = true
+        // setTimeout(_, 0): deja que el handler actual termine de
+        // resolver/rechazar el Promise (lo que permite cleanup de
+        // SSE readers en chat_service y guarda drafts) antes de
+        // hard-navigate.
+        setTimeout(() => {
+          window.location.href = '/consent-required'
+        }, 0)
       }
     }
     return Promise.reject(error)

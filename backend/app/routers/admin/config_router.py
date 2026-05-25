@@ -134,6 +134,11 @@ async def patch_admin_config(
     )
     await db.commit()
     await db.refresh(row)
+    # F1 LLM switch: no requiere invalidación de cache de proceso —
+    # `get_llm_provider()` lee la key per-request via
+    # SystemConfigRepository, así que el próximo turno ya usa el valor
+    # actualizado (resuelve el problema multi-worker que tendría un
+    # cache global). CR-03 review 2026-05-25.
     return SystemConfigItem(key=row.key, value=row.value, updated_at=row.updated_at)
 
 

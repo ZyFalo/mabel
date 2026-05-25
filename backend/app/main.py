@@ -1,3 +1,4 @@
+import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,6 +8,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
+
+# CR-05 (review 2026-05-25): Python 3.11 stdlib NO registra
+# `.webmanifest` → vite-plugin-pwa emite `/manifest.webmanifest` y sin
+# este registro `FileResponse` lo sirve con `application/octet-stream`,
+# lo que Firefox rechaza con "Manifest fetched but mime type incorrect"
+# y la PWA no se ofrece para instalar.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 # Admin routers (Fase 8)
 from app.routers.admin.audit_logs_router import router as admin_audit_logs_router
@@ -120,6 +128,30 @@ if _FRONTEND_DIR.is_dir():
     # request al SPA porque FileResponse rompe sobre archivo inexistente.
     if _INDEX_FILE.is_file():
 
+        # CR-05 (review 2026-05-25): el service worker (`sw.js`) y los
+        # artefactos PWA (`manifest.webmanifest`, `workbox-*.js`,
+        # `registerSW.js`) DEBEN servirse con `Cache-Control: no-cache`.
+        # Sin esto el browser aplica heuristic caching (~10% del
+        # Last-Modified delta) y pinea a usuarios en una versión vieja
+        # del SW indefinidamente — `registerType: 'autoUpdate'` solo
+        # dispara cuando el browser re-fetcha `sw.js`.
+        _NO_CACHE_PATTERNS = (
+            "sw.js",
+            "manifest.webmanifest",
+            "registerSW.js",
+        )
+
+        def _spa_file_response(path: Path) -> FileResponse:
+            name = path.name
+            if name in _NO_CACHE_PATTERNS or name.startswith("workbox-"):
+                return FileResponse(
+                    path,
+                    headers={
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                    },
+                )
+            return FileResponse(path)
+
         @app.get("/{full_path:path}", include_in_schema=False)
         async def spa_fallback(full_path: str):
             """Catch-all para React Router. SEGURIDAD: resolvemos la ruta
@@ -132,14 +164,24 @@ if _FRONTEND_DIR.is_dir():
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404)
             if not full_path:
-                return FileResponse(_INDEX_FILE)
+                return _spa_file_response(_INDEX_FILE)
             candidate = (_FRONTEND_DIR / full_path).resolve()
             try:
                 candidate.relative_to(_FRONTEND_DIR)
             except ValueError:
                 # Intento de path traversal: caemos al SPA en vez de 403
                 # para no filtrar la existencia del filtro.
-                return FileResponse(_INDEX_FILE)
+                return _spa_file_response(_INDEX_FILE)
             if candidate.is_file():
-                return FileResponse(candidate)
-            return FileResponse(_INDEX_FILE)
+                return _spa_file_response(candidate)
+            # Si piden un archivo PWA conocido y NO existe, devolver 404
+            # explícito en lugar de servir index.html (que falla la
+            # registración SW silenciosamente con un misleading parse
+            # error en console).
+            if (
+                candidate.name in _NO_CACHE_PATTERNS
+                or candidate.name.startswith("workbox-")
+                or candidate.suffix in (".js", ".webmanifest", ".json", ".map")
+            ):
+                raise HTTPException(status_code=404)
+            return _spa_file_response(_INDEX_FILE)

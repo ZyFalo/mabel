@@ -123,6 +123,16 @@ def validate_guardrails_enabled(value: Any) -> None:
         _invalid("guardrails_enabled must be a boolean")
 
 
+def validate_llm_provider_active(value: Any) -> None:
+    """Solo dos valores aceptados: el adapter OpenAI-compat apuntando al
+    fine-tune en Modal ('mabel_gemma4') o el adapter Gemini nativo
+    ('gemini'). Se rechaza cualquier otro string para evitar deploys
+    inconsistentes (ej. 'openai' sin LLM_BASE_URL apuntando a OpenAI).
+    """
+    if not isinstance(value, str) or value not in ("mabel_gemma4", "gemini"):
+        _invalid("llm_provider_active debe ser 'mabel_gemma4' o 'gemini'")
+
+
 def validate_study_lock_enabled(value: Any) -> None:
     if not isinstance(value, bool):
         _invalid("study_lock_enabled must be a boolean")
@@ -134,6 +144,7 @@ _VALIDATORS = {
     "sos_severity_threshold": validate_sos_severity_threshold,
     "guardrails_enabled": validate_guardrails_enabled,
     "study_lock_enabled": validate_study_lock_enabled,
+    "llm_provider_active": validate_llm_provider_active,
 }
 
 
@@ -588,7 +599,7 @@ class AdminConfigService:
         model = self._resolve_active_llm_model()
         start = _time.monotonic()
         try:
-            adapter = get_llm_provider()
+            adapter, _ = await get_llm_provider(self.db)
             collected_any = False
             # NOTE: gemini-2.5-* family burns ~50-200 reasoning tokens before
             # producing output. Cap at 256 so the ping reliably emits >=1 token

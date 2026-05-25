@@ -30,16 +30,23 @@ from app.services.llm import get_llm_provider
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
-def _get_chat_service(db=Depends(get_db)) -> ChatService:
+async def _get_chat_service(db=Depends(get_db)) -> ChatService:
+    """Async para que `get_llm_provider(db)` pueda leer la key
+    `system_config.llm_provider_active` desde BD via SystemConfigRepository
+    (cache per-request). FastAPI ejecuta Depends async sin cambios para
+    los callers.
+    """
     config_repo = SystemConfigRepository(db)
     event_repo = SafetyEventRepository(db)
     guardrails = GuardrailsService(config_repo=config_repo, event_repo=event_repo)
+    llm, provider_name = await get_llm_provider(db)
     return ChatService(
         session_repo=SessionRepository(db),
         message_repo=MessageRepository(db),
         preference_repo=PreferenceRepository(db),
-        llm=get_llm_provider(),
+        llm=llm,
         guardrails=guardrails,
+        provider_name=provider_name,
     )
 
 

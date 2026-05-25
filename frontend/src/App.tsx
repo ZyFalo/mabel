@@ -16,6 +16,7 @@ import AdminSafetyEvents from './pages/admin/SafetyEvents'
 import AdminConfig from './pages/admin/Config'
 import AdminAuditLogs from './pages/admin/AuditLogs'
 import StudentLayout from './components/layout/StudentLayout'
+import OfflineBanner from './components/layout/OfflineBanner'
 import SessionExpiredModal from './components/ui/SessionExpiredModal'
 import ToastContainer from './components/ui/Toast'
 import { setOnSessionExpired } from './api/client'
@@ -65,6 +66,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <OfflineBanner />
       <ToastContainer />
       <SessionExpiredHandler />
       <Routes>

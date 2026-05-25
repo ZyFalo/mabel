@@ -16,7 +16,6 @@ from app.repositories.session_repository import SessionRepository
 from app.services.llm.prompts import (
     build_checkin_context_block,
     build_system_prompt,
-    is_mabel_gemma4,
 )
 from app.services.llm.provider import LLMProvider
 
@@ -148,12 +147,23 @@ class ChatService:
         preference_repo: PreferenceRepository,
         llm: LLMProvider,
         guardrails=None,
+        provider_name: str = "mabel_gemma4",
     ) -> None:
+        """`provider_name` identifica el adapter activo ('mabel_gemma4' o
+        'gemini'). Recibido por inyección desde session_router para que
+        el chat service pueda condicionar comportamientos según el motor
+        sin volver a leer system_config (lo lee el factory una sola vez
+        por request). CR-02/CR-03 (review 2026-05-25): reemplaza la
+        función `is_mabel_gemma4()` global que era estática y rompía el
+        switch admin runtime (voice-mode TTS suffix quedaba dead code
+        para Gemini).
+        """
         self.session_repo = session_repo
         self.message_repo = message_repo
         self.preference_repo = preference_repo
         self.llm = llm
         self.guardrails = guardrails
+        self.provider_name = provider_name
 
     async def create_session(
         self,
@@ -295,7 +305,7 @@ class ChatService:
         # - Modelos genéricos (Gemini fallback): prompt rico que ya
         #   incluye el bloque de check-in inline.
         system_prompt = build_system_prompt(session.checkin_payload)
-        gemma4 = is_mabel_gemma4()
+        gemma4 = self.provider_name == "mabel_gemma4"
 
         if gemma4:
             # Inyecta el check-in como prefijo al PRIMER user turn de
@@ -456,7 +466,7 @@ class ChatService:
         save_history = prefs.save_history if prefs else False
 
         system_prompt = build_system_prompt(session.checkin_payload)
-        if voice_mode and not is_mabel_gemma4():
+        if voice_mode and self.provider_name != "mabel_gemma4":
             # Sin esto, el PRIMER mensaje en voice mode se genera con el
             # prompt de texto (bullets, emojis, parrafos largos) y suena
             # robotico al TTS — primera impresion rota del modo voz.

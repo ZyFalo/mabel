@@ -49,7 +49,7 @@ async def main() -> int:
             session_repo=SessionRepository(db),
             message_repo=MessageRepository(db),
             preference_repo=PreferenceRepository(db),
-            llm=get_llm_provider(),
+            llm=(await get_llm_provider(db))[0],
             guardrails=None,
         )
 

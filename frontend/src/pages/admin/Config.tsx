@@ -84,6 +84,18 @@ function indexByKey(items: SystemConfigItem[]): Record<string, SystemConfigItem>
   return out
 }
 
+type LlmProviderKey = 'mabel_gemma4' | 'gemini'
+
+function asLlmProvider(value: unknown): LlmProviderKey {
+  // Acepta el storage JSONB ('mabel_gemma4' | 'gemini') con default
+  // defensivo a Mabel-Gemma4 (config productiva del piloto).
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase()
+    if (v === 'gemini' || v === 'gemini_native') return 'gemini'
+  }
+  return 'mabel_gemma4'
+}
+
 function asKeywordArray(value: unknown): KeywordEntry[] {
   // Backend currently writes the structured shape; legacy seed data
   // (plain string list) is also accepted for the migration window.
@@ -1439,7 +1451,13 @@ interface LLMInfo {
  * El resultado de la última prueba se guarda en
  * `system_config.llm_last_test` para que sobreviva reloads.
  */
-function GeminiSection() {
+function GeminiSection({
+  initialProvider,
+  onChanged,
+}: {
+  initialProvider: LlmProviderKey
+  onChanged: () => void
+}) {
   const addToast = useToastStore((s) => s.addToast)
   const [info, setInfo] = useState<LLMInfo | null>(null)
   const [loadingInfo, setLoadingInfo] = useState(true)
@@ -1449,6 +1467,16 @@ function GeminiSection() {
   // looked stuck even though the request had finished with an error.
   const [loadError, setLoadError] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
+  // Switch admin LLM (2026-05-25). El valor activo se materializa
+  // localmente para feedback inmediato del toggle; el parent refresca
+  // el configMap completo via onChanged() tras un PATCH exitoso para
+  // que la próxima vez que se monte el componente, el initialProvider
+  // sea el correcto.
+  const [provider, setProvider] = useState<LlmProviderKey>(initialProvider)
+  const [savingProvider, setSavingProvider] = useState(false)
+  useEffect(() => {
+    setProvider(initialProvider)
+  }, [initialProvider])
 
   const loadInfo = useCallback(async () => {
     setLoadingInfo(true)
@@ -1468,6 +1496,42 @@ function GeminiSection() {
   useEffect(() => {
     loadInfo()
   }, [loadInfo])
+
+  async function patchProvider(next: LlmProviderKey) {
+    if (next === provider || savingProvider) return
+    // Confirmación explícita al cambiar a Gemini: el adapter consume
+    // GEMINI_API_KEY (API de pago) y los mensajes salen a Google.
+    if (next === 'gemini') {
+      const ok = window.confirm(
+        'Cambiar a Gemini envía los mensajes a la API de Google ' +
+          '(de pago, requiere GEMINI_API_KEY configurada). ¿Continuar?',
+      )
+      if (!ok) return
+    }
+    setSavingProvider(true)
+    const prev = provider
+    setProvider(next) // optimistic
+    try {
+      await apiClient.patch('/admin/config/llm_provider_active', { value: next })
+      addToast({
+        type: 'success',
+        message:
+          next === 'mabel_gemma4'
+            ? 'Proveedor activo: Mabel-Gemma4 (Modal). Aplica al próximo mensaje.'
+            : 'Proveedor activo: Gemini. Aplica al próximo mensaje.',
+      })
+      onChanged()
+      await loadInfo() // refresca tile "Modelo" / "Endpoint" del nuevo provider
+    } catch (err) {
+      setProvider(prev) // rollback
+      addToast({
+        type: 'error',
+        message: formatApiError(err, 'No se pudo cambiar el proveedor activo.'),
+      })
+    } finally {
+      setSavingProvider(false)
+    }
+  }
 
   async function runTest() {
     setTesting(true)
@@ -1558,6 +1622,64 @@ function GeminiSection() {
         </div>
       ) : (
         <>
+          {/* Switch admin: alterna proveedor activo en caliente, sin
+              redeploy. PATCH /admin/config/llm_provider_active con
+              cache TTL 30s invalidado al instante. El system prompt se
+              mantiene unificado al fine-tune de Mabel-Gemma4 (decisión
+              2026-05-25). */}
+          <div className="mb-5 border border-gray-200 rounded-md p-4 bg-gray-50/60">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0 max-w-md">
+                <p className="text-sm font-semibold text-text-primary">
+                  Proveedor activo en caliente
+                </p>
+                <p className="text-[12px] text-text-primary/70 mt-1">
+                  Alterna el modelo que responde el chat. El cambio aplica al
+                  próximo mensaje (las sesiones en curso continúan con el
+                  nuevo modelo desde el siguiente turno).
+                </p>
+              </div>
+              <div
+                role="radiogroup"
+                aria-label="Proveedor LLM activo"
+                className="inline-flex rounded-md border border-gray-300 bg-white overflow-hidden shrink-0"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={provider === 'mabel_gemma4'}
+                  disabled={savingProvider}
+                  onClick={() => patchProvider('mabel_gemma4')}
+                  className={[
+                    'px-4 py-2 text-sm font-medium transition-colors',
+                    provider === 'mabel_gemma4'
+                      ? 'bg-primary text-white'
+                      : 'text-text-primary hover:bg-gray-100',
+                    savingProvider ? 'opacity-60 cursor-wait' : '',
+                  ].join(' ')}
+                >
+                  Mabel-Gemma4
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={provider === 'gemini'}
+                  disabled={savingProvider}
+                  onClick={() => patchProvider('gemini')}
+                  className={[
+                    'px-4 py-2 text-sm font-medium transition-colors border-l border-gray-300',
+                    provider === 'gemini'
+                      ? 'bg-primary text-white'
+                      : 'text-text-primary hover:bg-gray-100',
+                    savingProvider ? 'opacity-60 cursor-wait' : '',
+                  ].join(' ')}
+                >
+                  Gemini
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Configuration grid — 5 cards in 2 columns */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <InfoTile
@@ -1986,6 +2108,7 @@ export default function Config() {
   const initialEnabled = asGuardrailsEnabled(configMap['guardrails_enabled']?.value)
   const initialStudyLock = asBool(configMap['study_lock_enabled']?.value)
   const initialHotlines = asHotlineArray(configMap['sos_hotline_numbers']?.value)
+  const initialProvider = asLlmProvider(configMap['llm_provider_active']?.value)
 
   return (
     <div
@@ -2095,7 +2218,7 @@ export default function Config() {
             onChanged={loadConfig}
           />
           <HotlinesSection initial={initialHotlines} onChanged={loadConfig} />
-          <GeminiSection />
+          <GeminiSection initialProvider={initialProvider} onChanged={loadConfig} />
           <SystemStatusSection />
         </div>
       )}
