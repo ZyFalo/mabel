@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from alembic import op
 
 
-revision = "013"
-down_revision = "012"
+revision = "013_seed_llm_provider"
+down_revision = "012_sessions_hidden"
 branch_labels = None
 depends_on = None
 
