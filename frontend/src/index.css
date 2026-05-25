@@ -228,6 +228,31 @@ html {
   }
 }
 
+/* Safe-area inset para PWA standalone en iPhone con notch (X y posteriores).
+   El meta `apple-mobile-web-app-status-bar-style="black-translucent"` (en
+   index.html) hace que la app gane los píxeles del status bar y el notch
+   para fondo continuo — pero el contenido propio (headers, sidebar toggle)
+   debe respetar `env(safe-area-inset-*)` o se ve "pegado arriba" detrás
+   del notch. Aplicamos al `#root` (no al body) para que el body siga
+   sirviendo de fondo extendido sin gap visible. Solo en standalone:
+   en la pestaña del browser Safari ya muestra su propia UI arriba y
+   no hay que reservar espacio adicional. */
+@media (display-mode: standalone) {
+  #root {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* iOS legacy (Safari < 16.4): `display-mode: standalone` MQ existe pero
+   `navigator.standalone` es la señal histórica. Como las MQ no pueden
+   leer JS, este selector body[data-pwa="ios-legacy"] sirve de fallback
+   si en el futuro queremos marcar el body desde React. Hoy iPhones 13
+   Pro y posteriores corren iOS >= 16.4, así que la MQ ya cubre el caso
+   mayoritario. */
+
 button, input, select, textarea {
   font: inherit;
   color: inherit;
