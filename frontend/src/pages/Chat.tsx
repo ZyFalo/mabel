@@ -1046,10 +1046,21 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Composer + disclaimer footer */}
+      {/* Composer + disclaimer footer. `paddingBottom` suma
+          `var(--safe-bottom)` para que el disclaimer legal
+          ("Mabel es psicoeducativa. No reemplaza atención
+          profesional...") quede SIEMPRE visible sobre el home
+          indicator de iOS PWA. Bug reportado 2026-05-27:
+          el disclaimer crítico (Ley 1581) quedaba recortado.
+          Distinto del SaveBar del Settings que sí puede solaparse
+          con el home indicator porque solo es un botón tappable —
+          aquí es texto legal que el usuario debe LEER. */}
       <div
         style={{
-          padding: '0 24px 20px',
+          paddingLeft: 24,
+          paddingRight: 24,
+          paddingTop: 0,
+          paddingBottom: 'calc(20px + var(--safe-bottom))',
           background: 'var(--ink-50)',
           flexShrink: 0,
         }}
