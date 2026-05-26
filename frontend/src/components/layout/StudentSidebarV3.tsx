@@ -817,10 +817,21 @@ export default function StudentSidebarV3({
       {/* SOS access lives in each page's top bar (SosButton component) —
           no longer duplicated in the sidebar. */}
 
-      {/* Profile pill footer */}
+      {/* Profile pill footer.
+          En mobileDrawer aplicamos `paddingBottom: calc(12px +
+          var(--safe-bottom))` para que la card del usuario quede por
+          encima del área del home indicator de iOS (PWA standalone).
+          Sin esto, en iPhone 13 Pro+ el toque sobre la card puede
+          superponerse con el gesto del swipe-up para cerrar app, y
+          visualmente la card queda pegada al borde sin respiro.
+          Desktop / mobile sin notch mantienen el padding original
+          (var(--safe-bottom) cae a 0px). Bug reportado 2026-05-26. */}
       <div
         style={{
           padding: isOpen ? '10px 12px 12px' : '10px 10px 12px',
+          paddingBottom: mobileDrawer
+            ? 'calc(12px + var(--safe-bottom))'
+            : undefined,
           borderTop: '1px solid var(--ink-200)',
           position: 'relative',
           transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
