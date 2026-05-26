@@ -532,10 +532,13 @@ button, input, select, textarea {
   .settings-breadcrumb-header {
     display: none !important;
   }
-  /* Content padding + safe-area-bottom para que el SaveBar interno
-     y el contenido no queden bajo el home indicator de iOS. */
+  /* Content padding sin safe-area-bottom — decisión 2026-05-26
+     (revertido): preferimos que el contenido se extienda hasta el
+     borde físico inferior en lugar de tener una franja blanca vacía
+     bajo el home indicator de iOS. Los CTAs internos (SaveBar) ya
+     tienen su padding propio que actúa como tap-target seguro. */
   .settings-content-inner {
-    padding: 16px 16px calc(16px + var(--safe-bottom)) !important;
+    padding: 16px !important;
   }
 }
 

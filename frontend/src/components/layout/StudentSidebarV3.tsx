@@ -818,20 +818,17 @@ export default function StudentSidebarV3({
           no longer duplicated in the sidebar. */}
 
       {/* Profile pill footer.
-          En mobileDrawer aplicamos `paddingBottom: calc(12px +
-          var(--safe-bottom))` para que la card del usuario quede por
-          encima del área del home indicator de iOS (PWA standalone).
-          Sin esto, en iPhone 13 Pro+ el toque sobre la card puede
-          superponerse con el gesto del swipe-up para cerrar app, y
-          visualmente la card queda pegada al borde sin respiro.
-          Desktop / mobile sin notch mantienen el padding original
-          (var(--safe-bottom) cae a 0px). Bug reportado 2026-05-26. */}
+          Decisión 2026-05-26 (revertido): NO reservar safe-area-bottom
+          aquí. El usuario prefiere que el card se extienda hasta el
+          borde físico inferior del drawer en lugar de tener una franja
+          blanca vacía bajo el home indicator de iOS. El padding interno
+          del button (8px 10px en su propio estilo) sigue siendo
+          suficiente tap-target — el área del home indicator se
+          superpone visualmente pero el gesto del sistema solo se
+          dispara con swipe-up, no con tap simple. */}
       <div
         style={{
           padding: isOpen ? '10px 12px 12px' : '10px 10px 12px',
-          paddingBottom: mobileDrawer
-            ? 'calc(12px + var(--safe-bottom))'
-            : undefined,
           borderTop: '1px solid var(--ink-200)',
           position: 'relative',
           transition: `padding ${COLLAPSE_DURATION}ms var(--ease-out)`,
