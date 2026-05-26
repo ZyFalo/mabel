@@ -102,14 +102,14 @@ export default function AdminHeader() {
         // primer elemento del AdminLayout (h-screen), sin safe-area
         // queda pegado bajo el notch en mobile. Reemplazamos `height`
         // fijo por `minHeight` dinámico para que el header crezca y
-        // mantenga sus 64px internos. Laterales con `max()` cubren
-        // landscape.
-        minHeight: 'calc(64px + env(safe-area-inset-top))',
-        paddingTop: 'env(safe-area-inset-top)',
+        // mantenga sus 64px internos. Patrón unificado de los 3
+        // headers (CR-A10 review 2026-05-26).
+        minHeight: 'calc(64px + var(--safe-top))',
+        paddingTop: 'var(--safe-top)',
         background: 'var(--white)',
         borderBottom: '1px solid var(--ink-200)',
-        paddingLeft: 'max(24px, env(safe-area-inset-left))',
-        paddingRight: 'max(24px, env(safe-area-inset-right))',
+        paddingLeft: 'max(24px, var(--safe-left))',
+        paddingRight: 'max(24px, var(--safe-right))',
       }}
     >
       {/* Mobile hamburger — solo visible <768px via CSS. Toggle del

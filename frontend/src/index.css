@@ -163,6 +163,20 @@
 
   --sidebar-width: 280px;
   --header-height: 64px;
+
+  /* ---------- PWA SAFE-AREA (iPhone notch / Dynamic Island) ----------
+     Tokens centralizados para que los headers (AuthShell mobile,
+     Header.tsx, AdminHeader.tsx) y el OfflineBanner respeten el
+     notch sin duplicar `env(safe-area-inset-*)` en cada inline style.
+     Fallback `0px` para devices sin notch (todo Android desktop +
+     iPhone 8 e inferiores). Los `0px` son críticos: sin el fallback,
+     `calc(3.5rem + env(safe-area-inset-top))` evalúa a `NaN` cuando
+     `env()` no resuelve, rompiendo el `minHeight` del header.
+     CR-A10 (review 2026-05-26). */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
 }
 
 /* ============================================================
@@ -228,45 +242,29 @@ html {
    la izquierda, header descolocado) — bug reportado 2026-05-26 en
    iPhone 13 Pro PWA pantalla de Login.
 
-   `!important` es necesario aquí porque muchos componentes de la app
-   (Input.tsx, Composer.tsx, ReportModal.tsx, etc.) declaran fontSize
-   inline en estilo (~14-15px) — los inline styles ganan sobre CSS
-   normal y dejarían el bug activo en mobile. La regla cubre TODOS
-   los controles editables del proyecto de una sola vez sin tener que
-   tocar cada archivo. No afecta desktop (>640px) donde el inline 14px
-   se mantiene. */
+   `!important` es necesario porque muchos componentes (Input.tsx,
+   Composer.tsx, ReportModal.tsx, etc.) declaran fontSize inline ~14-15px,
+   y los inline styles ganan sobre CSS normal. Restringimos a los TIPOS
+   que iOS realmente zoomea (text, email, password, search, tel, url,
+   number, textarea, select) y excluimos checkbox/radio/range/color/date
+   que NO disparan autozoom y donde un mínimo 16px rompería diseño
+   (ej. radios compactos del check-in). CR-A6 review 2026-05-26. */
 @media (max-width: 640px) {
-  input,
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='date']):not([type='time']):not([type='datetime-local']):not([type='file']),
   select,
   textarea {
     font-size: 16px !important;
   }
 }
 
-/* Safe-area inset para PWA standalone en iPhone con notch (X y posteriores).
-   El meta `apple-mobile-web-app-status-bar-style="black-translucent"` (en
-   index.html) hace que la app gane los píxeles del status bar y el notch
-   para fondo continuo — pero el contenido propio (headers, sidebar toggle)
-   debe respetar `env(safe-area-inset-*)` o se ve "pegado arriba" detrás
-   del notch. Aplicamos al `#root` (no al body) para que el body siga
-   sirviendo de fondo extendido sin gap visible. Solo en standalone:
-   en la pestaña del browser Safari ya muestra su propia UI arriba y
-   no hay que reservar espacio adicional. */
-@media (display-mode: standalone) {
-  #root {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-}
-
-/* iOS legacy (Safari < 16.4): `display-mode: standalone` MQ existe pero
-   `navigator.standalone` es la señal histórica. Como las MQ no pueden
-   leer JS, este selector body[data-pwa="ios-legacy"] sirve de fallback
-   si en el futuro queremos marcar el body desde React. Hoy iPhones 13
-   Pro y posteriores corren iOS >= 16.4, así que la MQ ya cubre el caso
-   mayoritario. */
+/* Safe-area inset PWA: NO se aplica al `#root` ni al `body`. Cada
+   header (AuthShell mobile, Header.tsx, AdminHeader.tsx) y el
+   OfflineBanner consumen `env(safe-area-inset-*)` directamente en
+   sus propios estilos para extender el fondo brand hasta el notch
+   y posicionar el contenido debajo. CR-A1 (review 2026-05-26):
+   antes esto vivía aquí como padding global del #root y producía
+   DOBLE inset cuando el header también lo aplicaba (gap blanco
+   visible arriba del header rojo en PWA standalone). */
 
 button, input, select, textarea {
   font: inherit;

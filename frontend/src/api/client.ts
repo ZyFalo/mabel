@@ -111,6 +111,18 @@ apiClient.interceptors.response.use(
         setTimeout(() => {
           window.location.href = '/consent-required'
         }, 0)
+        // CR-A4 (review 2026-05-26): timer de seguridad para resetear
+        // el flag si la navegación nunca se completa (offline, page
+        // freeze, navigation cancelada por el usuario). Sin esto, un
+        // navigate fallido dejaría el flag en true para toda la vida
+        // de la página y futuros 403 quedarían silenciados — el
+        // usuario seguiría operando con consent stale sin ser
+        // redirigido. 5s es suficiente para cualquier navigate real
+        // y no enmascara cascadas legítimas (ya tenemos guard de
+        // pathname para los casos donde sí se completó).
+        setTimeout(() => {
+          consentRedirecting = false
+        }, 5000)
       }
     }
     return Promise.reject(error)

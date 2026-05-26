@@ -31,18 +31,18 @@ export default function Header({ onToggleSidebar, showHamburger = false }: Heade
       // layout (StudentLayout, AdminLayout) que tiene `h-screen`, así
       // que sin estos paddings su contenido queda pegado al borde
       // superior del viewport y el notch del iPhone (13 Pro+) lo tapa.
-      // `paddingTop: env(safe-area-inset-top)` empuja el contenido bajo
-      // el notch sin separar visualmente el header del status area —
-      // el fondo brand se extiende hasta el borde superior.
-      // `minHeight: calc(3.5rem + inset)` reemplaza el `h-14` para que
-      // la barra crezca dinámicamente y mantenga sus 56px internos.
-      // Laterales con max() cubren landscape (notch lateral).
+      // Patrón unificado de los 3 headers de la app (CR-A10 review
+      // 2026-05-26): `minHeight: calc(SIZE + var(--safe-top))` para
+      // que la barra crezca dinámicamente preservando SIZE interno
+      // visible (3.5rem ≈ 56px) + `paddingTop: var(--safe-top)` empuja
+      // el contenido bajo el notch. Laterales con `max()` cubren
+      // landscape (notch lateral).
       className="bg-primary flex items-center justify-between shrink-0"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
-        minHeight: 'calc(3.5rem + env(safe-area-inset-top))',
-        paddingLeft: 'max(1rem, env(safe-area-inset-left))',
-        paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        paddingTop: 'var(--safe-top)',
+        minHeight: 'calc(3.5rem + var(--safe-top))',
+        paddingLeft: 'max(1rem, var(--safe-left))',
+        paddingRight: 'max(1rem, var(--safe-right))',
       }}
     >
       <div className="flex items-center gap-3">

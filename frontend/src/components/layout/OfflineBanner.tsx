@@ -15,7 +15,9 @@ import { useEffect, useState } from 'react'
  *     voz nueva, hacer login/registro.
  *
  * Se monta en el root layout (App.tsx) para cubrir todas las rutas
- * autenticadas. No interfiere con el SOS FAB (z-index inferior).
+ * autenticadas. Z-index 30: queda DEBAJO de SosButton (35) y de
+ * SosPanel modal (50) — si hay crisis activa, el panel SOS prima
+ * sobre la notificación de conectividad.
  */
 export default function OfflineBanner() {
   const [offline, setOffline] = useState<boolean>(() => {
@@ -49,10 +51,19 @@ export default function OfflineBanner() {
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 50,
+        zIndex: 30,
         background: 'var(--warn-600, #D97706)',
         color: '#FFFFFF',
-        padding: '8px 16px',
+        // CR-A2 (review 2026-05-26): respetar safe-area-inset para que
+        // en PWA standalone con notch (iPhone 13 Pro+), el texto no
+        // quede oculto detrás del Dynamic Island. El fondo naranja se
+        // extiende hasta el borde superior, el padding empuja el texto
+        // debajo del notch. Tokens `--safe-*` definidos en index.css
+        // (CR-A10 review 2026-05-26).
+        paddingTop: 'calc(8px + var(--safe-top))',
+        paddingBottom: 8,
+        paddingLeft: 'max(16px, var(--safe-left))',
+        paddingRight: 'max(16px, var(--safe-right))',
         textAlign: 'center',
         fontSize: 13,
         fontWeight: 600,

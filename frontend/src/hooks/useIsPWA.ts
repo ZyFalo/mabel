@@ -30,7 +30,14 @@ export function useIsPWA(): boolean {
     // el media query cambia. Subscribirse para reaccionar.
     const mql = window.matchMedia('(display-mode: standalone)')
     function handler() {
-      setIsPWA(detectPWA())
+      // CR-A5 (review 2026-05-26): leer mql.matches directo en vez
+      // de re-invocar detectPWA() que vuelve a llamar matchMedia(),
+      // ahorra una query duplicada. Para iOS legacy (navigator.standalone),
+      // el evento change del MQ no dispara — pero ese caso no necesita
+      // reactividad porque iOS legacy nunca permite "instalar" sin
+      // navigate completo (siempre reload tras add-to-home-screen).
+      const nav = window.navigator as Navigator & { standalone?: boolean }
+      setIsPWA(mql.matches || nav.standalone === true)
     }
     // Safari < 14 usa addListener legacy. Cast via `unknown` para que
     // TypeScript no se queje de la API obsoleta.
@@ -46,6 +53,9 @@ export function useIsPWA(): boolean {
       legacy.addListener(handler)
       return () => legacy.removeListener?.(handler)
     }
+    // No-op cleanup explícito para satisfacer reglas de hooks (todas
+    // las ramas del effect devuelven function o undefined consistente).
+    return undefined
   }, [])
 
   return isPWA
@@ -56,6 +66,5 @@ function detectPWA(): boolean {
   if (window.matchMedia('(display-mode: standalone)').matches) return true
   // iOS Safari legacy.
   const nav = window.navigator as Navigator & { standalone?: boolean }
-  if (nav.standalone === true) return true
-  return false
+  return nav.standalone === true
 }

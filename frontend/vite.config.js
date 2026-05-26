@@ -88,9 +88,12 @@ export default defineConfig({
             // con un regex demasiado amplio y el detalle quedaba
             // vacío offline a pesar de que el OfflineBanner promete
             // lectura del historial).
+            // CR-A8 (review 2026-05-26): regex sin `\?` porque
+            // url.pathname NUNCA contiene query string (eso vive en
+            // url.search). Simplificado a `/` | end-of-string.
             urlPattern: ({ url, request }) =>
               request.method === 'GET' &&
-              /\/api\/v1\/sessions(\/|$|\?)/.test(url.pathname),
+              /^\/api\/v1\/sessions(\/|$)/.test(url.pathname),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'mabel-sessions-history',

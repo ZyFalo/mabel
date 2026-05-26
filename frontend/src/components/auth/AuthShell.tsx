@@ -149,10 +149,15 @@ export default function AuthShell({
       <div
         className="flex md:hidden"
         style={{
-          paddingTop: 'calc(20px + env(safe-area-inset-top))',
+          // Patrón unificado de safe-area (CR-A10 review 2026-05-26)
+          // — usamos los tokens `--safe-*` definidos en index.css en
+          // vez de inlineor `env()` directamente. Si necesitamos
+          // ajustar el fallback o aplicar un offset global, se hace
+          // en :root y los 3 headers + OfflineBanner lo heredan.
+          paddingTop: 'calc(20px + var(--safe-top))',
           paddingBottom: 20,
-          paddingLeft: 'max(24px, env(safe-area-inset-left))',
-          paddingRight: 'max(24px, env(safe-area-inset-right))',
+          paddingLeft: 'max(24px, var(--safe-left))',
+          paddingRight: 'max(24px, var(--safe-right))',
           background:
             'linear-gradient(160deg, var(--mabel-700) 0%, var(--mabel-600) 60%, var(--mabel-800) 100%)',
           color: '#fff',

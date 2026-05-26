@@ -174,14 +174,18 @@ if _FRONTEND_DIR.is_dir():
                 return _spa_file_response(_INDEX_FILE)
             if candidate.is_file():
                 return _spa_file_response(candidate)
-            # Si piden un archivo PWA conocido y NO existe, devolver 404
-            # explícito en lugar de servir index.html (que falla la
+            # Si piden un artefacto PWA CONOCIDO y NO existe, devolver
+            # 404 explícito en lugar de servir index.html (que falla la
             # registración SW silenciosamente con un misleading parse
-            # error en console).
-            if (
-                candidate.name in _NO_CACHE_PATTERNS
-                or candidate.name.startswith("workbox-")
-                or candidate.suffix in (".js", ".webmanifest", ".json", ".map")
+            # error en console). CR-A3 (review 2026-05-26): restringimos
+            # el 404 a los nombres específicos del build PWA — antes
+            # incluía cualquier `.js`/`.json`/`.map`/`.webmanifest` lo
+            # que podría romper React Router deep links si la app
+            # añadiera rutas que terminan en esos sufijos (p.ej.
+            # `/datasets/empathy.json` para descargas, o un futuro
+            # `/sessions/{id}.json` API alterno).
+            if candidate.name in _NO_CACHE_PATTERNS or candidate.name.startswith(
+                "workbox-"
             ):
                 raise HTTPException(status_code=404)
             return _spa_file_response(_INDEX_FILE)
