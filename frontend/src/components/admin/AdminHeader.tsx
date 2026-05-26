@@ -98,10 +98,18 @@ export default function AdminHeader() {
     <header
       className="shrink-0 flex items-center justify-between"
       style={{
-        height: 64,
+        // Notch/Dynamic Island (iPhone 13 Pro+): el AdminHeader es el
+        // primer elemento del AdminLayout (h-screen), sin safe-area
+        // queda pegado bajo el notch en mobile. Reemplazamos `height`
+        // fijo por `minHeight` dinámico para que el header crezca y
+        // mantenga sus 64px internos. Laterales con `max()` cubren
+        // landscape.
+        minHeight: 'calc(64px + env(safe-area-inset-top))',
+        paddingTop: 'env(safe-area-inset-top)',
         background: 'var(--white)',
         borderBottom: '1px solid var(--ink-200)',
-        padding: '0 24px',
+        paddingLeft: 'max(24px, env(safe-area-inset-left))',
+        paddingRight: 'max(24px, env(safe-area-inset-right))',
       }}
     >
       {/* Mobile hamburger — solo visible <768px via CSS. Toggle del

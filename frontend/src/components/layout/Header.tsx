@@ -26,7 +26,25 @@ export default function Header({ onToggleSidebar, showHamburger = false }: Heade
   const homeLink = isAdmin ? '/admin' : '/home'
 
   return (
-    <header className="h-14 bg-primary flex items-center px-4 justify-between shrink-0">
+    <header
+      // Notch/Dynamic Island: el header rojo es el primer elemento del
+      // layout (StudentLayout, AdminLayout) que tiene `h-screen`, así
+      // que sin estos paddings su contenido queda pegado al borde
+      // superior del viewport y el notch del iPhone (13 Pro+) lo tapa.
+      // `paddingTop: env(safe-area-inset-top)` empuja el contenido bajo
+      // el notch sin separar visualmente el header del status area —
+      // el fondo brand se extiende hasta el borde superior.
+      // `minHeight: calc(3.5rem + inset)` reemplaza el `h-14` para que
+      // la barra crezca dinámicamente y mantenga sus 56px internos.
+      // Laterales con max() cubren landscape (notch lateral).
+      className="bg-primary flex items-center justify-between shrink-0"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        minHeight: 'calc(3.5rem + env(safe-area-inset-top))',
+        paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+        paddingRight: 'max(1rem, env(safe-area-inset-right))',
+      }}
+    >
       <div className="flex items-center gap-3">
         {/* Student mobile: hamburger to open sidebar drawer */}
         {!isAdmin && onToggleSidebar && showHamburger && (

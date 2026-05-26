@@ -135,11 +135,24 @@ export default function AuthShell({
 
       {/* MOBILE top header (< md). NOTE: `display` must be controlled via the
           className (flex md:hidden), NOT inline — inline styles override
-          Tailwind's `md:hidden` and the header would leak into desktop. */}
+          Tailwind's `md:hidden` and the header would leak into desktop.
+
+          Notch/Dynamic Island: el header es `position: fixed; top: 0`, así
+          que sin `env(safe-area-inset-top)` el contenido (logo + título)
+          queda pegado al borde superior del viewport y el notch del iPhone
+          (13 Pro+) lo tapa. Sumamos el inset al padding-top sin tocar el
+          padding-bottom — la barra brand crece dinámicamente hasta cubrir
+          también el área del notch con su gradient rojo (look continuo,
+          no franja negra) y deja el contenido visible debajo.
+          `paddingLeft/Right` con `max(24px, env(safe-area-inset-*))`
+          cubre el caso landscape donde el notch invade los costados. */}
       <div
         className="flex md:hidden"
         style={{
-          padding: '20px 24px',
+          paddingTop: 'calc(20px + env(safe-area-inset-top))',
+          paddingBottom: 20,
+          paddingLeft: 'max(24px, env(safe-area-inset-left))',
+          paddingRight: 'max(24px, env(safe-area-inset-right))',
           background:
             'linear-gradient(160deg, var(--mabel-700) 0%, var(--mabel-600) 60%, var(--mabel-800) 100%)',
           color: '#fff',
