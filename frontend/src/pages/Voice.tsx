@@ -492,7 +492,7 @@ export default function Voice() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {/* Capa 4 — chip de estado LLM también visible en voice */}
-          <LlmStatusChip status={llm.status} />
+          <LlmStatusChip status={llm.status} provider={llm.provider} />
           <span
             style={{
               fontSize: 12,

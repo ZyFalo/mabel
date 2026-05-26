@@ -519,7 +519,7 @@ export default function Chat() {
               Se actualiza por polling cada 30 s desde useLlmPrewarm. El
               usuario siempre sabe si Mabel responderá rápido o si va a
               cold-startar sin tener que enviar un mensaje primero. */}
-          <LlmStatusChip status={llm.status} />
+          <LlmStatusChip status={llm.status} provider={llm.provider} />
 
           {/* SOS — crisis access pill, always visible in header */}
           <SosButton onClick={openCrisis} />

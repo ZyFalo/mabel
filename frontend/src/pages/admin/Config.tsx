@@ -1638,6 +1638,23 @@ function GeminiSection({
                   próximo mensaje (las sesiones en curso continúan con el
                   nuevo modelo desde el siguiente turno).
                 </p>
+                {/* CR-B10 (review 2026-05-26): nota informativa para el
+                    admin sobre la coherencia BD ↔ env. El toggle aquí
+                    solo cambia la flag en system_config; el endpoint
+                    HTTP del provider sigue siendo `LLM_BASE_URL` (env
+                    Railway). Si LLM_BASE_URL apunta a Gemini pero la
+                    flag dice mabel_gemma4, el chat seguirá pegando a
+                    Gemini aunque el chip diga "Mabel-Gemma4". */}
+                <p className="text-[11.5px] text-warning-700 mt-2 flex items-start gap-1">
+                  <span aria-hidden="true">⚠</span>
+                  <span>
+                    El switch a <strong>Mabel-Gemma4</strong> requiere que
+                    la variable de entorno <code>LLM_BASE_URL</code> en
+                    Railway apunte al endpoint de Modal. Si está mal
+                    configurada, el chat sigue usando el endpoint físico
+                    del env aunque la flag diga otra cosa.
+                  </span>
+                </p>
               </div>
               <div
                 role="radiogroup"

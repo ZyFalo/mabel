@@ -39,8 +39,24 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def _resolve_active_provider(db: AsyncSession | None) -> str:
-    """Devuelve "mabel_gemma4" o "gemini" leyendo BD (si hay) con fallback a env."""
+_KNOWN_PROVIDERS = ("mabel_gemma4", "gemini", "gemini_native", "openai_compat")
+
+
+async def resolve_active_provider(db: AsyncSession | None) -> str:
+    """Devuelve "mabel_gemma4" o "gemini" leyendo BD (si hay) con fallback a env.
+
+    Función pública compartida — llamada tanto por `get_llm_provider()`
+    (factory del chat) como por `routers/llm_health_router.py` (health
+    endpoint). Tener una sola implementación evita drift entre lo que
+    reporta el chip de estado y lo que realmente rutea el chat.
+    CR-B5 (review 2026-05-26): antes existía una copia duplicada en
+    el router con normalización casi idéntica pero independiente.
+
+    Si el valor almacenado no matchea ningún provider conocido, loguea
+    warning y cae al fallback (CR-B6 review 2026-05-26: antes el
+    valor desconocido se colapsaba silenciosamente a mabel_gemma4 sin
+    señal — un admin con typo en SQL directo nunca se enteraba).
+    """
     if db is None:
         return _provider_from_env()
 
@@ -51,11 +67,19 @@ async def _resolve_active_provider(db: AsyncSession | None) -> str:
         raw = await repo.get_value("llm_provider_active")
         if isinstance(raw, str) and raw.strip():
             value = raw.strip().lower()
-            # Aceptamos los alias del storage layer (legacy 'openai_compat'
-            # mapea al deploy productivo de Mabel-Gemma4 en Modal).
             if value in ("gemini", "gemini_native"):
                 return "gemini"
-            return "mabel_gemma4"
+            if value in ("mabel_gemma4", "openai_compat"):
+                return "mabel_gemma4"
+            # Valor desconocido: NO silenciar. El admin debería saber.
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "llm_provider_active unknown value %r (expected one of %r), "
+                "falling back to env LLM_PROVIDER",
+                value,
+                _KNOWN_PROVIDERS,
+            )
     except Exception:  # noqa: BLE001 — cualquier fallo de BD cae a env
         # No tumbar el chat si la lectura de config falla. Log mínimo
         # para no contaminar el response stream del LLM.
@@ -65,6 +89,11 @@ async def _resolve_active_provider(db: AsyncSession | None) -> str:
             "llm_provider_active read failed, falling back to env LLM_PROVIDER"
         )
     return _provider_from_env()
+
+
+# Backward-compat alias (algunos imports legacy podrían usar el nombre
+# privado). El símbolo público canónico es `resolve_active_provider`.
+_resolve_active_provider = resolve_active_provider
 
 
 def _provider_from_env() -> str:

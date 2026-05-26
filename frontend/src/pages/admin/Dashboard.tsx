@@ -8,6 +8,8 @@ import DonutChartWrapper from '../../components/admin/charts/DonutChartWrapper'
 import LineChartWrapper from '../../components/admin/charts/LineChartWrapper'
 import MetricLineWithReference from '../../components/admin/charts/MetricLineWithReference'
 import { CHART_COLORS } from '../../components/admin/charts/chartTheme'
+import LlmStatusChip from '../../components/chat/LlmStatusChip'
+import useLlmPrewarm from '../../hooks/useLlmPrewarm'
 
 const POLL_INTERVAL_MS = 30000
 
@@ -262,6 +264,13 @@ function Chip({ label, style }: { label: string; style?: React.CSSProperties }) 
 }
 
 export default function Dashboard() {
+  // Live status del LLM (GAP-3 review 2026-05-26). Polling cada 30 s
+  // para que el admin vea en el header del dashboard si Mabel está
+  // warm/cold/down sin tener que ir a /admin/config y hacer "Probar
+  // conexión" manual. La lógica es provider-aware: si el admin
+  // switcheó a Gemini, el chip refleja el estado real de Gemini.
+  const llm = useLlmPrewarm({ pollIntervalMs: 30000 })
+
   const navigate = useNavigate()
   const [data, setData] = useState<DashboardResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -445,6 +454,11 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center" style={{ gap: 12 }}>
+          {/* Chip live del estado del LLM activo. Visible siempre — el
+              admin necesita ver el motor warm/cold/down como
+              indicador operacional permanente. Distinto del student
+              donde solo muestra warnings. */}
+          <LlmStatusChip status={llm.status} provider={llm.provider} />
           {lastUpdated && (
             <p
               style={{

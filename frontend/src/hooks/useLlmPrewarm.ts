@@ -33,9 +33,17 @@ import { AxiosError } from 'axios'
 import apiClient from '../api/client'
 
 export type LlmStatus = 'unknown' | 'warm' | 'cold' | 'down'
+/**
+ * Identidad del motor LLM activo, derivada del response del backend.
+ * `null` cuando aún no se ha completado el primer check o el backend
+ * no la reportó (instalaciones pre-mig 013 / pre-provider-aware health).
+ */
+export type LlmProvider = 'mabel_gemma4' | 'gemini' | null
 
 interface UseLlmPrewarmReturn {
   status: LlmStatus
+  /** Motor activo según el backend. Null hasta el primer check exitoso. */
+  provider: LlmProvider
   /** True SOLO mientras el primer check (o un recheck()) está en vuelo.
    *  No flickea durante el polling automático. */
   checking: boolean
@@ -54,6 +62,7 @@ export default function useLlmPrewarm(
   options: UseLlmPrewarmOptions = {},
 ): UseLlmPrewarmReturn {
   const [status, setStatus] = useState<LlmStatus>('unknown')
+  const [provider, setProvider] = useState<LlmProvider>(null)
   const [checking, setChecking] = useState(false)
   const [tick, setTick] = useState(0)
   const { pollIntervalMs } = options
@@ -77,6 +86,13 @@ export default function useLlmPrewarm(
         if (cancelled) return
         const s = (res.data?.status as LlmStatus) || 'unknown'
         setStatus(s === 'warm' || s === 'cold' || s === 'down' ? s : 'unknown')
+        // Backend devuelve `provider` desde 2026-05-26 (provider-aware
+        // health). Si la instalación es vieja y no lo envía, dejamos
+        // null para que el chip no muestre sufijo.
+        const p = res.data?.provider
+        if (p === 'mabel_gemma4' || p === 'gemini') {
+          setProvider(p)
+        }
       } catch (err) {
         if (cancelled) return
         const axErr = err as AxiosError
@@ -88,6 +104,14 @@ export default function useLlmPrewarm(
         } else {
           setStatus('unknown')
         }
+        // CR-B4 (review 2026-05-26): reset provider en error de red /
+        // timeout. Sin esto, si el admin alterna provider mientras hay
+        // un poll en vuelo que falla, el state previo persiste y el
+        // chip puede mostrar contradicciones (ej. 'cold' + 'Motor
+        // activo: Gemini' — Gemini no tiene cold start). Setear null
+        // hace que el popover oculte el sufijo del motor hasta el
+        // siguiente check exitoso, mejor que mostrar info stale.
+        setProvider(null)
       } finally {
         if (!cancelled && !silent) setChecking(false)
       }
@@ -142,5 +166,5 @@ export default function useLlmPrewarm(
     }
   }, [tick, pollIntervalMs])
 
-  return { status, checking, recheck: () => setTick((t) => t + 1) }
+  return { status, provider, checking, recheck: () => setTick((t) => t + 1) }
 }

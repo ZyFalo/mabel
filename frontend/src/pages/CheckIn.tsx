@@ -3,6 +3,8 @@ import { useLocation, useNavigate, useOutletContext, useParams } from 'react-rou
 import { ArrowRight, Pencil } from 'lucide-react'
 import SosButton from '../components/ui/SosButton'
 import UmbAvatar from '../components/ui/UmbAvatar'
+import LlmStatusChip from '../components/chat/LlmStatusChip'
+import useLlmPrewarm from '../hooks/useLlmPrewarm'
 import type { StudentOutletContext } from '../types/studentOutlet'
 import apiClient from '../api/client'
 import { useChatStore } from '../stores/chatStore'
@@ -32,6 +34,16 @@ export default function CheckIn() {
   const { openCrisis } = useOutletContext<StudentOutletContext>()
   const addToast = useToastStore((s) => s.addToast)
   const createSession = useChatStore((s) => s.createSession)
+  // Pre-warm + estado del LLM mientras el estudiante rellena el
+  // formulario (GAP-2 review 2026-05-26). El check-in toma 30-90s,
+  // tiempo de oro para que Modal complete su cold start antes del
+  // primer mensaje. El chip discreto se muestra solo cuando hay algo
+  // que comunicar (cold/down).
+  // Polling 120s (CR-B9 review 2026-05-26): el check-in dura típicamente
+  // <2 min, así que el polling raramente dispara más de una vez. Con
+  // el cache server-side TTL 15s (CR-B3), incluso si dispara, suele
+  // ser cache hit sin tocar el provider externo.
+  const llm = useLlmPrewarm({ pollIntervalMs: 120000 })
   // Modo "new" (draft): no hay sesión todavía. Al submit creamos la
   // sesión + check-in atómicamente vía POST /sessions con
   // `checkin_payload`. "Saltar todo" vuelve al Home sin crear nada,
@@ -201,6 +213,19 @@ export default function CheckIn() {
           >
             ¿Cómo estás llegando hoy?
           </h1>
+          {/* Chip discreto solo cuando hay algo accionable que avisar
+              (cold/down). El estudiante puede aprovechar el tiempo del
+              check-in mientras Mabel termina de calentar. CR-B8
+              (review 2026-05-26): excluimos 'unknown' del condicional
+              para evitar CLS y "Verificando..." flicker al primer
+              mount mientras el health check inicial está en vuelo. */}
+          {llm.status !== 'warm' && llm.status !== 'unknown' && (
+            <div
+              style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}
+            >
+              <LlmStatusChip status={llm.status} provider={llm.provider} />
+            </div>
+          )}
           <p
             style={{
               fontSize: 14,

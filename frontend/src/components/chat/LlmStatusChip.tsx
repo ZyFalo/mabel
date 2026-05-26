@@ -14,10 +14,21 @@
  * texto del popover lo lee cualquier AT.
  */
 import { useEffect, useRef, useState } from 'react'
-import type { LlmStatus } from '../../hooks/useLlmPrewarm'
+import type { LlmProvider, LlmStatus } from '../../hooks/useLlmPrewarm'
 
 interface LlmStatusChipProps {
   status: LlmStatus
+  /** Motor activo según backend (opcional). Si se pasa, se renderiza
+   *  una línea adicional en el popover de detalle: "via Modal" /
+   *  "via Gemini". Útil para QA durante el piloto cuando se hace
+   *  switch admin entre motores y se necesita confirmar visualmente
+   *  cuál está respondiendo. */
+  provider?: LlmProvider
+}
+
+const PROVIDER_LABEL: Record<Exclude<LlmProvider, null>, string> = {
+  mabel_gemma4: 'Mabel-Gemma4 (Modal)',
+  gemini: 'Gemini (Google)',
 }
 
 const PRESETS: Record<
@@ -56,8 +67,9 @@ const PRESETS: Record<
   },
 }
 
-export default function LlmStatusChip({ status }: LlmStatusChipProps) {
+export default function LlmStatusChip({ status, provider }: LlmStatusChipProps) {
   const p = PRESETS[status]
+  const providerLabel = provider ? PROVIDER_LABEL[provider] : null
   const [open, setOpen] = useState(false)
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
@@ -93,7 +105,16 @@ export default function LlmStatusChip({ status }: LlmStatusChipProps) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`${p.label}. ${p.detail} Pulsa para más detalle.`}
+        // CR-B7 (review 2026-05-26): incluir el provider en el
+        // aria-label para que screen readers conozcan el motor activo
+        // SIN tener que abrir el popover. Relevante para consentimiento
+        // informado (Ley 1581 art. 4): el estudiante debe poder saber
+        // qué tercero procesa su input sin interacción extra.
+        aria-label={
+          providerLabel
+            ? `${p.label}. ${p.detail} Motor activo: ${providerLabel}. Pulsa para más detalle.`
+            : `${p.label}. ${p.detail} Pulsa para más detalle.`
+        }
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -154,6 +175,19 @@ export default function LlmStatusChip({ status }: LlmStatusChipProps) {
             {p.label}
           </div>
           {p.detail}
+          {providerLabel && (
+            <div
+              style={{
+                marginTop: 8,
+                paddingTop: 8,
+                borderTop: '1px solid var(--ink-100)',
+                fontSize: 11.5,
+                color: 'var(--ink-500)',
+              }}
+            >
+              Motor activo: <strong>{providerLabel}</strong>
+            </div>
+          )}
         </div>
       )}
     </span>

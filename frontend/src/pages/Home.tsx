@@ -20,6 +20,7 @@ import { usePreferencesStore } from '../stores/preferencesStore'
 import useLlmPrewarm from '../hooks/useLlmPrewarm'
 import { useToastStore } from '../stores/toastStore'
 import Composer from '../components/chat/Composer'
+import LlmStatusChip from '../components/chat/LlmStatusChip'
 import SuggestionChip from '../components/chat/SuggestionChip'
 import UmbAvatar from '../components/ui/UmbAvatar'
 import SosButton from '../components/ui/SosButton'
@@ -61,12 +62,17 @@ export default function Home() {
   const user = useAuthStore((s) => s.user)
   const createSession = useChatStore((s) => s.createSession)
   const addToast = useToastStore((s) => s.addToast)
-  // Pre-warm fire-and-forget: si Modal está cold, este ping arranca
-  // el cold start en paralelo a que la persona lee el saludo y elige
-  // su sugerencia. No usamos `status` aquí porque Home no muestra
-  // banner — el indicador vive en Chat/Voice cuando ya estamos
-  // dentro de la sesión.
-  useLlmPrewarm()
+  // Pre-warm + status: el ping arranca el cold start de Modal en
+  // paralelo a que la persona lee el saludo y elige su sugerencia, y
+  // el chip discreto le avisa antes de hacer click si Mabel está
+  // dormida y va a tardar (GAP-1 review 2026-05-26).
+  // Polling 120s (CR-B9 review 2026-05-26): Home no es página de
+  // espera activa, 30s era amplificación injustificada — 4h de
+  // tab abierta serían 480 calls vs 120 con este intervalo. El cache
+  // server-side TTL 15s del backend (CR-B3) absorbe la diferencia
+  // sin notar latencia: aunque el frontend pollea cada 120s, el
+  // estado real puede haber sido refresh hace 1s desde otro caller.
+  const llm = useLlmPrewarm({ pollIntervalMs: 120000 })
 
   // Read the user's check-in preference so the "Llenar check-in" CTA
   // only renders for students who have it enabled. If `checkin_enabled`
@@ -226,6 +232,28 @@ export default function Home() {
         >
           {greetingText}
         </h1>
+
+        {/* Chip discreto de estado del LLM (GAP-1 review 2026-05-26).
+            Visible solo cuando hay algo accionable que el usuario debería
+            saber: cold (Modal despertando) o down (Mabel no disponible).
+            CR-B8 (review 2026-05-26): excluimos también 'unknown' del
+            render para evitar que aparezca el chip parpadeante
+            "Verificando..." durante los 1-15 s del primer check, lo
+            que producía CLS (layout shift) y ruido visual gratuito
+            sobre el saludo en el 100% de las cargas. El admin Dashboard
+            sí muestra el chip en 'unknown' (siempre visible) porque
+            ahí es indicador operacional permanente. */}
+        {llm.status !== 'warm' && llm.status !== 'unknown' && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              marginBottom: 14,
+            }}
+          >
+            <LlmStatusChip status={llm.status} provider={llm.provider} />
+          </div>
+        )}
 
         <p
           style={{
