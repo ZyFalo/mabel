@@ -36,8 +36,16 @@ export default function SosButton({
     variant === 'floating'
       ? {
           position: 'fixed',
-          top: 12,
-          right: 12,
+          // CR (bug PWA iPhone notch 2026-05-26): `top: calc(12px +
+          // var(--safe-top))` posiciona el botón DEBAJO del notch en
+          // PWA standalone. Antes era `top: 12` absoluto, lo que
+          // hacía que el SOS rojo cayera DENTRO del área del notch y
+          // quedara visualmente fundido con la mini-banda brand roja
+          // del StudentLayout (también roja → invisible). El var
+          // `--safe-top` cae a 0px en devices sin notch (Android, web
+          // desktop) preservando la posición original.
+          top: 'calc(12px + var(--safe-top))',
+          right: 'calc(12px + var(--safe-right))',
           zIndex: 35,
         }
       : {}
