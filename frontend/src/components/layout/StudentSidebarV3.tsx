@@ -587,7 +587,27 @@ export default function StudentSidebarV3({
         // their own grid-template-columns trick).
       }}
     >
-      {/* Brand header — Avatar M anchored left, label fades */}
+      {/* Mini-banda brand SOLO en mobileDrawer: cubre el área del notch
+          DENTRO del sidebar para que cuando el drawer está abierto y
+          tapa la mini-banda externa del StudentLayout, el status bar
+          de iOS siga teniendo fondo brand red (texto blanco legible
+          en vez de texto blanco sobre el ink-50 del aside). Mismo
+          gradient que la banda externa para continuidad visual.
+          Bug reportado 2026-05-26 captura sidebar mobile. */}
+      {mobileDrawer && (
+        <div
+          aria-hidden
+          style={{
+            height: 'var(--safe-top)',
+            background:
+              'linear-gradient(160deg, var(--mabel-700) 0%, var(--mabel-600) 60%, var(--mabel-800) 100%)',
+            flexShrink: 0,
+          }}
+        />
+      )}
+      {/* Brand header — Avatar M anchored left, label fades.
+          En mobileDrawer NO añadimos safe-top al padding porque la
+          mini-banda de arriba ya empuja el header debajo del notch. */}
       <div
         style={{
           padding: isOpen ? '14px 16px' : '14px 0',
