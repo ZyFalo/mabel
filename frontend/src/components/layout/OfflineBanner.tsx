@@ -15,9 +15,13 @@ import { useEffect, useState } from 'react'
  *     voz nueva, hacer login/registro.
  *
  * Se monta en el root layout (App.tsx) para cubrir todas las rutas
- * autenticadas. Z-index 30: queda DEBAJO de SosButton (35) y de
- * SosPanel modal (50) — si hay crisis activa, el panel SOS prima
- * sobre la notificación de conectividad.
+ * autenticadas. Z-index 40: queda ENCIMA de SosButton floating (35)
+ * porque comparten área visual (ambos arriba del notch) y el banner
+ * de conectividad es el evento más prioritario cuando aparece —
+ * sin red el SOS panel tampoco funciona (depende de líneas externas
+ * y, en su panel, del chat). El SosPanel modal (z:50) sigue por
+ * encima si hay crisis activa concurrente con offline.
+ * CR-C4 review 2026-05-27.
  */
 export default function OfflineBanner() {
   const [offline, setOffline] = useState<boolean>(() => {
@@ -51,7 +55,7 @@ export default function OfflineBanner() {
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 30,
+        zIndex: 40,
         background: 'var(--warn-600, #D97706)',
         color: '#FFFFFF',
         // CR-A2 (review 2026-05-26): respetar safe-area-inset para que

@@ -590,13 +590,14 @@ export default function StudentSidebarV3({
       {/* Mini-banda brand SOLO en mobileDrawer: cubre el área del notch
           DENTRO del sidebar para que cuando el drawer está abierto y
           tapa la mini-banda externa del StudentLayout, el status bar
-          de iOS siga teniendo fondo brand red (texto blanco legible
-          en vez de texto blanco sobre el ink-50 del aside). Mismo
-          gradient que la banda externa para continuidad visual.
-          Bug reportado 2026-05-26 captura sidebar mobile. */}
+          de iOS siga teniendo fondo brand red.
+          Comparte la clase `.pwa-notch-band` con la banda externa —
+          ambas se renderizan solo cuando `@media (display-mode:
+          standalone)` (CR-C3 review 2026-05-27). */}
       {mobileDrawer && (
         <div
           aria-hidden
+          className="pwa-notch-band"
           style={{
             height: 'var(--safe-top)',
             background:

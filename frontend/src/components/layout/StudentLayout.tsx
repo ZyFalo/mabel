@@ -110,21 +110,30 @@ export default function StudentLayout() {
   return (
     <div className="h-screen flex flex-col bg-[var(--ink-50)]">
       {/* Mini-banda brand para cubrir el área del notch en PWA mobile.
-          StudentLayout NO renderiza Header.tsx en mobile (usa solo el
-          FAB hamburger flotante), así que sin esta banda el área del
-          notch quedaría con el fondo claro del body y el status bar
-          de iOS (black-translucent) se vería con texto oscuro sobre
-          blanco — mal contraste y sin separación visual del header.
-          Solo visible en mobile + cuando hay safe-area (iPhone notch).
-          Bug reportado 2026-05-26 captura Home mobile. */}
+          StudentLayout NO renderiza header rojo en mobile (usa solo el
+          FAB hamburger), así que sin esta banda el notch quedaría con
+          el fondo claro del body y el status bar de iOS (black-
+          translucent) tendría mal contraste.
+
+          CR-C1 (review 2026-05-27): la banda es IN-FLOW (flexShrink: 0),
+          NO `position: fixed`. Sin esto, el `<main>` empezaba en
+          top:0 del viewport y los headers internos de las pages
+          (Chat "Session header bar" con chip LLM + SOS + voz + menú;
+          SessionDetail "Volver") quedaban tapados por la banda
+          fixed en sus primeros ~44px (área del notch).
+
+          CR-C3: gated por `@media (display-mode: standalone)` en CSS
+          para evitar flicker pop-in en Safari iOS no-instalado, donde
+          env(safe-area-inset-top) cambia al ocultar la URL bar. */}
       {isMobile && (
         <div
           aria-hidden
-          className="fixed top-0 left-0 right-0 z-20"
+          className="pwa-notch-band"
           style={{
             height: 'var(--safe-top)',
             background:
               'linear-gradient(160deg, var(--mabel-700) 0%, var(--mabel-600) 60%, var(--mabel-800) 100%)',
+            flexShrink: 0,
           }}
         />
       )}

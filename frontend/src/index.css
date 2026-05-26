@@ -266,6 +266,22 @@ html {
    DOBLE inset cuando el header también lo aplicaba (gap blanco
    visible arriba del header rojo en PWA standalone). */
 
+/* PWA notch band — solo visible cuando la app corre en standalone
+   (PWA instalada). En Safari iOS tab normal, env(safe-area-inset-top)
+   cambia al ocultar la URL bar, lo que producía un "pop-in" flicker
+   de la banda. En modo browser tab, el navegador ya muestra su
+   propia UI arriba y NO necesitamos pintar el notch. CR-C3 review
+   2026-05-27. La clase se aplica a la banda del StudentLayout y a
+   la banda interna del sidebar drawer. */
+.pwa-notch-band {
+  display: none;
+}
+@media (display-mode: standalone) {
+  .pwa-notch-band {
+    display: block;
+  }
+}
+
 button, input, select, textarea {
   font: inherit;
   color: inherit;
