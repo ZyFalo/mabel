@@ -41,6 +41,7 @@ import { useAuthStore } from './stores/authStore'
 function SessionExpiredHandler() {
   const [showExpired, setShowExpired] = useState(false)
   const navigate = useNavigate()
+  const logout = useAuthStore((s) => s.logout)
 
   useEffect(() => {
     setOnSessionExpired(() => setShowExpired(true))
@@ -51,6 +52,15 @@ function SessionExpiredHandler() {
       open={showExpired}
       onLogin={() => {
         setShowExpired(false)
+        // Bug fix 2026-05-26: además de navigate, sincronizar el Zustand
+        // con la limpieza de localStorage que ya hizo el axios
+        // interceptor. Sin esto, el store seguía con
+        // `isAuthenticated:true`, PublicRoute redirigía al /home según
+        // role, /home disparaba otro 401, el modal volvía a aparecer
+        // → loop visible reportado por usuario en /consent-required
+        // tras revocar consent. `logout()` resetea el store y permite
+        // que PublicRoute deje pasar a /login limpio.
+        logout()
         navigate('/login')
       }}
     />
