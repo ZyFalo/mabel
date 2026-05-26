@@ -456,8 +456,26 @@ button, input, select, textarea {
    Settings modal — responsive (<768px). Desktop sin cambios.
    El sidebar de 280px no cabe en mobile, asi que se transforma en
    barra superior horizontal scrolleable + el contenido pasa debajo.
+
+   Redesign mobile 2026-05-26: respetar safe-area-inset top/bottom
+   (notch + home indicator iOS PWA), eliminar el breadcrumb header
+   redundante, exponer close button prominente en la barra superior,
+   y dejar el contenido fullscreen sin padding del backdrop.
    ============================================================ */
+
+/* Close button del sidebar header: visible SOLO en mobile. En desktop
+   el close vive en el breadcrumb header del content area (coherente
+   con el split layout). */
+.settings-sidebar-close-mobile {
+  display: none;
+}
+
 @media (max-width: 768px) {
+  /* Modal fullscreen sin padding del backdrop — antes el wrapper
+     tenía padding: 24 del nivel JSX, dejando un margen feo. */
+  .settings-modal-backdrop {
+    padding: 0 !important;
+  }
   .settings-modal-shell {
     flex-direction: column !important;
     height: 100% !important;
@@ -465,6 +483,9 @@ button, input, select, textarea {
     max-height: 100vh !important;
     border-radius: 0 !important;
     border: 0 !important;
+    /* `safe-bottom` se aplica al SaveBar interno, no al shell
+       (el shell se expande hasta el bottom para que el background
+       blanco cubra todo, sin gap). */
   }
   .settings-sidebar {
     width: 100% !important;
@@ -473,12 +494,20 @@ button, input, select, textarea {
     border-bottom: 1px solid var(--ink-200) !important;
     flex-direction: column !important;
   }
+  /* Header del sidebar es la barra superior fija en mobile.
+     `padding-top` incluye safe-area-inset-top para que el reloj /
+     notch de iOS no tape el título "Ajustes / Preferencias". */
   .settings-sidebar-header {
-    padding: 14px 16px 10px !important;
+    padding: calc(14px + var(--safe-top)) 16px 10px !important;
     border-bottom: 1px solid var(--ink-200) !important;
   }
   .settings-sidebar-header-title {
     font-size: 16px !important;
+  }
+  /* Close button visible en mobile dentro del header del sidebar. */
+  .settings-sidebar-close-mobile {
+    display: inline-flex !important;
+    flex-shrink: 0;
   }
   .settings-nav-list {
     flex-direction: row !important;
@@ -496,11 +525,17 @@ button, input, select, textarea {
     flex: 1 1 auto !important;
     min-height: 0 !important;
   }
+  /* Breadcrumb redundante en mobile: ya tenemos la nav-list con la
+     tab activa visible arriba. Ocultar el breadcrumb "Ajustes /
+     Privacidad / ×" libera ~50px de vertical y elimina el "doble
+     header" feo. El close × ahora vive en el sidebar header. */
   .settings-breadcrumb-header {
-    padding: 12px 16px !important;
+    display: none !important;
   }
+  /* Content padding + safe-area-bottom para que el SaveBar interno
+     y el contenido no queden bajo el home indicator de iOS. */
   .settings-content-inner {
-    padding: 16px !important;
+    padding: 16px 16px calc(16px + var(--safe-bottom)) !important;
   }
 }
 

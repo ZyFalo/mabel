@@ -427,7 +427,7 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
 
   return (
     <div
-      className="fade-in"
+      className="fade-in settings-modal-backdrop"
       style={{
         position: 'fixed',
         inset: 0,
@@ -477,30 +477,44 @@ export default function Settings({ open, onClose, initialTab: initialTabProp = '
             style={{
               padding: '20px 18px 14px',
               borderBottom: '1px solid var(--ink-200)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 12,
             }}
           >
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'var(--ink-400)',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                marginBottom: 6,
-              }}
-            >
-              Ajustes
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: 'var(--ink-400)',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  marginBottom: 6,
+                }}
+              >
+                Ajustes
+              </div>
+              <div
+                className="settings-sidebar-header-title"
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: 'var(--ink-900)',
+                  letterSpacing: '-0.015em',
+                }}
+              >
+                Preferencias
+              </div>
             </div>
-            <div
-              className="settings-sidebar-header-title"
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: 'var(--ink-900)',
-                letterSpacing: '-0.015em',
-              }}
-            >
-              Preferencias
+            {/* Close × visible solo en mobile (CSS @media). El header
+                del sidebar es la barra superior fija en mobile, así que
+                queda visible siempre. En desktop, el close vive en el
+                breadcrumb del content area (más coherente con split
+                layout). Redesign mobile 2026-05-26. */}
+            <div className="settings-sidebar-close-mobile">
+              <CloseButton onClose={handleClose} />
             </div>
           </div>
           <nav
