@@ -38,8 +38,17 @@ export default function RevokeConsentModal({
     setLoading(true)
     try {
       await apiClient.patch('/consents/current', { action: 'revoke' })
-      localStorage.removeItem('mabel_token')
-      localStorage.removeItem('mabel_user')
+      // NO borramos el token: el JWT sigue siendo válido tras revocar
+      // (la sesión sigue siendo del mismo usuario, solo cambia el
+      // estado del consent). Borrar el token + navigate provocaba un
+      // loop: ConsentRequired.tsx pegaba a /users/me/consent-status
+      // sin Authorization → 401 → SessionExpiredModal → click "Ir al
+      // login" → PublicRoute leía isAuthenticated:true del Zustand
+      // (no se había limpiado) → redirect a /home → otro 401 → loop.
+      // Bug fix 2026-05-25.
+      // El backend (`require_consent`) responderá 403 con
+      // detail.consent_status='revoked' en la próxima ruta protegida;
+      // ConsentRequired carga su variante "revoked" sin problema.
       navigate('/consent-required')
     } catch {
       addToast({ type: 'error', message: 'Error al revocar consentimiento' })

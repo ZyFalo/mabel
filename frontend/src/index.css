@@ -192,10 +192,17 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  /* El scroll de la app se contiene a los `<main>` internos (los layouts
-     usan flex con overflow-y-auto). Evitamos que el body funcione como
-     un scroll alternativo cuando algún descendiente excede `h-screen`. */
-  overflow: hidden;
+  /* Permitimos scroll vertical natural del body para páginas públicas
+     cuyo contenido excede el viewport en mobile (Consent, Onboarding,
+     Login con form largo). Antes era `overflow: hidden` global, lo
+     que en mobile clipeaba la pantalla de aceptar consentimiento y
+     dejaba al usuario sin forma de llegar al botón "Aceptar". Los
+     layouts autenticados (Student/Admin) usan `h-screen` con
+     `overflow-y-auto` en su propio `<main>`, así que el body como
+     scroll alternativo no se activa ahí (el contenido ocupa
+     exactamente 100vh y nunca excede). Bug fix 2026-05-25. */
+  overflow-x: hidden;
+  overflow-y: auto;
   /* iOS Safari + Android Chrome: previene auto-zoom al rotar el
      dispositivo. El "ligero zoom+" reportado en mobile (2026-05-25) era
      consecuencia de esta heurística móvil sumada a algún input con
