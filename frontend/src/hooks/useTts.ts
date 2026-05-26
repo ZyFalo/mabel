@@ -104,17 +104,47 @@ export default function useTts() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const cancelledRef = useRef(false)
+  // Última solicitud de TTS — guardamos texto + voice para poder
+  // re-disparar la reproducción cuando el usuario desmutea mientras
+  // Mabel estaba hablando (bug 2026-05-27). Se sobreescribe cada
+  // vez que llega un nuevo mensaje a reproducir, así que el replay
+  // siempre apunta al último mensaje del assistant, no a uno viejo.
+  const lastSpeechRef = useRef<{ text: string; voice?: string } | null>(null)
+
+  // Forward declaration por hoisting: toggleMute usa playTtsInternal,
+  // que se define más abajo y a su vez puede ser invocada por el
+  // efecto del unmute. useRef rompe la dependencia circular sin
+  // cambiar la API pública del hook.
+  const playTtsRef = useRef<
+    ((text: string, voice?: string) => Promise<number>) | null
+  >(null)
 
   const toggleMute = useCallback(() => {
     setIsMuted((prev) => {
       const next = !prev
       localStorage.setItem(MUTE_KEY, String(next))
       if (next) {
+        // Mute → cancelar reproducción en vuelo. El texto queda en
+        // lastSpeechRef para poder replay al desmutear.
         cancelledRef.current = true
         if (abortRef.current) abortRef.current.abort()
         if (audioRef.current) {
           audioRef.current.pause()
           audioRef.current = null
+        }
+      } else {
+        // Desmute → si hay un mensaje guardado, replay desde el
+        // inicio. La UX esperada (reportada 2026-05-27): "cuando
+        // muteo y desmuteo mientras Mabel habla, debería volver a
+        // escucharla nuevamente". Reset desde el inicio porque
+        // pausar/reanudar exacto requeriría persistir el blob
+        // del audio actual y su currentTime, mientras que con
+        // sentence-streaming el blob cambia cada frase y la
+        // posición se vuelve ambigua.
+        const last = lastSpeechRef.current
+        if (last && playTtsRef.current) {
+          // Async fire-and-forget — el setState ya devolvió `next`.
+          void playTtsRef.current(last.text, last.voice)
         }
       }
       return next
@@ -149,7 +179,23 @@ export default function useTts() {
               return
             }
             const durationMs = Math.round(audio.duration * 1000)
-            audio.play().catch(() => resolve(0))
+            // Loguear errores específicos de play() — iOS Safari PWA
+            // bloquea autoplay sin user gesture activo y rechaza
+            // con NotAllowedError. Bug PWA 2026-05-27: antes el
+            // catch swallowea silenciosamente y el usuario veía que
+            // no sonaba sin pista del por qué. Ahora el error sale
+            // a la consola con nombre + mensaje para diagnóstico.
+            audio.play().catch((playErr: Error) => {
+              console.error(
+                '[useTts] audio.play() failed:',
+                playErr?.name || 'Unknown',
+                '-',
+                playErr?.message || playErr,
+              )
+              URL.revokeObjectURL(url)
+              if (audioRef.current === audio) audioRef.current = null
+              resolve(0)
+            })
             audio.onended = () => {
               URL.revokeObjectURL(url)
               if (audioRef.current === audio) audioRef.current = null
@@ -178,6 +224,10 @@ export default function useTts() {
 
   const playTts = useCallback(
     async (text: string, voice?: string): Promise<number> => {
+      // Guardar la solicitud ANTES del check de mute. Si el usuario
+      // mutea y luego desmutea, queremos que el replay encuentre
+      // el texto aquí (mismo último mensaje que NO se reprodujo).
+      lastSpeechRef.current = { text, voice }
       if (isMuted) return 0
       cancelledRef.current = false
       const cleaned = sanitizeForTts(text)
@@ -196,6 +246,11 @@ export default function useTts() {
     },
     [isMuted, playOneSentence],
   )
+
+  // Conectar el ref con la callback estable. El ref es la única
+  // forma de invocar playTts desde toggleMute sin crear una
+  // dependencia circular en el useCallback de toggleMute.
+  playTtsRef.current = playTts
 
   const stopTts = useCallback(() => {
     cancelledRef.current = true

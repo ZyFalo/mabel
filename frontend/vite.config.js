@@ -76,6 +76,19 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
         runtimeCaching: [
           {
+            // Endpoints de audio: TTS (Piper synth → blob audio),
+            // ASR (Whisper transcribe), voice (modal voz). Explicit
+            // NetworkOnly para que workbox NO transforme la response
+            // ni añada headers de cache que rompan el blob audio en
+            // iOS Safari PWA. Reportado 2026-05-27: TTS no reproducía
+            // audio en PWA mobile aunque funcionaba en browser tab —
+            // probable que un fetch handler intermedio del SW estuviera
+            // alterando el blob.
+            urlPattern: ({ url }) =>
+              /^\/api\/v1\/(tts|asr|voice)\b/.test(url.pathname),
+            handler: 'NetworkOnly',
+          },
+          {
             // GET /api/v1/sessions* (listing, detalle y mensajes
             // históricos) → NetworkFirst con fallback cache:
             // online siempre trae fresh; offline muestra la última
