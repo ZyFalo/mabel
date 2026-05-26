@@ -109,15 +109,38 @@ export default function StudentLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-[var(--ink-50)]">
+      {/* Mini-banda brand para cubrir el área del notch en PWA mobile.
+          StudentLayout NO renderiza Header.tsx en mobile (usa solo el
+          FAB hamburger flotante), así que sin esta banda el área del
+          notch quedaría con el fondo claro del body y el status bar
+          de iOS (black-translucent) se vería con texto oscuro sobre
+          blanco — mal contraste y sin separación visual del header.
+          Solo visible en mobile + cuando hay safe-area (iPhone notch).
+          Bug reportado 2026-05-26 captura Home mobile. */}
+      {isMobile && (
+        <div
+          aria-hidden
+          className="fixed top-0 left-0 right-0 z-20"
+          style={{
+            height: 'var(--safe-top)',
+            background:
+              'linear-gradient(160deg, var(--mabel-700) 0%, var(--mabel-600) 60%, var(--mabel-800) 100%)',
+          }}
+        />
+      )}
       {/* Mobile floating hamburger — solo cuando el sidebar esta cerrado en mobile.
-          Desktop/tablet usan el toggle propio del sidebar; admin mantiene su header. */}
+          Desktop/tablet usan el toggle propio del sidebar; admin mantiene su header.
+          `top: calc(12px + var(--safe-top))` posiciona el botón DEBAJO del notch,
+          alineado con el área visible (sin el botón quedaría tapado por
+          la mini-banda brand). */}
       {isMobile && !sidebarOpen && (
         <button
           onClick={toggleSidebar}
           aria-label="Abrir menu"
           title="Abrir menu"
-          className="fixed top-3 left-3 z-30 p-2 rounded-lg shadow-sm transition-opacity hover:opacity-80"
+          className="fixed left-3 z-30 p-2 rounded-lg shadow-sm transition-opacity hover:opacity-80"
           style={{
+            top: 'calc(12px + var(--safe-top))',
             backgroundColor: '#fff',
             color: 'var(--ink-900)',
             borderWidth: '1px',
