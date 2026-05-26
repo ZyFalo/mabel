@@ -234,6 +234,18 @@ html {
      scroll horizontal local (ej. tabla admin scrolleable), debe contener
      el scroll en su propio wrapper con `overflow-x: auto`. */
   overflow-x: hidden;
+  /* PWA iOS rubber-band fix (reportado 2026-05-27): iOS Safari
+     permite "elastic scroll" del body en PWA standalone — al
+     arrastrar desde arriba, el body se desplaza y revela el área
+     debajo del notch sin la mini-banda brand cubriéndola, dejando
+     ver el status bar sobre fondo blanco. `overscroll-behavior-y:
+     none` desactiva el rubber band Y el pull-to-refresh nativo.
+     Aplicado al `html` (no solo body) porque iOS toma el outer
+     elemento como ancla del bounce. */
+  overscroll-behavior-y: none;
+}
+body {
+  overscroll-behavior-y: none;
 }
 
 /* iOS Safari aplica un AUTOZOOM al hacer focus en inputs con font-size

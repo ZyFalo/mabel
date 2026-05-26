@@ -22,14 +22,12 @@ export default function SaveBar({
       style={{
         marginTop: 12,
         paddingTop: 18,
-        // CR-C2 (review 2026-05-27): paddingBottom respeta el
-        // safe-area del home indicator de iOS PWA. El comment del
-        // index.css §Settings prometía que el SaveBar tenía esto;
-        // antes no. Sin el inset, el botón "Guardar cambios" sit
-        // bajo el home indicator y se ve clipped visualmente. En
-        // devices sin home indicator (Android, desktop) el var
-        // cae a 0px y no hay padding extra.
-        paddingBottom: 'var(--safe-bottom)',
+        // Decisión PO 2026-05-27 (revertido CR-C2): NO reservar
+        // safe-area-bottom. El usuario prefiere consistencia con
+        // el resto de la app (commit c826b84) — sin franja blanca
+        // al fondo. El botón "Guardar cambios" puede solaparse
+        // visualmente con el home indicator de iOS pero sigue
+        // tappable (iOS solo reserva el gesto swipe, no taps).
         borderTop: '1px solid var(--ink-100)',
       }}
     >
