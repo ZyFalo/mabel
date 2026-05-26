@@ -224,14 +224,22 @@ html {
 
 /* iOS Safari aplica un AUTOZOOM al hacer focus en inputs con font-size
    < 16px (regla histórica de WebKit para legibilidad). Eso reposiciona
-   el viewport y se siente como un "ligero zoom" indeseado. Forzamos
-   16px en mobile para neutralizarlo SIN tocar la tipografía visual del
-   resto de la UI. Aplica a TODOS los controles editables. */
+   el viewport y el layout entero se ve desplazado (texto recortado por
+   la izquierda, header descolocado) — bug reportado 2026-05-26 en
+   iPhone 13 Pro PWA pantalla de Login.
+
+   `!important` es necesario aquí porque muchos componentes de la app
+   (Input.tsx, Composer.tsx, ReportModal.tsx, etc.) declaran fontSize
+   inline en estilo (~14-15px) — los inline styles ganan sobre CSS
+   normal y dejarían el bug activo en mobile. La regla cubre TODOS
+   los controles editables del proyecto de una sola vez sin tener que
+   tocar cada archivo. No afecta desktop (>640px) donde el inline 14px
+   se mantiene. */
 @media (max-width: 640px) {
   input,
   select,
   textarea {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
 
